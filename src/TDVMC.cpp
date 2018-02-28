@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
 	}
 
 	val = 0;
-	cout << "finish d " << val << endl;
+	cout << "finish " << val << endl;
 	return val;
 }
 
