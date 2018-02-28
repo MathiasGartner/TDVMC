@@ -44,7 +44,7 @@ all: TDVMC
 TDVMC: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C++ Linker'
-	mpic++  -o "TDVMC" $(OBJS) $(USER_OBJS) $(LIBS)
+	mpic++ -L/usr/include/jsoncpp -o "TDVMC" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
