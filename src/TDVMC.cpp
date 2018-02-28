@@ -1,13 +1,3 @@
-/*
- ============================================================================
- Name        : TDVMC.c
- Author      : Mathias Gartner
- Version     :
- Copyright   : 
- Description :
- ============================================================================
- */
-
 #include <chrono>
 #include "Constants.h"
 #include <cstring>
@@ -168,6 +158,7 @@ void PrintConfig()
 
 void ReadConfig(string filePath)
 {
+	cout << "file exits: " << FileExist(filePath) << "." << endl;
 	Json::Value configData;
 	Json::Reader configReader;
 	ifstream configFile(filePath, ifstream::binary);
@@ -472,7 +463,7 @@ bool LoadLastPositionsFromFile(string filename, double** R)
 	string prevline;
 	vector<string> coordinates;
 	ifstream file;
-	file.open("./" + filename + ".csv", ios::in);
+	file.open("./config/" + filename + ".csv", ios::in);
 	while (getline(file, line))
 	{
 		prevline = line;
@@ -510,7 +501,7 @@ void InitCoordinateConfiguration(double** R)
 	if (!LoadLastPositionsFromFile(filename, R))
 	{
 		cout << "LBOX=" << LBOX << endl;
-		int type = 1;
+		int type = 2;
 		if (type == 0)
 		{
 			//Random

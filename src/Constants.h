@@ -1,8 +1,5 @@
 #pragma once
 
-#define USE_MPI
-//#define RUN_TESTS
-
 #include <math.h>
 #include <string>
 #include <vector>

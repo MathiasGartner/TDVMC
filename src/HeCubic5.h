@@ -157,7 +157,7 @@ void InitSystem()
 		grBinVolumes[i] = grBinVolumes[i] - grBinVolumes[i - 1];
 	}
 
-	kValues = ReadFromFile("./bin/kVectors.json", 0);
+	kValues = ReadFromFile("./config/kVectors.json", 0);
 	for (int k = 0; k < numOfkValues; k++)
 	{
 		for (unsigned int kn = 0; kn < kValues[k].size(); kn++)

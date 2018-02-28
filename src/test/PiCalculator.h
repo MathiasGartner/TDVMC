@@ -1,9 +1,3 @@
-/*
- * PiCalculator.h
- *
- *  Created on: 27.02.2018
- *      Author: Mathias Gartner
- */
 #pragma once
 
 #include <math.h>
