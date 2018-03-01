@@ -4,13 +4,22 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
-../src/TDVMC.cpp 
+../src/HeDrop.cpp \
+../src/MathOperators.cpp \
+../src/TDVMC.cpp \
+../src/Utils.cpp 
 
 OBJS += \
-./src/TDVMC.o 
+./src/HeDrop.o \
+./src/MathOperators.o \
+./src/TDVMC.o \
+./src/Utils.o 
 
 CPP_DEPS += \
-./src/TDVMC.d 
+./src/HeDrop.d \
+./src/MathOperators.d \
+./src/TDVMC.d \
+./src/Utils.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes

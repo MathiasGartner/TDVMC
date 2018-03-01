@@ -4,6 +4,7 @@
 #include <ctime>
 #include <fstream>
 #include "HeDrop5.h"
+#include "HeDrop.h"
 #include <iomanip>
 #include <json/json.h>
 #include <math.h>
@@ -77,6 +78,7 @@ vector<double> phiIList;
 vector<double> AllLocalEnergyR;
 vector<vector<double> > AllOtherExpectationValues;
 vector<vector<double> > AllParametersR;
+vector<vector<double> > AllParametersI;
 vector<vector<double> > AllAdditionalSystemProperties;
 
 default_random_engine generator;
@@ -1028,10 +1030,10 @@ void CalculateNextParametersEuler(double* uR, double* uI, double *phiR, double *
 		for (int i = 0; i < N_PARAM; i++)
 		{
 			uR[i] = uR[i] + uDotR[i] * TIMESTEP;
-			//uI[i] = uI[i] + uDotI[i] * TIMESTEP;
+			uI[i] = uI[i] + uDotI[i] * TIMESTEP;
 		}
 		*phiR = *phiR + phiDotR * TIMESTEP;
-		//*phiI = *phiI + phiDotI * TIMESTEP;
+		*phiI = *phiI + phiDotI * TIMESTEP;
 	}
 }
 
@@ -1468,6 +1470,7 @@ int mainMPI(int argc, char** argv)
 			AllLocalEnergyR.push_back(localEnergyR);
 			AllOtherExpectationValues.push_back(otherExpectationValues);
 			AllParametersR.push_back(ArrayToVector(uR, N_PARAM));
+			AllParametersI.push_back(ArrayToVector(uI, N_PARAM));
 		}
 		if (Sys::USE_PHI)
 		{
@@ -1493,6 +1496,7 @@ int mainMPI(int argc, char** argv)
 				WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER", 100);
 				WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", "kinetic, potential, wf, g(r)", 100);
 				WriteDataToFile(AllParametersR, "AllParametersR", "uR", 100);
+				WriteDataToFile(AllParametersI, "AllParametersI", "uI", 100);
 			}
 		}
 		if (FileExist("./stop"))
@@ -1516,10 +1520,12 @@ int mainMPI(int argc, char** argv)
 		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER");
 		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", "kinetic, potential, wf, g(r)");
 		WriteDataToFile(AllParametersR, "AllParametersR", "uR");
+		WriteDataToFile(AllParametersI, "AllParametersI", "uI");
 
 		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR100", "ER", 100);
 		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues100", "kinetic, potential, wf, g(r)", 100);
 		WriteDataToFile(AllParametersR, "AllParametersR100", "uR", 100);
+		WriteDataToFile(AllParametersI, "AllParametersI100", "uI", 100);
 	}
 
 	nAcceptances = 0;
