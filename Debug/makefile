@@ -47,17 +47,12 @@ TDVMC: $(OBJS) $(USER_OBJS)
 	mpic++ -L/usr/include/jsoncpp -o "TDVMC" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
-	$(MAKE) --no-print-directory post-build
 
 # Other Targets
 clean:
 	-$(RM) $(CC_DEPS)$(C++_DEPS)$(EXECUTABLES)$(C_UPPER_DEPS)$(CXX_DEPS)$(OBJS)$(CPP_DEPS)$(C_DEPS) TDVMC
 	-@echo ' '
 
-post-build:
-	-cp -a ../config ./config
-	-@echo ' '
-
-.PHONY: all clean dependents post-build
+.PHONY: all clean dependents
 
 -include ../makefile.targets

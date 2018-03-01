@@ -3,7 +3,7 @@
 #include <cstring>
 #include <ctime>
 #include <fstream>
-#include "HeCubic5.h"
+#include "HeDrop5.h"
 #include <iomanip>
 #include <json/json.h>
 #include <math.h>
@@ -463,7 +463,7 @@ bool LoadLastPositionsFromFile(string filename, double** R)
 	string prevline;
 	vector<string> coordinates;
 	ifstream file;
-	file.open("./config/" + filename + ".csv", ios::in);
+	file.open("../config/" + filename + ".csv", ios::in);
 	while (getline(file, line))
 	{
 		prevline = line;
@@ -1362,7 +1362,8 @@ int mainMPI(int argc, char** argv)
 				MPI_Abort(MPI_COMM_WORLD, 0);
 				return 1;
 			}
-			ReadConfig(argv[1]);
+			//ReadConfig(argv[1]);
+			ReadConfig("/home/gartner/Sources/TDVMC/config/drop_6.config");
 			CreateOutputDirectory(argv[1]);
 		}
 		//PrintConfig();
