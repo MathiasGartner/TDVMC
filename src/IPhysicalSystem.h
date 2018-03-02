@@ -7,6 +7,7 @@ using namespace std;
 class IPhysicalSystem
 {
 protected:
+	double time;
 	double wf;
 	double wfNew;
 	double exponent;
@@ -26,27 +27,30 @@ protected:
 public:
 	IPhysicalSystem()
 	{
+		this->time = 0;
 	}
 
 	virtual ~IPhysicalSystem()
 	{
 	}
 
-	virtual double GetWf() { return wf; }
-	virtual double GetWfNew() { return wfNew; }
-	virtual double GetExponent() { return exponent; }
+	double GetTime() { return time; }
+	void SetTime(double t) { this->time = time; }
+	double GetWf() { return wf; }
+	double GetWfNew() { return wfNew; }
+	double GetExponent() { return exponent; }
 
-	virtual double GetLocalEnergyR() { return localEnergyR; }
-	virtual double GetLocalEnergyI() { return localEnergyI; }
-	virtual vector<double> GetLocalOperators() { return localOperators; }
-	virtual vector<vector<double> > GetLocalOperatorsMatrix() { return localOperatorsMatrix; }
-	virtual vector<double> GetLocalOperatorlocalEnergyR() { return localOperatorlocalEnergyR; }
-	virtual vector<double> GetLocalOperatorlocalEnergyI() { return localOperatorlocalEnergyI; }
+	double GetLocalEnergyR() { return localEnergyR; }
+	double GetLocalEnergyI() { return localEnergyI; }
+	vector<double> GetLocalOperators() { return localOperators; }
+	vector<vector<double> > GetLocalOperatorsMatrix() { return localOperatorsMatrix; }
+	vector<double> GetLocalOperatorlocalEnergyR() { return localOperatorlocalEnergyR; }
+	vector<double> GetLocalOperatorlocalEnergyI() { return localOperatorlocalEnergyI; }
 
-	virtual vector<double> GetOtherExpectationValues() { return otherExpectationValues; }
-	virtual vector<double> GetAdditionalSystemProperties() { return additionalSystemProperties; }
-	virtual int GetNumOfOtherExpectationValues() { return numOfOtherExpectationValues; }
-	virtual int GetNumOfAdditionalSystemProperties() { return numOfAdditionalSystemProperties; }
+	vector<double> GetOtherExpectationValues() { return otherExpectationValues; }
+	vector<double> GetAdditionalSystemProperties() { return additionalSystemProperties; }
+	int GetNumOfOtherExpectationValues() { return numOfOtherExpectationValues; }
+	int GetNumOfAdditionalSystemProperties() { return numOfAdditionalSystemProperties; }
 
 	virtual bool USE_NORMALIZATION_AND_PHASE() = 0;
 

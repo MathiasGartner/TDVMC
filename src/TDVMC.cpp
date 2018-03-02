@@ -647,7 +647,7 @@ void DoMetropolisStep(double** R, double* uR, double* uI, double phiR, double ph
 	delete[] oldPosition;
 }
 
-void UpdateExpectationValues(double** R, double* uR, double* uI, double phiR, double phiI, double t)
+void UpdateExpectationValues(double** R, double* uR, double* uI, double phiR, double phiI, bool intermediateStep = false)
 {
 	//vector<vector<double> > singlelocalOperators; // for all O_k
 	vector<double> singlelocalEnergyR; // for all E^R
@@ -668,7 +668,7 @@ void UpdateExpectationValues(double** R, double* uR, double* uI, double phiR, do
     ClearVector(otherExpectationValues);
 
     sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
-	if (processRank == rootRank && t >= 0)
+	if (processRank == rootRank && !intermediateStep)
 	{
 		cout << "exponent=" << sys->GetExponent() << "\t\twf=" << sys->GetWf() << "\t\tphiR=" << phiR << endl;
 	}
@@ -726,7 +726,7 @@ void UpdateExpectationValues(double** R, double* uR, double* uI, double phiR, do
 	//localOperatorsMatrix = Mean(singlelocalOperatorsMatrix);
 	//localOperatorlocalEnergyR = Mean(singlelocalOperatorlocalEnergyR);
 	//localOperatorlocalEnergyI = Mean(singlelocalOperatorlocalEnergyI);
-	if (processRank == rootRank && t >= 0)
+	if (processRank == rootRank && !intermediateStep)
 	{
 		//WriteDataToFile(singlelocalEnergyR, "singlelocalEnergyR" + to_string(t), "singlelocalEnergyR");
 		//Sys::WriteLocalOperatorsToFile(to_string(t));
@@ -734,13 +734,13 @@ void UpdateExpectationValues(double** R, double* uR, double* uI, double phiR, do
 		//WriteParticlesToFile(R, to_string(t));
 	}
 
-	if (processRank == rootRank && t >= 0)
+	if (processRank == rootRank && !intermediateStep)
 	{
 		cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
 	}
 }
 
-void ParallelUpdateExpectationValues(double** R, double* uR, double* uI, double phiR, double phiI, double t)
+void ParallelUpdateExpectationValues(double** R, double* uR, double* uI, double phiR, double phiI, bool intermediateStep = false)
 {
 	chrono::high_resolution_clock::time_point t1;
 	chrono::high_resolution_clock::time_point t2;
@@ -748,13 +748,13 @@ void ParallelUpdateExpectationValues(double** R, double* uR, double* uI, double 
 	double dblDuration;
 	t1 = chrono::high_resolution_clock::now();
 
-	UpdateExpectationValues(R, uR, uI, phiR, phiI, t);
+	UpdateExpectationValues(R, uR, uI, phiR, phiI, intermediateStep);
 
 	t2 = chrono::high_resolution_clock::now();
 	duration = chrono::duration_cast<chrono::milliseconds>( t2 - t1 ).count();
 	dblDuration = (double) duration;
 	vector<double> timings = ReduceToMinMaxMean(&dblDuration);
-	if (processRank == rootRank && t >= 0)
+	if (processRank == rootRank && !intermediateStep)
 	{
 		Log("duration: min = " + to_string(timings[0]) + " ms");
 		Log("          max = " + to_string(timings[1]) + " ms");
@@ -1092,7 +1092,7 @@ void CalculateNextParametersPC(double** R, double* uR, double* uI, double *phiR,
 		//BroadcastValue(&tmpPhiR);
 		//BroadcastValue(&tmpPhiI);
 		BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-		ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, -1); //INFO: t = -1 means that it is just an immediate update of the expectation values
+		ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
 		if (processRank == rootRank)
 		{
 			BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
@@ -1162,7 +1162,7 @@ void CalculateNextParametersRK4(double** R, double* uR, double* uI, double *phiR
 		//tmpPhiI = *phiI + phiDotI[0] * TIMESTEP / 2.0;
 	}
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, -1); //INFO: t = -1 means that it is just an immediate update of the expectation values
+	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
 
 	if (processRank == rootRank)
 	{
@@ -1178,7 +1178,7 @@ void CalculateNextParametersRK4(double** R, double* uR, double* uI, double *phiR
 		//tmpPhiI = *phiI + phiDotI[1] * TIMESTEP / 2.0;
 	}
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, -1); //INFO: t = -1 means that it is just an immediate update of the expectation values
+	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
 
 	if (processRank == rootRank)
 	{
@@ -1194,7 +1194,7 @@ void CalculateNextParametersRK4(double** R, double* uR, double* uI, double *phiR
 		//tmpPhiI = *phiI + phiDotI[2] * TIMESTEP;
 	}
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, -1); //INFO: t = -1 means that it is just an immediate update of the expectation values
+	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
 
 	if (processRank == rootRank)
 	{
@@ -1372,7 +1372,7 @@ int mainMPI(int argc, char** argv)
 			}
 			//ReadConfig(argv[1]);
 			//ReadConfig("/home/gartner/Sources/TDVMC/config/drop_6.config");
-			ReadConfig("/home/gartner/Sources/TDVMC/config/bulk_64.config");
+			ReadConfig("/home/gartner/Sources/TDVMC/config/drop_3.config");
 			CreateOutputDirectory(argv[1]);
 		}
 		//PrintConfig();
@@ -1381,8 +1381,8 @@ int mainMPI(int argc, char** argv)
 	BroadcastConfig();
 	//PrintConfig();
 
-	//sys = new HeDrop(configDirectory);
-	sys = new HeBulk(configDirectory);
+	sys = new HeDrop(configDirectory);
+	//sys = new HeBulk(configDirectory);
 	Init();
 
 	double** R;
@@ -1435,6 +1435,7 @@ int mainMPI(int argc, char** argv)
 		nAcceptances = 0;
 		nTrials = 0;
 		step++;
+		sys->SetTime(currentTime);
 
 		BroadcastNewParameters(uR, uI, &phiR, &phiI);
 		if (processRank == rootRank)
@@ -1463,7 +1464,7 @@ int mainMPI(int argc, char** argv)
 		{
 			MoveCenterOfMassToZero(R);
 		}
-		ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI, currentTime);
+		ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
 		if (processRank == rootRank)
 		{
 			if (step % 100 == 0)
@@ -1700,7 +1701,7 @@ int mainSerial(int argc, char** argv)
 		nTrials = 0;
 		step++;
 
-		UpdateExpectationValues(R, uR, uI, phiR, phiI, t);
+		UpdateExpectationValues(R, uR, uI, phiR, phiI);
 		WriteDataToFile(localOperators, "AAlocalOperators", "localOperators");
 		WriteDataToFile(localEnergyR, "AAlocalEnergyR", "localEnergyR");
 		WriteDataToFile(localEnergyI, "AAlocalEnergyI", "localEnergyI");

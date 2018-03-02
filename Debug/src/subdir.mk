@@ -6,6 +6,7 @@
 CPP_SRCS += \
 ../src/HeBulk.cpp \
 ../src/HeDrop.cpp \
+../src/HeDropRealTime.cpp \
 ../src/MathOperators.cpp \
 ../src/TDVMC.cpp \
 ../src/Utils.cpp 
@@ -13,6 +14,7 @@ CPP_SRCS += \
 OBJS += \
 ./src/HeBulk.o \
 ./src/HeDrop.o \
+./src/HeDropRealTime.o \
 ./src/MathOperators.o \
 ./src/TDVMC.o \
 ./src/Utils.o 
@@ -20,6 +22,7 @@ OBJS += \
 CPP_DEPS += \
 ./src/HeBulk.d \
 ./src/HeDrop.d \
+./src/HeDropRealTime.d \
 ./src/MathOperators.d \
 ./src/TDVMC.d \
 ./src/Utils.d 
