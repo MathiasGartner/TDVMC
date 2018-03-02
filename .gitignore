@@ -1,0 +1,4 @@
+Debug/src/*.d
+Debug/src/*.o
+Release/src/*.d
+Release/src/*.o
