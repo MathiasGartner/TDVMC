@@ -30,6 +30,8 @@ IPhysicalSystem* sys;
 
 //bool useNIC = false; //for drops
 bool useNIC = true; //for bulk with PBC
+//bool moveCOMToZero = false; //for drops with external potential
+bool moveCOMToZero = true; //for drops without external potential
 
 string OUTPUT_DIRECTORY;
 string originalOutputDirectory;
@@ -619,9 +621,9 @@ void DoMetropolisStep(double** R, double* uR, double* uI, double phiR, double ph
 	}
 	if (!isfinite(wfQuotient) || !isfinite(sys->GetWfNew()) || !isfinite(sys->GetWf()))
 	{
-		cout << "something != finite !!!!!!!!!!!!!!!!!!!!!!!!" << endl;
-		cout << "wfQuotient=" << wfQuotient << ", wfNew=" << sys->GetWfNew() << ", wf=" << sys->GetWf() << ", nTrials=" << nTrials << endl;
-		sleep(1);
+		//cout << "something != finite !!!!!!!!!!!!!!!!!!!!!!!!" << endl;
+		//cout << "wfQuotient=" << wfQuotient << ", wfNew=" << sys->GetWfNew() << ", wf=" << sys->GetWf() << ", nTrials=" << nTrials << endl;
+		//sleep(1);
 		sampleOkay = false;
 		if (!isfinite(wfQuotient) && sys->GetWfNew() > 0 && sys->GetWf() == 0) //INFO: this can happen when a new timestep is startet and the wavefunction is zero for the first particle configuration
 		{
@@ -1335,6 +1337,21 @@ void ParallelCalculateAdditionalSystemProperties(double** R, double* uR, double*
 	ReduceValues(additionalSystemProperties);
 }
 
+void AlignCoordinates(double** R)
+{
+	if (useNIC)
+	{
+		MoveCoordinatesToFirstCell(R);
+	}
+	else
+	{
+		if (moveCOMToZero)
+		{
+			MoveCenterOfMassToZero(R);
+		}
+	}
+}
+
 int mainMPI(int argc, char** argv)
 {
 	char processName[80];
@@ -1370,14 +1387,17 @@ int mainMPI(int argc, char** argv)
 				MPI_Abort(MPI_COMM_WORLD, 0);
 				return 1;
 			}
-			//ReadConfig(argv[1]);
+			ReadConfig(argv[1]);
 			//ReadConfig("/home/gartner/Sources/TDVMC/config/drop_6.config");
-			ReadConfig("/home/gartner/Sources/TDVMC/config/drop_3.config");
+			//ReadConfig("/home/gartner/Sources/TDVMC/config/drop_3.config");
 			CreateOutputDirectory(argv[1]);
 		}
 		//PrintConfig();
 	}
-	configDirectory = "/home/gartner/Sources/TDVMC/config/";
+	//configDirectory = "/home/gartner/Sources/TDVMC/config/";
+	string argv1str = string(argv[1]);
+	configDirectory = argv1str.substr(0, argv1str.find_last_of("\\/")) + "/";
+	//cout << "configDirectory=\"" << configDirectory << "\"" << endl;
 	BroadcastConfig();
 	//PrintConfig();
 
@@ -1456,14 +1476,7 @@ int mainMPI(int argc, char** argv)
 		//PrintParameters(uI);
 		//cout << "phiR=" << phiR << ", phiI=" << phiI << endl;
 
-		if (useNIC)
-		{
-			MoveCoordinatesToFirstCell(R);
-		}
-		else
-		{
-			MoveCenterOfMassToZero(R);
-		}
+		AlignCoordinates(R);
 		ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
 		if (processRank == rootRank)
 		{
@@ -1557,14 +1570,7 @@ int mainMPI(int argc, char** argv)
 		//WriteDataToFile(uRList, "finalParameterList", "uR[n]");
 	}
 	BroadcastNewParameters(uR, uI, &phiR, &phiI);
-	if (useNIC)
-	{
-		MoveCoordinatesToFirstCell(R);
-	}
-	else
-	{
-		MoveCenterOfMassToZero(R);
-	}
+	AlignCoordinates(R);
 	ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
 	if (processRank == rootRank)
 	{
@@ -1572,14 +1578,7 @@ int mainMPI(int argc, char** argv)
 		WriteDataToFile(AllAdditionalSystemProperties, "AllAdditionalSystemProperties", "g(r), ...");
 	}
 
-	if (useNIC)
-	{
-		MoveCoordinatesToFirstCell(R);
-	}
-	else
-	{
-		MoveCenterOfMassToZero(R);
-	}
+	AlignCoordinates(R);
 	if (processRank == rootRank)
 	{
 		WriteParticleInputFile("AAFinish_particleconfiguration_" + to_string(N), R);

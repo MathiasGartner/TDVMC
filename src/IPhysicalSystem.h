@@ -35,7 +35,7 @@ public:
 	}
 
 	double GetTime() { return time; }
-	void SetTime(double t) { this->time = time; }
+	void SetTime(double time) { this->time = time; }
 	double GetWf() { return wf; }
 	double GetWfNew() { return wfNew; }
 	double GetExponent() { return exponent; }
