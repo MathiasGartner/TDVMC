@@ -1,76 +1,29 @@
-#pragma once
+#include "HeBulk.h"
 
-#include "Constants.h"
-#include <iostream>
-#include "Utils.h"
-
-using namespace std;
-
-namespace Sys
+HeBulk::HeBulk(string configDirectory) : IPhysicalSystem()
 {
+	this->configDirectory = configDirectory;
+}
 
-const bool USE_PHI = false;
-
-int	numberOfSplines;
-vector<double> splineSums; //indices: k (bin); for <O_k>
-vector<vector<vector<double> >  > splineSumsD; //indices: k (bin), n (particle), a (coordinate)
-vector<vector<double> > splineSumsD2; //indices: k (bin), n (particle)
-double mcMillanSum;
-vector<vector<double> > mcMillanSumD;
-vector<double> mcMillanSumD2;
-double rijSplit;
-double halfLength;
-double maxDistance;
-double nodePointSpacing;
-double nodePointSpacing2;
-
-double wf;
-double exponent;
-vector<double> localOperators; //indices: k (bin); for <O_k>
-double localEnergyR; // for <E^R>
-double localEnergyI; // for <E^I>
-vector<vector<double> > localOperatorsMatrix; // for <O_k O_j>
-vector<double> localOperatorlocalEnergyR; // for <O_k E^R>
-vector<double> localOperatorlocalEnergyI; // for <O_k E^I>
-
-int grBinCount = 100;
-int grBinStartIndex = 3;
-vector<double> grBins;
-vector<double> grBinVolumes;
-double grMaxDistance;
-double grNodePointSpacing;
-vector<vector<vector<double> > > kValues;
-int numOfkValues = 300;
-
-vector<double> otherExpectationValues; // eg. for potential and kinetic energy
-int numOfOtherExpectationValues = 3 + grBinCount;
-vector<double> additionalSystemProperties; // for properties at the end of the simulation
-int numOfAdditionalSystemProperties = numOfOtherExpectationValues + numOfkValues;
-
-double wfNew;
-double exponentNew;
-double mcMillanSumNew;
-vector<double> splineSumsNew; //indices: k (bin); for <O_k>
-vector<double> sumOldPerBin;
-vector<double> sumNewPerBin;
-
-double factorFirstSpline1;
-double factorFirstSpline2;
-double factorSecondSpline1;
-double factorSecondSpline2;
-double factorLastSpline;
-double factorSecondLastSpline;
-double factorLastSplinePhi;
-double factorSecondLastSplinePhi;
-
-void InitSystem()
+bool HeBulk::USE_NORMALIZATION_AND_PHASE()
 {
+	return false;
+}
+
+void HeBulk::InitSystem()
+{
+	grBinCount = 100;
+	grBinStartIndex = 3;
+	numOfkValues = 300;
+	numOfOtherExpectationValues = 3 + grBinCount;
+	numOfAdditionalSystemProperties = numOfOtherExpectationValues + numOfkValues;
+
 	rijSplit = 1.95;
 
 	numberOfSplines = N_PARAM - 1 + 3 + 3;	//+3+3: trailing and leading splines
 											//-1: phiR, mcMillan
 	halfLength = LBOX / 2.0;
-	nodePointSpacing = (halfLength - rijSplit) / (double)(numberOfSplines - 3.0);
+	nodePointSpacing = (halfLength - rijSplit) / (double) (numberOfSplines - 3.0);
 	maxDistance = halfLength;
 	//nodePointSpacing = (maxDistance - rijSplit) / (double)(numberOfSplines - 3.0 - 3.0);
 	nodePointSpacing2 = pow(nodePointSpacing, 2);
@@ -86,7 +39,6 @@ void InitSystem()
 	factorLastSpline = 1.0;
 	factorSecondLastSplinePhi = -3.0 / 2.0;
 	factorLastSplinePhi = 0.0;
-
 
 	wf = 0.0;
 	exponent = 0.0;
@@ -122,17 +74,17 @@ void InitSystem()
 	localOperatorsMatrix.resize(N_PARAM);
 	for (auto &row : localOperatorsMatrix)
 	{
-    	row.resize(N_PARAM);
-    }
-    ClearVector(localOperatorsMatrix);
+		row.resize(N_PARAM);
+	}
+	ClearVector(localOperatorsMatrix);
 	localOperatorlocalEnergyR.resize(N_PARAM);
-    ClearVector(localOperatorlocalEnergyR);
+	ClearVector(localOperatorlocalEnergyR);
 	localOperatorlocalEnergyI.resize(N_PARAM);
-    ClearVector(localOperatorlocalEnergyI);
+	ClearVector(localOperatorlocalEnergyI);
 	otherExpectationValues.resize(numOfOtherExpectationValues);
-    ClearVector(otherExpectationValues);
+	ClearVector(otherExpectationValues);
 	additionalSystemProperties.resize(numOfAdditionalSystemProperties);
-    ClearVector(additionalSystemProperties);
+	ClearVector(additionalSystemProperties);
 
 	wfNew = 0.0;
 	exponentNew = 0.0;
@@ -144,7 +96,7 @@ void InitSystem()
 	grBins.resize(grBinCount);
 	ClearVector(grBins);
 	grMaxDistance = halfLength;
-	grNodePointSpacing = grMaxDistance / (double)grBinCount;
+	grNodePointSpacing = grMaxDistance / (double) grBinCount;
 
 	grBinVolumes.resize(grBinCount);
 	ClearVector(grBinVolumes);
@@ -157,7 +109,7 @@ void InitSystem()
 		grBinVolumes[i] = grBinVolumes[i] - grBinVolumes[i - 1];
 	}
 
-	kValues = ReadFromFile("../config/kVectors.json", 0);
+	kValues = ReadFromFile(this->configDirectory + "kVectors.json", 0);
 	for (int k = 0; k < numOfkValues; k++)
 	{
 		for (unsigned int kn = 0; kn < kValues[k].size(); kn++)
@@ -173,19 +125,13 @@ void InitSystem()
 	cout << "nodePointSpacing=" << nodePointSpacing << endl;
 }
 
-void WriteSplineSumsToFiles(string ending)
+vector<double> HeBulk::GetCenterOfMass(double** R)
 {
-	WriteDataToFile(splineSums, "splineSums" + ending, "value");
-	WriteDataToFile(splineSumsD, "splineSumsD" + ending, "x, y, z");
-	WriteDataToFile(splineSumsD2, "splineSumsD2" + ending, "value");
+	vector<double> com = {0, 0, 0};
+	return com;
 }
 
-void WriteLocalOperatorsToFile(string ending)
-{
-	WriteDataToFile(localOperators, "localOperators" + ending, "value");
-}
-
-void CalculateExpectationValues(double** R, double* uR, double* uI, double phiR, double phiI)
+void HeBulk::CalculateExpectationValues(double** R, double* uR, double* uI, double phiR, double phiI)
 {
 	double* vecrni = new double[DIM];
 	double* evecrni = new double[DIM];
@@ -433,13 +379,7 @@ void CalculateExpectationValues(double** R, double* uR, double* uI, double phiR,
 	delete[] vecKineticSumI1;
 }
 
-vector<double> GetCenterOfMass(double** R)
-{
-	vector<double> com = {0, 0, 0};
-	return com;
-}
-
-void CalculateAdditionalSystemProperties(double** R, double* uR, double* uI, double phiR, double phiI)
+void HeBulk::CalculateAdditionalSystemProperties(double** R, double* uR, double* uI, double phiR, double phiI)
 {
     ClearVector(additionalSystemProperties);
 	CalculateExpectationValues(R, uR, uI, phiR, phiI);
@@ -478,7 +418,7 @@ void CalculateAdditionalSystemProperties(double** R, double* uR, double* uI, dou
 	delete[] vecrij;
 }
 
-void CalculateWavefunction(double** R, double* uR, double* uI, double phiR, double phiI)
+void HeBulk::CalculateWavefunction(double** R, double* uR, double* uI, double phiR, double phiI)
 {
 	double sum = 0;
 	double interval;
@@ -537,7 +477,7 @@ void CalculateWavefunction(double** R, double* uR, double* uI, double phiR, doub
 	delete[] vecrni;
 }
 
-void CalculateWFChange(double** R, double* uR, double* uI, double phiR, double phiI, int changedParticleIndex, double* oldPosition)
+void HeBulk::CalculateWFChange(double** R, double* uR, double* uI, double phiR, double phiI, int changedParticleIndex, double* oldPosition)
 {
 	double sum = 0;
 	double mcMillanOld = 0;
@@ -623,7 +563,7 @@ void CalculateWFChange(double** R, double* uR, double* uI, double phiR, double p
 	delete[] vecrni;
 }
 
-double GetWFQuotient(double** R, double* uR, double* uI, double phiR, double phiI, int changedParticleIndex, double* oldPosition)
+double HeBulk::GetWFQuotient(double** R, double* uR, double* uI, double phiR, double phiI, int changedParticleIndex, double* oldPosition)
 {
 	CalculateWFChange(R, uR, uI, phiR, phiI, changedParticleIndex, oldPosition);
 	double wfQuotient = exp(2.0 * (exponentNew - exponent));
@@ -633,7 +573,7 @@ double GetWFQuotient(double** R, double* uR, double* uI, double phiR, double phi
 	return wfQuotient;
 }
 
-void AcceptMove()
+void HeBulk::AcceptMove()
 {
 	wf = wfNew;
 	exponent = exponentNew;
@@ -642,6 +582,4 @@ void AcceptMove()
 	{
 		splineSums[i] = splineSumsNew[i];
 	}
-}
-
 }

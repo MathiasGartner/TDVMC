@@ -4,18 +4,21 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
+../src/HeBulk.cpp \
 ../src/HeDrop.cpp \
 ../src/MathOperators.cpp \
 ../src/TDVMC.cpp \
 ../src/Utils.cpp 
 
 OBJS += \
+./src/HeBulk.o \
 ./src/HeDrop.o \
 ./src/MathOperators.o \
 ./src/TDVMC.o \
 ./src/Utils.o 
 
 CPP_DEPS += \
+./src/HeBulk.d \
 ./src/HeDrop.d \
 ./src/MathOperators.d \
 ./src/TDVMC.d \

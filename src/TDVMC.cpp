@@ -3,7 +3,7 @@
 #include <cstring>
 #include <ctime>
 #include <fstream>
-#include "HeDrop5.h"
+#include "HeBulk.h"
 #include "HeDrop.h"
 #include <iomanip>
 #include <json/json.h>
@@ -26,11 +26,14 @@
 
 using namespace std;
 
+IPhysicalSystem* sys;
+
 //bool useNIC = false; //for drops
 bool useNIC = true; //for bulk with PBC
 
 string OUTPUT_DIRECTORY;
 string originalOutputDirectory;
+string configDirectory;
 int N;           	    		//number of particles
 int DIM;     	        	 	//number of dimensions
 int N_PARAM;	        	  	//number of parameters of trial function
@@ -437,6 +440,12 @@ void Init()
 	nAcceptances = 0;
 	nTrials = 0;
 
+    mc_nsteps = (double)MC_NSTEPS;
+    mc_nadditionalsteps = (double)MC_NADDITIONALSTEPS;
+}
+
+void PostSystemInit()
+{
 	localOperators.resize(N_PARAM);
 	localOperatorsMatrix.resize(N_PARAM);
 	for (auto &row : localOperatorsMatrix)
@@ -445,12 +454,9 @@ void Init()
     }
 	localOperatorlocalEnergyR.resize(N_PARAM);
 	localOperatorlocalEnergyI.resize(N_PARAM);
-    otherExpectationValues.resize(Sys::numOfOtherExpectationValues);
-    additionalSystemProperties.resize(Sys::numOfAdditionalSystemProperties);
+    otherExpectationValues.resize(sys->GetNumOfOtherExpectationValues());
+    additionalSystemProperties.resize(sys->GetNumOfAdditionalSystemProperties());
     AllAdditionalSystemProperties.resize(0);
-
-    mc_nsteps = (double)MC_NSTEPS;
-    mc_nadditionalsteps = (double)MC_NADDITIONALSTEPS;
 }
 
 void WriteParticlesToFile(double** R, string ending)
@@ -465,7 +471,7 @@ bool LoadLastPositionsFromFile(string filename, double** R)
 	string prevline;
 	vector<string> coordinates;
 	ifstream file;
-	file.open("../config/" + filename + ".csv", ios::in);
+	file.open(configDirectory + filename + ".csv", ios::in);
 	while (getline(file, line))
 	{
 		prevline = line;
@@ -581,7 +587,7 @@ void MoveCoordinatesToFirstCell(double** R)
 void MoveCenterOfMassToZero(double** R)
 {
 	vector<double> com;
-	com = Sys::GetCenterOfMass(R);
+	com = sys->GetCenterOfMass(R);
 	for (int i = 0; i < N; i++)
 	{
 		for (int a = 0; a < DIM; a++)
@@ -603,21 +609,21 @@ void DoMetropolisStep(double** R, double* uR, double* uI, double phiR, double ph
 		//R[randomParticle][i] += (random01() - 0.5) * MC_STEP;
 		R[randomParticle][i] += randomNormal(MC_STEP, 0.0);
 	}
-	double wfQuotient = Sys::GetWFQuotient(R, uR, uI, phiR, phiI, randomParticle, oldPosition);
+	double wfQuotient = sys->GetWFQuotient(R, uR, uI, phiR, phiI, randomParticle, oldPosition);
 
-	if (wfQuotient == 0 || Sys::wfNew == 0 || Sys::wf == 0)
+	if (wfQuotient == 0 || sys->GetWfNew() == 0 || sys->GetWf() == 0)
 	{
 		//cout << "something == 0 !!!!!!!!!!!!!!!!!!!!!!!!" << endl;
 		//cout << "wfQuotient=" << wfQuotient << ", wfNew=" << Sys::wfNew << ", wf=" << Sys::wf << ", nTrials=" << nTrials << endl;
 		//sleep(1);
 	}
-	if (!isfinite(wfQuotient) || !isfinite(Sys::wfNew) || !isfinite(Sys::wf))
+	if (!isfinite(wfQuotient) || !isfinite(sys->GetWfNew()) || !isfinite(sys->GetWf()))
 	{
 		cout << "something != finite !!!!!!!!!!!!!!!!!!!!!!!!" << endl;
-		cout << "wfQuotient=" << wfQuotient << ", wfNew=" << Sys::wfNew << ", wf=" << Sys::wf << ", nTrials=" << nTrials << endl;
+		cout << "wfQuotient=" << wfQuotient << ", wfNew=" << sys->GetWfNew() << ", wf=" << sys->GetWf() << ", nTrials=" << nTrials << endl;
 		sleep(1);
 		sampleOkay = false;
-		if (!isfinite(wfQuotient) && Sys::wfNew > 0 && Sys::wf == 0) //INFO: this can happen when a new timestep is startet and the wavefunction is zero for the first particle configuration
+		if (!isfinite(wfQuotient) && sys->GetWfNew() > 0 && sys->GetWf() == 0) //INFO: this can happen when a new timestep is startet and the wavefunction is zero for the first particle configuration
 		{
 			sampleOkay = true;
 			wfQuotient = 1; //INFO: accept by 100%
@@ -634,7 +640,7 @@ void DoMetropolisStep(double** R, double* uR, double* uI, double phiR, double ph
 	}
 	else
 	{
-		Sys::AcceptMove();
+		sys->AcceptMove();
 		nAcceptances++;
 	}
 	nTrials++;
@@ -661,10 +667,10 @@ void UpdateExpectationValues(double** R, double* uR, double* uI, double phiR, do
     ClearVector(localOperatorlocalEnergyI);
     ClearVector(otherExpectationValues);
 
-	Sys::CalculateWavefunction(R, uR, uI, phiR, phiI);
+    sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
 	if (processRank == rootRank && t >= 0)
 	{
-		cout << "exponent=" << Sys::exponent << "\t\twf=" << Sys::wf << "\t\tphiR=" << phiR << endl;
+		cout << "exponent=" << sys->GetExponent() << "\t\twf=" << sys->GetWf() << "\t\tphiR=" << phiR << endl;
 	}
 	//cout << "wf=" << Sys::wf << endl;
 	//Sys::WriteLocalOperatorsToFile("start");
@@ -680,24 +686,24 @@ void UpdateExpectationValues(double** R, double* uR, double* uI, double phiR, do
 			DoMetropolisStep(R, uR, uI, phiR, phiI);
 		}
 
-		Sys::CalculateExpectationValues(R, uR, uI, phiR, phiI);
+		sys->CalculateExpectationValues(R, uR, uI, phiR, phiI);
 
 		//INFO: consumes too much memory
 		//singlelocalOperators.push_back(Sys::localOperators);
-		singlelocalEnergyR.push_back(Sys::localEnergyR);
+		singlelocalEnergyR.push_back(sys->GetLocalEnergyR());
 		//singlelocalEnergyI.push_back(Sys::localEnergyI);
 		//singlelocalOperatorsMatrix.push_back(Sys::localOperatorsMatrix);
 		//singlelocalOperatorlocalEnergyR.push_back(Sys::localOperatorlocalEnergyR);
 		//singlelocalOperatorlocalEnergyI.push_back(Sys::localOperatorlocalEnergyI);
 
 		//INFO: calculate contribution to average value
-		localOperators += Sys::localOperators / mc_nsteps;
-		localEnergyR += Sys::localEnergyR / mc_nsteps;
-		localEnergyI += Sys::localEnergyI / mc_nsteps;
-		localOperatorsMatrix += Sys::localOperatorsMatrix / mc_nsteps;
-		localOperatorlocalEnergyR += Sys::localOperatorlocalEnergyR / mc_nsteps;
-		localOperatorlocalEnergyI += Sys::localOperatorlocalEnergyI / mc_nsteps;
-		otherExpectationValues += Sys::otherExpectationValues / mc_nsteps;
+		localOperators += sys->GetLocalOperators() / mc_nsteps;
+		localEnergyR += sys->GetLocalEnergyR() / mc_nsteps;
+		localEnergyI += sys->GetLocalEnergyI() / mc_nsteps;
+		localOperatorsMatrix += sys->GetLocalOperatorsMatrix() / mc_nsteps;
+		localOperatorlocalEnergyR += sys->GetLocalOperatorlocalEnergyR() / mc_nsteps;
+		localOperatorlocalEnergyI += sys->GetLocalOperatorlocalEnergyI() / mc_nsteps;
+		otherExpectationValues += sys->GetOtherExpectationValues() / mc_nsteps;
 
 		if ((10 * i) % MC_NSTEPS == 0)
 		{
@@ -1283,7 +1289,7 @@ void CalculateAdditionalSystemProperties(double** R, double* uR, double* uI, dou
 	int percent = 0;
     ClearVector(additionalSystemProperties);
     ClearVector(AllAdditionalSystemProperties);
-	Sys::CalculateWavefunction(R, uR, uI, phiR, phiI);
+    sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
 	for (int i = 0; i < MC_NADDITIONALINITIALIZATIONSTEPS; i++)
 	{
 		DoMetropolisStep(R, uR, uI, phiR, phiI);
@@ -1295,11 +1301,11 @@ void CalculateAdditionalSystemProperties(double** R, double* uR, double* uI, dou
 			DoMetropolisStep(R, uR, uI, phiR, phiI);
 		}
 
-		Sys::CalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
+		sys->CalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
 
 		//INFO: calculate contribution to average value
-		additionalSystemProperties += Sys::additionalSystemProperties / mc_nadditionalsteps;
-		AllAdditionalSystemProperties.push_back(Sys::additionalSystemProperties);
+		additionalSystemProperties += sys->GetAdditionalSystemProperties() / mc_nadditionalsteps;
+		AllAdditionalSystemProperties.push_back(sys->GetAdditionalSystemProperties());
 
 		if ((100 * i) % MC_NADDITIONALSTEPS == 0)
 		{
@@ -1365,13 +1371,18 @@ int mainMPI(int argc, char** argv)
 				return 1;
 			}
 			//ReadConfig(argv[1]);
-			ReadConfig("/home/gartner/Sources/TDVMC/config/drop_6.config");
+			//ReadConfig("/home/gartner/Sources/TDVMC/config/drop_6.config");
+			ReadConfig("/home/gartner/Sources/TDVMC/config/bulk_64.config");
 			CreateOutputDirectory(argv[1]);
 		}
 		//PrintConfig();
 	}
+	configDirectory = "/home/gartner/Sources/TDVMC/config/";
 	BroadcastConfig();
 	//PrintConfig();
+
+	//sys = new HeDrop(configDirectory);
+	sys = new HeBulk(configDirectory);
 	Init();
 
 	double** R;
@@ -1417,7 +1428,8 @@ int mainMPI(int argc, char** argv)
 	}
 
 	int step = 0;
-	Sys::InitSystem();
+	sys->InitSystem();
+	PostSystemInit();
 	for (currentTime = 0; currentTime <= TOTALTIME; currentTime += TIMESTEP)
 	{
 		nAcceptances = 0;
@@ -1472,7 +1484,7 @@ int mainMPI(int argc, char** argv)
 			AllParametersR.push_back(ArrayToVector(uR, N_PARAM));
 			AllParametersI.push_back(ArrayToVector(uI, N_PARAM));
 		}
-		if (Sys::USE_PHI)
+		if (sys->USE_NORMALIZATION_AND_PHASE())
 		{
 			CalculateNextParameters(R, uR, uI, &phiR, &phiI);
 			if (processRank == rootRank)
@@ -1488,7 +1500,7 @@ int mainMPI(int argc, char** argv)
 		{
 			if (step % 100 == 0)
 			{
-				WriteDataToFile(uR, N_PARAM, "parametersR" + to_string(step), "parameterR, phiR=" + to_string(phiR) + ", wf=" + to_string(Sys::wf));
+				WriteDataToFile(uR, N_PARAM, "parametersR" + to_string(step), "parameterR, phiR=" + to_string(phiR) + ", wf=" + to_string(sys->GetWf()));
 				WriteDataToFile(uI, N_PARAM, "parametersI" + to_string(step), "parameterI, phiI=" + to_string(phiI));
 			}
 			if (step % 100 == 0)
@@ -1583,7 +1595,7 @@ int mainMPI(int argc, char** argv)
 		}
 	}
 
-	sleep(10000);
+	sleep(10);
 	Log("free memory ...");
 
 	for (int i = 0; i < N; i++)
@@ -1593,6 +1605,7 @@ int mainMPI(int argc, char** argv)
 	delete[] R;
 	delete[] uR;
 	delete[] uI;
+	delete sys;
 
 	Log("finalize ...");
 	MPI_Finalize();
@@ -1680,7 +1693,7 @@ int mainSerial(int argc, char** argv)
 
 	int step = 0;
 	cout << "LBOX=" << LBOX << endl;
-	Sys::InitSystem();
+	sys->InitSystem();
 	for (double t = 0; t <= TOTALTIME; t += TIMESTEP)
 	{
 		nAcceptances = 0;
