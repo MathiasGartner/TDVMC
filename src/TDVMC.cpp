@@ -33,6 +33,7 @@ bool USE_MEAN_FOR_FINAL_PARAMETERS = false;
 string OUTPUT_DIRECTORY;
 string originalOutputDirectory;
 string configDirectory;
+string configFilePath;
 int N;           	    		//number of particles
 int DIM;     	        	 	//number of dimensions
 int N_PARAM;	        	  	//number of parameters of trial function
@@ -314,26 +315,26 @@ void WriteParticleInputFile(string fileName, double** R)
 
 void ReadRandomGeneratorStatesFromFile(string fileNamePrefix)
 {
-	ifstream fGenerator(configDirectory + fileNamePrefix + "_generator.dat");
+	ifstream fGenerator(configDirectory + fileNamePrefix + "_generator_" + to_string(processRank) + ".dat");
 	fGenerator >> generator;
 	fGenerator.close();
-	ifstream fUniform(configDirectory + fileNamePrefix + "_uniform.dat");
+	ifstream fUniform(configDirectory + fileNamePrefix + "_uniform_" + to_string(processRank) + ".dat");
 	fUniform >> distUniform;
 	fUniform.close();
-	ifstream fNormal(configDirectory + fileNamePrefix + "_normal.dat");
+	ifstream fNormal(configDirectory + fileNamePrefix + "_normal_" + to_string(processRank) + ".dat");
 	fNormal >> distNormal;
 	fNormal.close();
 }
 
 void WriteRandomGeneratorStatesToFile(string fileNamePrefix)
 {
-	ofstream fGenerator(OUTPUT_DIRECTORY + fileNamePrefix + "_generator.dat");
+	ofstream fGenerator(OUTPUT_DIRECTORY + fileNamePrefix + "_generator_" + to_string(processRank) + ".dat");
 	fGenerator << generator;
 	fGenerator.close();
-	ofstream fUniform(OUTPUT_DIRECTORY + fileNamePrefix + "_uniform.dat");
+	ofstream fUniform(OUTPUT_DIRECTORY + fileNamePrefix + "_uniform_" + to_string(processRank) + ".dat");
 	fUniform << distUniform;
 	fUniform.close();
-	ofstream fNormal(OUTPUT_DIRECTORY + fileNamePrefix + "_normal.dat");
+	ofstream fNormal(OUTPUT_DIRECTORY + fileNamePrefix + "_normal_" + to_string(processRank) + ".dat");
 	fNormal << distNormal;
 	fNormal.close();
 }
@@ -459,9 +460,12 @@ void ReduceValues(vector<vector<double> >& data)
 
 void Init()
 {
-	if (FileExist(configDirectory + "state" + "_generator.dat") && FileExist(configDirectory + "state" + "_uniform.dat") && FileExist(configDirectory + "state" + "_normal.dat"))
+	if (FileExist(configDirectory + "random/state" + "_generator_" + to_string(processRank) + ".dat") &&
+		FileExist(configDirectory + "random/state" + "_uniform_" + to_string(processRank) + ".dat") &&
+		FileExist(configDirectory + "random/state" + "_normal_" + to_string(processRank) + ".dat"))
 	{
-		ReadRandomGeneratorStatesFromFile("state");
+		Log("read random generator configurations");
+		ReadRandomGeneratorStatesFromFile("random/state");
 	}
 	else
 	{
@@ -503,6 +507,7 @@ bool LoadLastPositionsFromFile(string filename, double** R)
 	string prevline;
 	vector<string> coordinates;
 	ifstream file;
+	//Log("try read particle configuration from file: " + configDirectory + filename + ".csv");
 	file.open(configDirectory + filename + ".csv", ios::in);
 	while (getline(file, line))
 	{
@@ -1382,7 +1387,7 @@ void AlignCoordinates(double** R)
 	}
 }
 
-int mainMPI(int argc, char** argv, string configFilePath)
+int mainMPI(int argc, char** argv)
 {
 	char processName[80];
 	int processNameLength;
@@ -1419,9 +1424,12 @@ int mainMPI(int argc, char** argv, string configFilePath)
 	sys = new HeDrop(configDirectory);
 	//sys = new HeBulk(configDirectory);
 	Init();
-	cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
-	cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
-	cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
+	if (processRank == rootRank)
+	{
+		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
+		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
+		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
+	}
 
 	double** R;
 	double* uR;
@@ -1567,7 +1575,10 @@ int mainMPI(int argc, char** argv, string configFilePath)
 		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues100", "kinetic, potential, wf, g(r)", 100);
 		WriteDataToFile(AllParametersR, "AllParametersR100", "uR", 100);
 		WriteDataToFile(AllParametersI, "AllParametersI100", "uI", 100);
-		WriteRandomGeneratorStatesToFile("state");
+	}
+	WriteRandomGeneratorStatesToFile("state");
+	if (processRank == rootRank)
+	{
 		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
 		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
 		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
@@ -1645,14 +1656,14 @@ int main(int argc, char **argv) {
 
 	if (argc == 0) //INFO: started with pbs on mach
 	{
-		string configFilePath = "/home/k3501/k354522/tVMC/bin/tVMC.config";
-		val = mainMPI(argc, argv, configFilePath);
+		configFilePath = "/home/k3501/k354522/tVMC/bin/tVMC.config";
+		val = mainMPI(argc, argv);
 	}
 	else if (argc == 1) //INFO: started without specifying config-file. used for local execution
 	{
-		string configFilePath = "/home/gartner/Sources/TDVMC/config/drop_3.config";
+		configFilePath = "/home/gartner/Sources/TDVMC/config/drop_3.config";
 		//string configFilePath = "/home/gartner/Sources/TDVMC/config/drop_6.config";
-		val = mainMPI(argc, argv, configFilePath);
+		val = mainMPI(argc, argv);
 	}
 	else if (argc > 1)
 	{
@@ -1674,7 +1685,9 @@ int main(int argc, char **argv) {
 		}
 		else
 		{
-			val = mainMPI(argc, argv, string(argv[1]));
+			//INFO: don't know why it does not work on zusie when configFilePath is passed as a third parameter to mainMPI -> therefore I use a global variable
+			configFilePath = string(argv[1]);
+			val = mainMPI(argc, argv);
 		}
 	}
 
