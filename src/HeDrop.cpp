@@ -5,11 +5,10 @@ using namespace std;
 HeDrop::HeDrop(string configDirectory) : IPhysicalSystem()
 {
 	this->configDirectory = configDirectory;
-}
 
-bool HeDrop::USE_NORMALIZATION_AND_PHASE()
-{
-	return true;
+	this->USE_NORMALIZATION_AND_PHASE = true;
+	this->USE_NIC = false;
+	this->USE_MOVE_COM_TO_ZERO = true;
 }
 
 void HeDrop::InitSystem()

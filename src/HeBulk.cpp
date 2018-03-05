@@ -3,11 +3,10 @@
 HeBulk::HeBulk(string configDirectory) : IPhysicalSystem()
 {
 	this->configDirectory = configDirectory;
-}
 
-bool HeBulk::USE_NORMALIZATION_AND_PHASE()
-{
-	return false;
+	this->USE_NORMALIZATION_AND_PHASE = false;
+	this->USE_NIC = true;
+	this->USE_MOVE_COM_TO_ZERO = false;
 }
 
 void HeBulk::InitSystem()

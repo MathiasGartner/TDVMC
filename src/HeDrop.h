@@ -84,8 +84,6 @@ private:
 public:
 	HeDrop(string configDirectory);
 
-	bool USE_NORMALIZATION_AND_PHASE();
-
 	void InitSystem();
 
 	vector<double> GetCenterOfMass(double** R);

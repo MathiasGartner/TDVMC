@@ -25,6 +25,10 @@ protected:
 	int numOfAdditionalSystemProperties;
 
 public:
+	bool USE_NORMALIZATION_AND_PHASE; //INFO: parameters phiR and phiI
+	bool USE_NIC; //INFO: nearest image convention
+	bool USE_MOVE_COM_TO_ZERO; //INFO: move center of mass to zero
+
 	IPhysicalSystem()
 	{
 		this->time = 0;
@@ -51,8 +55,6 @@ public:
 	vector<double> GetAdditionalSystemProperties() { return additionalSystemProperties; }
 	int GetNumOfOtherExpectationValues() { return numOfOtherExpectationValues; }
 	int GetNumOfAdditionalSystemProperties() { return numOfAdditionalSystemProperties; }
-
-	virtual bool USE_NORMALIZATION_AND_PHASE() = 0;
 
 	virtual void InitSystem() = 0;
 

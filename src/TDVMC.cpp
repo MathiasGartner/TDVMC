@@ -29,10 +29,6 @@ using namespace std;
 IPhysicalSystem* sys;
 
 bool USE_MEAN_FOR_FINAL_PARAMETERS = false;
-//bool useNIC = false; //for drops
-bool useNIC = true; //for bulk with PBC
-//bool moveCOMToZero = false; //for drops with external potential
-bool moveCOMToZero = true; //for drops without external potential
 
 string OUTPUT_DIRECTORY;
 string originalOutputDirectory;
@@ -1373,133 +1369,17 @@ void ParallelCalculateAdditionalSystemProperties(double** R, double* uR, double*
 
 void AlignCoordinates(double** R)
 {
-	if (useNIC)
+	if (sys->USE_NIC)
 	{
 		MoveCoordinatesToFirstCell(R);
 	}
 	else
 	{
-		if (moveCOMToZero)
+		if (sys->USE_MOVE_COM_TO_ZERO)
 		{
 			MoveCenterOfMassToZero(R);
 		}
 	}
-}
-
-int mainSerial(int argc, char** argv)
-{
-	if (argc < 2)
-	{
-		cout << "no config file specified... argc=" << argc << endl;
-		return 1;
-	}
-	ReadConfig(argv[1]);
-	CreateOutputDirectory(argv[1]);
-	//PrintConfig();
-	Init();
-
-	double** R;
-	double** Rcopy;
-	double* uR;
-	double* uI;
-	double phiR;
-	double phiI;
-
-	R = new double*[N];
-	Rcopy = new double*[N];
-	for (int i = 0; i < N; i++)
-	{
-		R[i] = new double[DIM];
-		Rcopy[i] = new double[DIM];
-	}
-	uR = new double[N_PARAM];
-	uI = new double[N_PARAM];
-
-	InitCoordinateConfiguration(R);
-	for (int i = 0; i < N_PARAM; i++)
-	{
-		//u[i] = PARAM_SPACE[i][0];
-		//u[i] = 1 + sin(i / (N_PARAM / 2.0 / M_PI));
-		//u[i] = 1.0;
-		//u[i] = i / (double)N_PARAM - 0.2;
-		//u[i] = random01();
-		//u[i] = -1000.0 * exp(-(i+0.1)/4.0) + 50.0;
-		//u[i] = exp(-100.0/pow(i, 2.0));
-		//u[i] = pow(exp(-10.0/(double)i), 5);
-		//u[i] = exp(-10000000.0/pow(i,5))*10.0;
-		//u[i] = exp(-pow((60.0/(double)i), 5))*1000.0;
-		//u[i] = exp(-pow(i/10.0, 5))*100;
-		//if (i > N_PARAM / 2.0)
-		//{
-		//	u[i] = -10.0;
-		//}
-		//else
-		//{
-		//	u[i] = 1.0;
-		//}
-		//double ii = 2.7 * (i + N_PARAM / 3.0) / (double)N_PARAM;
-		//u[i] = pow(ii, 2) * cos(ii) + 1.0;
-		//double ii = i * M_PI / N_PARAM;
-		//u[i] = sin(ii + 0.1) * exp(-5.0 * pow(ii, 3));
-		//double ii = (i + 1.0) / (double)(N_PARAM / 1.3);
-		//uR[i] = min(-1.0 / pow(ii, 1) + 1.0, 0.0);
-		//uI[i] = 0.0;
-		//uR[i] = 1.0;
-		//uR[i] = 1.0;
-		//uR[i] = 1.0 / (double)(i + 1.0);
-		//uI[i] = 0.0;
-		uR[i] = PARAMS_REAL[i];
-		uI[i] = PARAMS_IMAGINARY[i];
-	}
-	phiR = PARAM_PHIR;
-	phiI = PARAM_PHII;
-	//phiR = -1.0;
-	//phiI = 0.0;
-	//NormalizeParameters(uR, uI, &phiR, &phiI);
-	//PrintParameters(uR);
-	//PrintParameters(uI);
-	WriteDataToFile(uR, N_PARAM, "parametersR0", "parameterR");
-	WriteDataToFile(uI, N_PARAM, "parametersI0", "parameterI");
-	//exit(0);
-
-	int step = 0;
-	cout << "LBOX=" << LBOX << endl;
-	sys->InitSystem();
-	for (double t = 0; t <= TOTALTIME; t += TIMESTEP)
-	{
-		nAcceptances = 0;
-		nTrials = 0;
-		step++;
-
-		UpdateExpectationValues(R, uR, uI, phiR, phiI);
-		WriteDataToFile(localOperators, "AAlocalOperators", "localOperators");
-		WriteDataToFile(localEnergyR, "AAlocalEnergyR", "localEnergyR");
-		WriteDataToFile(localEnergyI, "AAlocalEnergyI", "localEnergyI");
-		WriteDataToFile(localOperatorsMatrix, "AAlocalOperatorsMatrix", "localOperatorsMatrix");
-		WriteDataToFile(localOperatorlocalEnergyR, "AAlocalOperatorlocalEnergyR", "localOperatorlocalEnergyR");
-		WriteDataToFile(localOperatorlocalEnergyI, "AAlocalOperatorlocalEnergyI", "localOperatorlocalEnergyI");
-		WriteDataToFile(otherExpectationValues, "AAotherExpectationValues", "otherExpectationValues");
-		cout << "t=" << t << endl;
-		cout << "localEnergyR=" << localEnergyR << endl;
-		cout << "kineticEnergy=" << otherExpectationValues[0] << endl;
-		cout << "potentialEnergy=" << otherExpectationValues[1] << endl;
-		cout << "==========================================" << endl << endl;
-		CalculateNextParameters(R, uR, uI, &phiR, &phiI);
-		WriteDataToFile(uR, N_PARAM, "parametersR" + to_string(step), "parameterR");
-		WriteDataToFile(uI, N_PARAM, "parametersI" + to_string(step), "parameterI");
-	}
-
-	for (int i = 0; i < N; i++)
-	{
-		delete[] R[i];
-		delete[] Rcopy[i];
-	}
-	delete[] R;
-	delete[] Rcopy;
-	delete[] uR;
-	delete[] uI;
-
-	return 0;
 }
 
 int mainMPI(int argc, char** argv, string configFilePath)
@@ -1633,7 +1513,7 @@ int mainMPI(int argc, char** argv, string configFilePath)
 			AllParametersR.push_back(ArrayToVector(uR, N_PARAM));
 			AllParametersI.push_back(ArrayToVector(uI, N_PARAM));
 		}
-		if (sys->USE_NORMALIZATION_AND_PHASE())
+		if (sys->USE_NORMALIZATION_AND_PHASE)
 		{
 			CalculateNextParameters(R, uR, uI, &phiR, &phiI);
 			if (processRank == rootRank)
@@ -1768,7 +1648,7 @@ int main(int argc, char **argv) {
 		string configFilePath = "/home/k3501/k354522/tVMC/bin/tVMC.config";
 		val = mainMPI(argc, argv, configFilePath);
 	}
-	if (argc == 1) //INFO: started without specifying config-file. used for local execution
+	else if (argc == 1) //INFO: started without specifying config-file. used for local execution
 	{
 		string configFilePath = "/home/gartner/Sources/TDVMC/config/drop_3.config";
 		//string configFilePath = "/home/gartner/Sources/TDVMC/config/drop_6.config";
