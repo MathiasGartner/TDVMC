@@ -28,6 +28,7 @@ using namespace std;
 
 IPhysicalSystem* sys;
 
+bool USE_MEAN_FOR_FINAL_PARAMETERS = false;
 //bool useNIC = false; //for drops
 bool useNIC = true; //for bulk with PBC
 //bool moveCOMToZero = false; //for drops with external potential
@@ -88,7 +89,7 @@ vector<vector<double> > AllAdditionalSystemProperties;
 
 default_random_engine generator;
 uniform_real_distribution<double> distUniform(0.0, 1.0);
-normal_distribution<double> distNormal(0.0,1.0);
+normal_distribution<double> distNormal(0.0, 1.0);
 
 void onSignalStop(int signum)
 {
@@ -100,9 +101,14 @@ void onSignalStop(int signum)
     }
 }
 
+double random01()
+{
+	return distUniform(generator);
+}
+
 //double random01()
 //{
-//	return distUniform(generator);
+//	return ((double) rand() / RAND_MAX);
 //}
 
 double randomNormal()
@@ -118,11 +124,6 @@ double randomNormal(double sigma, double mu)
 void Log(string message)
 {
 	cout << "#" << setfill(' ') << setw(2) << processRank << "@" << get_cpu_id() << ": " << message << endl << flush;
-}
-
-double random01()
-{
-	return ((double) rand() / RAND_MAX);
 }
 
 void CreateOutputDirectory(string filePath)
@@ -315,6 +316,32 @@ void WriteParticleInputFile(string fileName, double** R)
 	WriteDataToFile(particlePositionList, fileName, "", 1, false);
 }
 
+void ReadRandomGeneratorStatesFromFile(string fileNamePrefix)
+{
+	ifstream fGenerator(configDirectory + fileNamePrefix + "_generator.dat");
+	fGenerator >> generator;
+	fGenerator.close();
+	ifstream fUniform(configDirectory + fileNamePrefix + "_uniform.dat");
+	fUniform >> distUniform;
+	fUniform.close();
+	ifstream fNormal(configDirectory + fileNamePrefix + "_normal.dat");
+	fNormal >> distNormal;
+	fNormal.close();
+}
+
+void WriteRandomGeneratorStatesToFile(string fileNamePrefix)
+{
+	ofstream fGenerator(OUTPUT_DIRECTORY + fileNamePrefix + "_generator.dat");
+	fGenerator << generator;
+	fGenerator.close();
+	ofstream fUniform(OUTPUT_DIRECTORY + fileNamePrefix + "_uniform.dat");
+	fUniform << distUniform;
+	fUniform.close();
+	ofstream fNormal(OUTPUT_DIRECTORY + fileNamePrefix + "_normal.dat");
+	fNormal << distNormal;
+	fNormal.close();
+}
+
 void BroadcastConfig()
 {
 	char dir[200];
@@ -436,8 +463,15 @@ void ReduceValues(vector<vector<double> >& data)
 
 void Init()
 {
-	generator = default_random_engine(processRank + 1);
-	srand(processRank + 1);
+	if (FileExist(configDirectory + "state" + "_generator.dat") && FileExist(configDirectory + "state" + "_uniform.dat") && FileExist(configDirectory + "state" + "_normal.dat"))
+	{
+		ReadRandomGeneratorStatesFromFile("state");
+	}
+	else
+	{
+		generator = default_random_engine(processRank + 1);
+		srand(processRank + 1);
+	}
 	LBOX = pow((N / RHO), 1.0/DIM); //box with dimensions [-L/2, L/2]
 	nAcceptances = 0;
 	nTrials = 0;
@@ -1352,269 +1386,6 @@ void AlignCoordinates(double** R)
 	}
 }
 
-int mainMPI(int argc, char** argv)
-{
-	char processName[80];
-	int processNameLength;
-
-	MPI_Init(&argc, &argv);
-	MPI_Comm_rank(MPI_COMM_WORLD, &processRank);
-	MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
-	MPI_Get_processor_name(processName, &processNameLength);
-
-	Log("running on cpu " + to_string(get_cpu_id()));
-
-	//if (processRank == rootRank)
-	//{
-	//	cout << "Read" << endl;
-	//	ReadFromFile("./bin/kVectors.json", 0);
-	//}
-
-	if (processRank == rootRank)
-	{
-		Log("Master process started...");
-
-		if (argc == 0) //INFO: started with pbs on mach
-		{
-			ReadConfig("/home/k3501/k354522/tVMC/bin/tVMC.config");
-			CreateOutputDirectory("/home/k3501/k354522/tVMC/bin/tVMC.config");
-		}
-		else
-		{
-			if (argc < 2)
-			{
-				cout << "no config file specified... argc=" << argc << endl;
-				MPI_Abort(MPI_COMM_WORLD, 0);
-				return 1;
-			}
-			ReadConfig(argv[1]);
-			//ReadConfig("/home/gartner/Sources/TDVMC/config/drop_6.config");
-			//ReadConfig("/home/gartner/Sources/TDVMC/config/drop_3.config");
-			CreateOutputDirectory(argv[1]);
-		}
-		//PrintConfig();
-	}
-	//configDirectory = "/home/gartner/Sources/TDVMC/config/";
-	string argv1str = string(argv[1]);
-	configDirectory = argv1str.substr(0, argv1str.find_last_of("\\/")) + "/";
-	//cout << "configDirectory=\"" << configDirectory << "\"" << endl;
-	BroadcastConfig();
-	//PrintConfig();
-
-	sys = new HeDrop(configDirectory);
-	//sys = new HeBulk(configDirectory);
-	Init();
-
-	double** R;
-	double* uR;
-	double* uI;
-	double phiR;
-	double phiI;
-
-	R = new double*[N];
-	for (int i = 0; i < N; i++)
-	{
-		R[i] = new double[DIM];
-	}
-	uR = new double[N_PARAM];
-	uI = new double[N_PARAM];
-
-	InitCoordinateConfiguration(R); //TODO: only init files in main process (at least when read from file)
-	if (processRank == rootRank)
-	{
-		for (int i = 0; i < N_PARAM; i++)
-		{
-			//double ii = (i + 1.0) / (double)(N_PARAM / 1.3);
-			//uR[i] = min(-1.0 / pow(ii, 1) + 1.0, 0.0);
-			//uR[i] = 1.0 / (double)(i + 1.0);
-			//uI[i] = 0.0;
-			uR[i] = PARAMS_REAL[i];
-			uI[i] = PARAMS_IMAGINARY[i];
-		}
-		phiR = PARAM_PHIR;
-		phiI = PARAM_PHII;
-		//phiR = -1.0;
-		//phiI = 0.0;
-		//NormalizeParameters(uR, uI, &phiR, &phiI);
-		//PrintParameters(uR);
-		//PrintParameters(uI);
-		WriteDataToFile(uR, N_PARAM, "parametersR0", "parameterR");
-		WriteDataToFile(uI, N_PARAM, "parametersI0", "parameterI");
-	}
-	if (processRank == rootRank)
-	{
-		cout << "PARAMS" << endl;
-		PrintParameters(uR);
-	}
-
-	int step = 0;
-	sys->InitSystem();
-	PostSystemInit();
-	for (currentTime = 0; currentTime <= TOTALTIME; currentTime += TIMESTEP)
-	{
-		nAcceptances = 0;
-		nTrials = 0;
-		step++;
-		sys->SetTime(currentTime);
-
-		BroadcastNewParameters(uR, uI, &phiR, &phiI);
-		if (processRank == rootRank)
-		{
-			uRList.push_back(ArrayToVector(uR, N_PARAM));
-			uIList.push_back(ArrayToVector(uI, N_PARAM));
-			phiRList.push_back(phiR);
-			phiIList.push_back(phiI);
-			if (uRList.size() > 105)
-			{
-				uRList.erase(uRList.begin());
-				uIList.erase(uIList.begin());
-				phiRList.erase(phiRList.begin());
-				phiIList.erase(phiIList.begin());
-			}
-		}
-		//PrintParameters(uR);
-		//PrintParameters(uI);
-		//cout << "phiR=" << phiR << ", phiI=" << phiI << endl;
-
-		AlignCoordinates(R);
-		ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
-		if (processRank == rootRank)
-		{
-			if (step % 100 == 0)
-			{
-				WriteDataToFile(localOperators, "localOperators" + to_string(step), "localOperators");
-				WriteDataToFile(localEnergyR, "localEnergyR" + to_string(step), "localEnergyR");
-				WriteDataToFile(localEnergyI, "localEnergyI" + to_string(step), "localEnergyI");
-				WriteDataToFile(localOperatorsMatrix, "localOperatorsMatrix" + to_string(step), "localOperatorsMatrix");
-				WriteDataToFile(localOperatorlocalEnergyR, "localOperatorlocalEnergyR" + to_string(step), "localOperatorlocalEnergyR");
-				WriteDataToFile(localOperatorlocalEnergyI, "localOperatorlocalEnergyI" + to_string(step), "localOperatorlocalEnergyI");
-				WriteDataToFile(otherExpectationValues, "otherExpectationValues" + to_string(step), "Ekin, Epot, wf, g(r)_1, ..., g(r)_100");
-			}
-			cout << "t=" << currentTime << endl;
-			//cout << "localEnergyR=" << localEnergyR << " (" << otherExpectationValues[0] << " + " << otherExpectationValues[1] << ")" << endl;
-			cout << "localEnergyR/N=" << localEnergyR / (double)N << " (" << otherExpectationValues[0] / (double)N << " + " << otherExpectationValues[1] / (double)N << ")" << endl;
-			AllLocalEnergyR.push_back(localEnergyR);
-			AllOtherExpectationValues.push_back(otherExpectationValues);
-			AllParametersR.push_back(ArrayToVector(uR, N_PARAM));
-			AllParametersI.push_back(ArrayToVector(uI, N_PARAM));
-		}
-		if (sys->USE_NORMALIZATION_AND_PHASE())
-		{
-			CalculateNextParameters(R, uR, uI, &phiR, &phiI);
-			if (processRank == rootRank)
-			{
-				//NormalizeWavefunction(otherExpectationValues[2], &phiR);
-			}
-		}
-		else
-		{
-			CalculateNextParameters(R, uR, uI);
-		}
-		if (processRank == rootRank)
-		{
-			if (step % 100 == 0)
-			{
-				WriteDataToFile(uR, N_PARAM, "parametersR" + to_string(step), "parameterR, phiR=" + to_string(phiR) + ", wf=" + to_string(sys->GetWf()));
-				WriteDataToFile(uI, N_PARAM, "parametersI" + to_string(step), "parameterI, phiI=" + to_string(phiI));
-			}
-			if (step % 100 == 0)
-			{
-				WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER", 100);
-				WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", "kinetic, potential, wf, g(r)", 100);
-				WriteDataToFile(AllParametersR, "AllParametersR", "uR", 100);
-				WriteDataToFile(AllParametersI, "AllParametersI", "uI", 100);
-			}
-		}
-		if (FileExist("./stop"))
-		{
-	        cout << "Detect stop-file!" << endl;
-	        cout << "Finishing simulation at t=" << currentTime << endl;
-	        TOTALTIME = currentTime;
-		}
-	}
-
-	if (processRank == rootRank)
-	{
-		PrintParameters(uR);
-		PrintParameters(uI);
-	}
-	//cout << "phiR=" << phiR << ", phiI=" << phiI << endl;
-
-	if (processRank == rootRank)
-	{
-		Log("Write last files ...");
-		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER");
-		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", "kinetic, potential, wf, g(r)");
-		WriteDataToFile(AllParametersR, "AllParametersR", "uR");
-		WriteDataToFile(AllParametersI, "AllParametersI", "uI");
-
-		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR100", "ER", 100);
-		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues100", "kinetic, potential, wf, g(r)", 100);
-		WriteDataToFile(AllParametersR, "AllParametersR100", "uR", 100);
-		WriteDataToFile(AllParametersI, "AllParametersI100", "uI", 100);
-	}
-
-	nAcceptances = 0;
-	nTrials = 0;
-	if (processRank == rootRank)
-	{
-		vector<double> finaluR = Mean(uRList);
-		vector<double> finaluI = Mean(uIList);
-		for (int i = 0; i < N_PARAM; i++)
-		{
-			uR[i] = finaluR[i];
-			uI[i] = finaluI[i];
-		}
-		phiR = Mean(phiRList);
-		phiI = Mean(phiIList);
-		//WriteDataToFile(uRList, "finalParameterList", "uR[n]");
-	}
-	BroadcastNewParameters(uR, uI, &phiR, &phiI);
-	AlignCoordinates(R);
-	ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
-	if (processRank == rootRank)
-	{
-		WriteDataToFile(additionalSystemProperties, "AdditionalSystemProperties", "g(r), ...");
-		WriteDataToFile(AllAdditionalSystemProperties, "AllAdditionalSystemProperties", "g(r), ...");
-	}
-
-	AlignCoordinates(R);
-	if (processRank == rootRank)
-	{
-		WriteParticleInputFile("AAFinish_particleconfiguration_" + to_string(N), R);
-		cout << "phiR=" << phiR << endl;
-		cout << "log(additionalSystemProperties[2])=" << log(additionalSystemProperties[2]) << endl;
-		phiR = phiR - log(additionalSystemProperties[2]);
-		cout << "phiR=" << phiR << endl;
-		WriteConfig("AAFinish_tVMC.config", uR, uI, phiR, phiI);
-
-		if (FileExist("./stop"))
-		{
-	        cout << "Delete stop-file!" << endl;
-	        RemoveFile("./stop");
-		}
-	}
-
-	sleep(10);
-	Log("free memory ...");
-
-	for (int i = 0; i < N; i++)
-	{
-		delete[] R[i];
-	}
-	delete[] R;
-	delete[] uR;
-	delete[] uI;
-	delete sys;
-
-	Log("finalize ...");
-	MPI_Finalize();
-
-	Log("done");
-
-	return 0;
-}
-
 int mainSerial(int argc, char** argv)
 {
 	if (argc < 2)
@@ -1731,13 +1502,279 @@ int mainSerial(int argc, char** argv)
 	return 0;
 }
 
+int mainMPI(int argc, char** argv, string configFilePath)
+{
+	char processName[80];
+	int processNameLength;
+
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &processRank);
+	MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
+	MPI_Get_processor_name(processName, &processNameLength);
+
+	Log("running on cpu " + to_string(get_cpu_id()));
+
+	if (processRank == rootRank)
+	{
+		Log("Master process started...");
+
+		if (FileExist(configFilePath))
+		{
+			ReadConfig(configFilePath);
+			CreateOutputDirectory(configFilePath);
+			//PrintConfig();
+		}
+		else
+		{
+			cout << "config file not found. path=\"" << configFilePath << "\"" << endl;
+			MPI_Abort(MPI_COMM_WORLD, 0);
+			return 1;
+		}
+	}
+	configDirectory = configFilePath.substr(0, configFilePath.find_last_of("\\/")) + "/"; //TODO: restrict all file access to main process
+	//cout << "configDirectory=\"" << configDirectory << "\"" << endl;
+	BroadcastConfig();
+	//PrintConfig();
+
+	sys = new HeDrop(configDirectory);
+	//sys = new HeBulk(configDirectory);
+	Init();
+	cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
+	cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
+	cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
+
+	double** R;
+	double* uR;
+	double* uI;
+	double phiR;
+	double phiI;
+
+	R = new double*[N];
+	for (int i = 0; i < N; i++)
+	{
+		R[i] = new double[DIM];
+	}
+	uR = new double[N_PARAM];
+	uI = new double[N_PARAM];
+
+	InitCoordinateConfiguration(R); //TODO: only init files in main process (at least when read from file)
+	if (processRank == rootRank)
+	{
+		for (int i = 0; i < N_PARAM; i++)
+		{
+			uR[i] = PARAMS_REAL[i];
+			uI[i] = PARAMS_IMAGINARY[i];
+		}
+		phiR = PARAM_PHIR;
+		phiI = PARAM_PHII;
+		//PrintParameters(uR);
+		//PrintParameters(uI);
+		WriteDataToFile(uR, N_PARAM, "parametersR0", "parameterR");
+		WriteDataToFile(uI, N_PARAM, "parametersI0", "parameterI");
+	}
+	if (processRank == rootRank)
+	{
+		cout << "PARAMS" << endl;
+		PrintParameters(uR);
+	}
+
+	sys->InitSystem();
+	PostSystemInit();
+
+	int step = 0;
+	for (currentTime = 0; currentTime <= TOTALTIME; currentTime += TIMESTEP)
+	{
+		nAcceptances = 0;
+		nTrials = 0;
+		step++;
+		sys->SetTime(currentTime);
+
+		BroadcastNewParameters(uR, uI, &phiR, &phiI);
+		if (USE_MEAN_FOR_FINAL_PARAMETERS)
+		{
+			if (processRank == rootRank)
+			{
+				uRList.push_back(ArrayToVector(uR, N_PARAM));
+				uIList.push_back(ArrayToVector(uI, N_PARAM));
+				phiRList.push_back(phiR);
+				phiIList.push_back(phiI);
+				if (uRList.size() > 105) //INFO: always keep the last few parameters in a list. at the end of the simulation the average of the last steps is calculated for a final value of the parameter
+				{
+					uRList.erase(uRList.begin());
+					uIList.erase(uIList.begin());
+					phiRList.erase(phiRList.begin());
+					phiIList.erase(phiIList.begin());
+				}
+			}
+		}
+		//PrintParameters(uR);
+		//PrintParameters(uI);
+		//cout << "phiR=" << phiR << ", phiI=" << phiI << endl;
+
+		AlignCoordinates(R);
+		ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
+		if (processRank == rootRank)
+		{
+			if (step % 100 == 0)
+			{
+				WriteDataToFile(localOperators, "localOperators" + to_string(step), "localOperators");
+				WriteDataToFile(localEnergyR, "localEnergyR" + to_string(step), "localEnergyR");
+				WriteDataToFile(localEnergyI, "localEnergyI" + to_string(step), "localEnergyI");
+				WriteDataToFile(localOperatorsMatrix, "localOperatorsMatrix" + to_string(step), "localOperatorsMatrix");
+				WriteDataToFile(localOperatorlocalEnergyR, "localOperatorlocalEnergyR" + to_string(step), "localOperatorlocalEnergyR");
+				WriteDataToFile(localOperatorlocalEnergyI, "localOperatorlocalEnergyI" + to_string(step), "localOperatorlocalEnergyI");
+				WriteDataToFile(otherExpectationValues, "otherExpectationValues" + to_string(step), "Ekin, Epot, wf, g(r)_1, ..., g(r)_100");
+			}
+			cout << "t=" << currentTime << endl;
+			//cout << "localEnergyR=" << localEnergyR << " (" << otherExpectationValues[0] << " + " << otherExpectationValues[1] << ")" << endl;
+			cout << "localEnergyR/N=" << localEnergyR / (double)N << " (" << otherExpectationValues[0] / (double)N << " + " << otherExpectationValues[1] / (double)N << ")" << endl;
+			AllLocalEnergyR.push_back(localEnergyR);
+			AllOtherExpectationValues.push_back(otherExpectationValues);
+			AllParametersR.push_back(ArrayToVector(uR, N_PARAM));
+			AllParametersI.push_back(ArrayToVector(uI, N_PARAM));
+		}
+		if (sys->USE_NORMALIZATION_AND_PHASE())
+		{
+			CalculateNextParameters(R, uR, uI, &phiR, &phiI);
+			if (processRank == rootRank)
+			{
+				//NormalizeWavefunction(otherExpectationValues[2], &phiR);
+			}
+		}
+		else
+		{
+			CalculateNextParameters(R, uR, uI);
+		}
+		if (processRank == rootRank)
+		{
+			if (step % 100 == 0)
+			{
+				WriteDataToFile(uR, N_PARAM, "parametersR" + to_string(step), "parameterR, phiR=" + to_string(phiR) + ", wf=" + to_string(sys->GetWf()));
+				WriteDataToFile(uI, N_PARAM, "parametersI" + to_string(step), "parameterI, phiI=" + to_string(phiI));
+			}
+			if (step % 100 == 0)
+			{
+				WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER", 100);
+				WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", "kinetic, potential, wf, g(r)", 100);
+				WriteDataToFile(AllParametersR, "AllParametersR", "uR", 100);
+				WriteDataToFile(AllParametersI, "AllParametersI", "uI", 100);
+			}
+		}
+		if (FileExist("./stop"))
+		{
+	        cout << "Detected stop-file!" << endl;
+	        cout << "Finishing simulation at t=" << currentTime << endl;
+	        TOTALTIME = currentTime;
+		}
+	}
+
+	if (processRank == rootRank)
+	{
+		PrintParameters(uR);
+		PrintParameters(uI);
+	}
+	//cout << "phiR=" << phiR << ", phiI=" << phiI << endl;
+
+	if (processRank == rootRank)
+	{
+		Log("Write last files ...");
+		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER");
+		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", "kinetic, potential, wf, g(r)");
+		WriteDataToFile(AllParametersR, "AllParametersR", "uR");
+		WriteDataToFile(AllParametersI, "AllParametersI", "uI");
+
+		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR100", "ER", 100);
+		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues100", "kinetic, potential, wf, g(r)", 100);
+		WriteDataToFile(AllParametersR, "AllParametersR100", "uR", 100);
+		WriteDataToFile(AllParametersI, "AllParametersI100", "uI", 100);
+		WriteRandomGeneratorStatesToFile("state");
+		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
+		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
+		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
+	}
+
+	nAcceptances = 0;
+	nTrials = 0;
+	if (USE_MEAN_FOR_FINAL_PARAMETERS)
+	{
+		if (processRank == rootRank)
+		{
+			vector<double> finaluR = Mean(uRList);
+			vector<double> finaluI = Mean(uIList);
+			for (int i = 0; i < N_PARAM; i++)
+			{
+				uR[i] = finaluR[i];
+				uI[i] = finaluI[i];
+			}
+			phiR = Mean(phiRList);
+			phiI = Mean(phiIList);
+			//WriteDataToFile(uRList, "finalParameterList", "uR[n]");
+		}
+	}
+	BroadcastNewParameters(uR, uI, &phiR, &phiI);
+	AlignCoordinates(R);
+	ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
+	if (processRank == rootRank)
+	{
+		WriteDataToFile(additionalSystemProperties, "AdditionalSystemProperties", "g(r), ...");
+		WriteDataToFile(AllAdditionalSystemProperties, "AllAdditionalSystemProperties", "g(r), ...");
+	}
+
+	AlignCoordinates(R);
+	if (processRank == rootRank)
+	{
+		WriteParticleInputFile("AAFinish_particleconfiguration_" + to_string(N), R);
+		cout << "phiR=" << phiR << endl;
+		cout << "log(additionalSystemProperties[2])=" << log(additionalSystemProperties[2]) << endl;
+		phiR = phiR - log(additionalSystemProperties[2]);
+		cout << "phiR=" << phiR << endl;
+		WriteConfig("AAFinish_tVMC.config", uR, uI, phiR, phiI);
+
+		if (FileExist("./stop"))
+		{
+	        cout << "Delete stop-file!" << endl;
+	        RemoveFile("./stop");
+		}
+	}
+
+	sleep(10);
+	Log("free memory ...");
+
+	for (int i = 0; i < N; i++)
+	{
+		delete[] R[i];
+	}
+	delete[] R;
+	delete[] uR;
+	delete[] uI;
+	delete sys;
+
+	Log("finalize ...");
+	MPI_Finalize();
+
+	Log("done");
+
+	return 0;
+}
+
 int main(int argc, char **argv) {
 	int val = -1;
 	cout << "#################################################" << endl;
 	cout << "#################################################" << endl;
 	Log("start");
 
-	if (argc > 1)
+	if (argc == 0) //INFO: started with pbs on mach
+	{
+		string configFilePath = "/home/k3501/k354522/tVMC/bin/tVMC.config";
+		val = mainMPI(argc, argv, configFilePath);
+	}
+	if (argc == 1) //INFO: started without specifying config-file. used for local execution
+	{
+		string configFilePath = "/home/gartner/Sources/TDVMC/config/drop_3.config";
+		//string configFilePath = "/home/gartner/Sources/TDVMC/config/drop_6.config";
+		val = mainMPI(argc, argv, configFilePath);
+	}
+	else if (argc > 1)
 	{
 		if (strcmp(argv[1], "-test") == 0)
 		{
@@ -1757,7 +1794,7 @@ int main(int argc, char **argv) {
 		}
 		else
 		{
-			val = mainMPI(argc, argv);
+			val = mainMPI(argc, argv, string(argv[1]));
 		}
 	}
 
