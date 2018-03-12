@@ -8,7 +8,8 @@
 using namespace std;
 
 void CalculatePi(int argc, char *argv[]) {
-	int rank, size;
+	int rank;
+	int size;
 	double PI25DT = 3.141592653589793238462643;
 	double mypi, pi, x, y;
 	int total, inside;

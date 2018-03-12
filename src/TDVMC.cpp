@@ -1,4 +1,3 @@
-#include <chrono>
 #include "Constants.h"
 #include <cstring>
 #include <ctime>
@@ -18,8 +17,10 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string>
+#include "test/MPITest.h"
 #include "test/PiCalculator.h"
 #include "test/Tests.h"
+#include "Timer.h"
 #include <unistd.h>
 #include "Utils.h"
 #include <vector>
@@ -84,7 +85,8 @@ vector<vector<double> > AllParametersR;
 vector<vector<double> > AllParametersI;
 vector<vector<double> > AllAdditionalSystemProperties;
 
-default_random_engine generator;
+mt19937_64 generator;
+//default_random_engine generator;
 uniform_real_distribution<double> distUniform(0.0, 1.0);
 normal_distribution<double> distNormal(0.0, 1.0);
 
@@ -469,7 +471,8 @@ void Init()
 	}
 	else
 	{
-		generator = default_random_engine(processRank + 1);
+		generator = mt19937_64(processRank + 1);
+		//generator = default_random_engine(processRank + 1);
 		srand(processRank + 1);
 	}
 	LBOX = pow((N / RHO), 1.0/DIM); //box with dimensions [-L/2, L/2]
@@ -779,17 +782,14 @@ void UpdateExpectationValues(double** R, double* uR, double* uI, double phiR, do
 
 void ParallelUpdateExpectationValues(double** R, double* uR, double* uI, double phiR, double phiI, bool intermediateStep = false)
 {
-	chrono::high_resolution_clock::time_point t1;
-	chrono::high_resolution_clock::time_point t2;
-	int duration;
+	Timer t;
 	double dblDuration;
-	t1 = chrono::high_resolution_clock::now();
+	t.start();
 
 	UpdateExpectationValues(R, uR, uI, phiR, phiI, intermediateStep);
 
-	t2 = chrono::high_resolution_clock::now();
-	duration = chrono::duration_cast<chrono::milliseconds>( t2 - t1 ).count();
-	dblDuration = (double) duration;
+	t.stop();
+	dblDuration = (double)t.duration();
 	vector<double> timings = ReduceToMinMaxMean(&dblDuration);
 	if (processRank == rootRank && !intermediateStep)
 	{
@@ -1262,12 +1262,10 @@ void CalculateNextParameters(double** R, double* uR, double* uI)
 
 void CalculateNextParameters(double** R, double* uR, double* uI, double *phiR, double *phiI)
 {
-	chrono::high_resolution_clock::time_point t1;
-	chrono::high_resolution_clock::time_point t2;
-	int duration;
+	Timer t;
 	if (processRank == rootRank)
 	{
-		t1 = chrono::high_resolution_clock::now();
+		t.start();
 	}
 
 	int type = 0;
@@ -1310,9 +1308,8 @@ void CalculateNextParameters(double** R, double* uR, double* uI, double *phiR, d
 
 	if (processRank == rootRank)
 	{
-		t2 = chrono::high_resolution_clock::now();
-		duration = chrono::duration_cast<chrono::milliseconds>( t2 - t1 ).count();
-		Log("DGL duration = " + to_string(duration) + " ms");
+		t.stop();
+		Log("DGL duration = " + to_string(t.duration()) + " ms");
 	}
 }
 
@@ -1650,6 +1647,7 @@ int mainMPI(int argc, char** argv)
 
 int main(int argc, char **argv) {
 	int val = -1;
+	cout << to_string(argc) << "|" << argv[1] << "|" << to_string(strcmp(argv[1], "-mpitest")) << "|" << endl;
 	cout << "#################################################" << endl;
 	cout << "#################################################" << endl;
 	Log("start");
@@ -1681,6 +1679,11 @@ int main(int argc, char **argv) {
 		else if (strcmp(argv[1], "-vectortest") == 0)
 		{
 			TestVectorDisplacements();
+			val = 0;
+		}
+		else if (strcmp(argv[1], "-mpitest") == 0)
+		{
+			TestMPI(argc, argv);
 			val = 0;
 		}
 		else

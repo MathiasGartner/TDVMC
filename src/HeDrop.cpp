@@ -307,7 +307,7 @@ void HeDrop::CalculateExpectationValues(double** R, double* uR, double* uI, doub
 					{
 						F = exp(-pow(d / x - 1, 2));
 					}
-					potentialIntern += (1.0 + 0.0 * pow(sin(10000.0 * this->time), 2)) * e * (a * exp(-alpha * x + beta * x2) - F * xminus6 * (c6 + xminus2 * (c8 + xminus2 * c10)));
+					potentialIntern += (1.0 + 0.05 * pow(sin(50000.0 * this->time), 2)) * e * (a * exp(-alpha * x + beta * x2) - F * xminus6 * (c6 + xminus2 * (c8 + xminus2 * c10)));
 				}
 
 				//kinetic energy
