@@ -186,7 +186,7 @@ void HeDrop::InitSystem()
 		}
 	}
 
-	cout << "nodePointSpacingShort=" << nodePointSpacingShort << ", nodePointSpacingLarge=" << nodePointSpacingLarge << ", rijSplit=" << rijSplit << ", rijSplineSplit=" << rijSplineSplit << ", rijTail=" << rijTail << endl;
+	//cout << "nodePointSpacingShort=" << nodePointSpacingShort << ", nodePointSpacingLarge=" << nodePointSpacingLarge << ", rijSplit=" << rijSplit << ", rijSplineSplit=" << rijSplineSplit << ", rijTail=" << rijTail << endl;
 }
 
 vector<double> HeDrop::GetCenterOfMass(double** R)
@@ -298,7 +298,7 @@ void HeDrop::CalculateExpectationValues(double** R, double* uR, double* uI, doub
 				//}
 				if (i < n)
 				{
-					double x = rni / rm;
+					double x = rni / (rm * (1.0 + 0.08 * pow(sin(6000.0 * this->time), 2)));
 					double x2 = pow(x, 2);
 					double xminus2 = 1.0 / x2;
 					double xminus6 = pow(xminus2, 3);
@@ -307,7 +307,7 @@ void HeDrop::CalculateExpectationValues(double** R, double* uR, double* uI, doub
 					{
 						F = exp(-pow(d / x - 1, 2));
 					}
-					potentialIntern += (1.0 + 0.05 * pow(sin(50000.0 * this->time), 2)) * e * (a * exp(-alpha * x + beta * x2) - F * xminus6 * (c6 + xminus2 * (c8 + xminus2 * c10)));
+					potentialIntern += (1.0 + 0.08 * pow(sin(6000.0 * this->time), 2)) * e * (a * exp(-alpha * x + beta * x2) - F * xminus6 * (c6 + xminus2 * (c8 + xminus2 * c10)));
 				}
 
 				//kinetic energy

@@ -14,6 +14,7 @@
 //#undef SEEK_CUR
 
 #include "mpi.h"
+#include "MPIMethods.h"
 #include <signal.h>
 #include <stdlib.h>
 #include <string>
@@ -548,7 +549,10 @@ void InitCoordinateConfiguration(double** R)
 	string filename = "particleconfiguration_" + to_string(N);
 	if (!LoadLastPositionsFromFile(filename, R))
 	{
-		cout << "LBOX=" << LBOX << endl;
+		if (processRank == rootRank)
+		{
+			cout << "LBOX=" << LBOX << endl;
+		}
 		int type = 2;
 		if (type == 0)
 		{
@@ -1394,7 +1398,7 @@ int mainMPI(int argc, char** argv)
 	MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
 	MPI_Get_processor_name(processName, &processNameLength);
 
-	Log("running on cpu " + to_string(get_cpu_id()));
+	//Log("running on cpu " + to_string(get_cpu_id()));
 
 	if (processRank == rootRank)
 	{
@@ -1647,10 +1651,10 @@ int mainMPI(int argc, char** argv)
 
 int main(int argc, char **argv) {
 	int val = -1;
-	cout << to_string(argc) << "|" << argv[1] << "|" << to_string(strcmp(argv[1], "-mpitest")) << "|" << endl;
-	cout << "#################################################" << endl;
-	cout << "#################################################" << endl;
-	Log("start");
+	//cout << to_string(argc) << "|" << argv[1] << "|" << to_string(strcmp(argv[1], "-mpitest")) << "|" << endl;
+	//cout << "#################################################" << endl;
+	//cout << "#################################################" << endl;
+	//Log("start");
 
 	if (argc == 0) //INFO: started with pbs on mach
 	{
@@ -1667,23 +1671,23 @@ int main(int argc, char **argv) {
 	{
 		if (strcmp(argv[1], "-test") == 0)
 		{
-			CalculatePi(argc, argv);
-			TestVectorDisplacements();
+			Test::CalculatePi(argc, argv);
+			Test::TestVectorDisplacements();
 			val = 0;
 		}
 		else if (strcmp(argv[1], "-pitest") == 0)
 		{
-			CalculatePi(argc, argv);
+			Test::CalculatePi(argc, argv);
 			val = 0;
 		}
 		else if (strcmp(argv[1], "-vectortest") == 0)
 		{
-			TestVectorDisplacements();
+			Test::TestVectorDisplacements();
 			val = 0;
 		}
 		else if (strcmp(argv[1], "-mpitest") == 0)
 		{
-			TestMPI(argc, argv);
+			Test::TestMPI(argc, argv);
 			val = 0;
 		}
 		else
@@ -1694,7 +1698,7 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	Log("exit");
+	//Log("exit");
 	return val;
 }
 

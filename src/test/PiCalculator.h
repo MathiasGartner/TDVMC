@@ -7,6 +7,9 @@
 
 using namespace std;
 
+namespace Test
+{
+
 void CalculatePi(int argc, char *argv[]) {
 	int rank;
 	int size;
@@ -41,4 +44,6 @@ void CalculatePi(int argc, char *argv[]) {
 				<< fabs(pi - PI25DT) << endl;
 
 	MPI::Finalize();
+}
+
 }

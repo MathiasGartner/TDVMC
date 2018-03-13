@@ -5,6 +5,9 @@
 
 using namespace std;
 
+namespace Test
+{
+
 double eps = 1e-9;
 
 bool CheckDouble(double d1, double d2)
@@ -65,4 +68,6 @@ void TestVectorDisplacements()
 	TestVectorDisplacement(4, 4, 4, 9.9, 0, 0, sqrt(1.9*1.9), -1.9, 0, 0);
 	TestVectorDisplacement(0.1, 0, 0, 3.9, 0, 0, sqrt(0.2*0.2), 0.2, 0, 0);
 	cout << endl;
+}
+
 }

@@ -1,65 +1,20 @@
 #pragma once
 
 #include "../Constants.h"
+#include "../MPIMethods.h"
 #include "../Timer.h"
 #include "../Utils.h"
 #include "mpi.h"
 
 using namespace std;
 
-int ownRank;
-int totalSize;
-
-void MPIVectorToArrayTest(vector<double>& v)
+namespace Test
 {
-	int rootRank = 0;
 
-	double* ownValues = new double[v.size()];
-	double* reducedValues = new double[v.size()];
+int numOfProcesses = 1;
+int rootRank = 0;
+int processRank = 0;
 
-	for (unsigned int i = 0; i < v.size(); i++)
-	{
-		ownValues[i] = v[i];
-	}
-	MPI_Reduce(ownValues, reducedValues, v.size(), MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
-	if (ownRank == rootRank)
-	{
-		for (unsigned int i = 0; i < v.size(); i++)
-		{
-			v[i] = reducedValues[i] / (double)totalSize;
-		}
-	}
-	delete[] ownValues;
-	delete[] reducedValues;
-}
-
-void MPIVector2DToArrayTest(vector<vector<double> >& v)
-{
-	for (unsigned int i = 0; i < v.size(); i++)
-	{
-		MPIVectorToArrayTest(v[i]);
-	}
-}
-
-vector<double> GetTimings(double* data)
-{
-	int rootRank = 0;
-	vector<double> values = {};
-	double own = 0;
-	double min = 0;
-	double max = 0;
-	double sum = 0;
-
-	own = *data;
-	MPI_Reduce(&own, &min, 1, MPI_DOUBLE, MPI_MIN, rootRank, MPI_COMM_WORLD);
-	MPI_Reduce(&own, &max, 1, MPI_DOUBLE, MPI_MAX, rootRank, MPI_COMM_WORLD);
-	MPI_Reduce(&own, &sum, 1, MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
-	if (ownRank == rootRank)
-	{
-		values = { min, max, sum / (double)totalSize };
-	}
-	return values;
-}
 
 void CreateRandomVector(vector<double>& v, int n, int randType)
 {
@@ -79,8 +34,7 @@ void CreateRandomVector(vector<double>& v, int n, int randType)
 		{
 			v[i] = distUniform(generator);
 		}
-	}
-	else if (randType == 2)
+	} else if (randType == 2)
 	{
 		mt19937_64 generator(time(NULL));
 		uniform_real_distribution<double> distUniform(0.0, 1.0);
@@ -102,8 +56,7 @@ void CreateRandomVector2D(vector<vector<double> >& v, int n, int randType)
 
 void PrintTimings(vector<double> timings, string message)
 {
-	int rootRank = 0;
-	if (ownRank == rootRank)
+	if (processRank == rootRank)
 	{
 		cout << message << endl;
 		cout << "duration: min = " << to_string(timings[0]) << " ms" << endl;
@@ -112,16 +65,150 @@ void PrintTimings(vector<double> timings, string message)
 	}
 }
 
-void TestMPI(int argc, char *argv[])
+void TestMPIData()
 {
-	MPI::Init(argc, argv);
-	ownRank = MPI::COMM_WORLD.Get_rank();
-	totalSize = MPI::COMM_WORLD.Get_size();
+	double value;
+	double* data = new double[3];
+	vector<double> v;
+	vector<vector<double> > v2;
 
+	//Broadcast double test
+	value = 1.0;
+	if (processRank == rootRank)
+	{
+		value = 3.3;
+	}
+	MPIMethods::BroadcastValue(&value);
+	if (value != 3.3)
+	{
+		cout << "ERROR on process " << to_string(processRank) << "!!" << endl;
+	}
+	else if (processRank == rootRank)
+	{
+		cout << "Broadcast double done" << endl;
+	}
+
+	//Broadcast double array test
+	data[0] = 1.0; data[1] = 2.0; data[2] = 3.0;
+	if (processRank == rootRank)
+	{
+		data[0] = 1.1; data[1] = 2.2; data[2] = 3.3;
+	}
+	MPIMethods::BroadcastValues(data, 3);
+	if (data[0] != 1.1 ||
+		data[1] != 2.2 ||
+		data[2] != 3.3)
+	{
+		cout << "ERROR on process " << to_string(processRank) << "!!" << endl;
+	}
+	else if (processRank == rootRank)
+	{
+		cout << "Broadcast double array done" << endl;
+	}
+
+	//Broadcast double vector test
+	v = {1.0, 2.0, 3.0};
+	if (processRank == rootRank)
+	{
+		v = {1.1, 2.2, 3.3};
+	}
+	MPIMethods::BroadcastValues(v);
+	if (v[0] != 1.1 ||
+		v[1] != 2.2 ||
+		v[2] != 3.3)
+	{
+		cout << "ERROR on process " << to_string(processRank) << "!!" << endl;
+	}
+	else if (processRank == rootRank)
+	{
+		cout << "Broadcast double vector done" << endl;
+	}
+
+	//Broadcast double 2D vector test
+	v2 = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}};
+	if (processRank == rootRank)
+	{
+		v2 = {{1.1, 2.2, 3.3}, {4.4, 5.5, 6.6}};
+	}
+	MPIMethods::BroadcastValues(v2);
+	if (v2[0][0] != 1.1 ||
+		v2[0][1] != 2.2 ||
+		v2[0][2] != 3.3 ||
+		v2[1][0] != 4.4 ||
+		v2[1][1] != 5.5 ||
+		v2[1][2] != 6.6)
+	{
+		cout << "ERROR on process " << to_string(processRank) << "!!" << endl;
+	}
+	else if (processRank == rootRank)
+	{
+		cout << "Broadcast double 2D vector done" << endl;
+	}
+
+	//ReduceToMinMaxMean test
+	value = processRank * 2.0;
+	v = MPIMethods::ReduceToMinMaxMean(value);
+	if (processRank == rootRank)
+	{
+		if (v[0] != 0.0 ||
+			v[1] != 2.0 * (numOfProcesses - 1) ||
+			v[2] != (numOfProcesses - 1))
+		{
+			cout << "ERROR calculating ReduceToMinMaxMean!!" << endl;
+		}
+		cout << "ReduceToMinMaxMean done" << endl;
+	}
+
+	//ReduceToAverage double test
+	value = processRank * 2.0;
+	MPIMethods::ReduceToAverage(&value);
+	if (processRank == rootRank)
+	{
+		if (value != (numOfProcesses - 1.0))
+		{
+			cout << "ERROR calculating ReduceToAverage double!!" << endl;
+		}
+		cout << "ReduceToAverage double done" << endl;
+	}
+
+	//ReduceToAverage vector test
+	v = {processRank * 1.0, processRank * 2.0, processRank * 3.0};
+	MPIMethods::ReduceToAverage(v);
+	if (processRank == rootRank)
+	{
+		if (v[0] != 0.5 * (numOfProcesses - 1.0) ||
+			v[1] != 1.0 * (numOfProcesses - 1.0) ||
+			v[2] != 1.5 * (numOfProcesses - 1.0))
+		{
+			cout << "ERROR calculating ReduceToAverage vector!!" << endl;
+		}
+		cout << "ReduceToAverage vector done" << endl;
+	}
+
+	//ReduceToAverage 2D vector test
+	v2 = {{processRank * 1.0, processRank * 2.0, processRank * 3.0}, {processRank * 4.0, processRank * 5.0, processRank * 6.0}};
+	MPIMethods::ReduceToAverage(v2);
+	if (processRank == rootRank)
+	{
+		if (v2[0][0] != 0.5 * (numOfProcesses - 1.0) ||
+			v2[0][1] != 1.0 * (numOfProcesses - 1.0) ||
+			v2[0][2] != 1.5 * (numOfProcesses - 1.0) ||
+			v2[1][0] != 2.0 * (numOfProcesses - 1.0) ||
+			v2[1][1] != 2.5 * (numOfProcesses - 1.0) ||
+			v2[1][2] != 3.0 * (numOfProcesses - 1.0))
+		{
+			cout << "ERROR calculating ReduceToAverage 2D vector!!" << endl;
+		}
+		cout << "ReduceToAverage 2D vector done" << endl;
+	}
+
+	delete[] data;
+}
+
+void TestMPITiming()
+{
 	Timer t;
-	double duration;
-	vector<double> timings;
-	int k = 1;
+	int k = 10;
 	int n = 1000000;
 	int n2D = 1000;
 	vector<double> v;
@@ -129,75 +216,80 @@ void TestMPI(int argc, char *argv[])
 
 	t.start();
 	for (int i = 0; i < k; i++)
-	CreateRandomVector(v, n, 0);
+		CreateRandomVector(v, n, 0);
 	t.stop();
-	//cout << "RandomVectorTest rand with n=" << to_string(n) << ": " << to_string(t.duration()) << "ms" << endl;
-	duration = t.duration();
-	timings = GetTimings(&duration);
-	PrintTimings(timings, "RandomVectorTest rand");
+	PrintTimings(MPIMethods::ReduceToMinMaxMean(t.duration()), "RandomVectorTest rand (" + to_string(n) + ")");
 
 	t.start();
 	for (int i = 0; i < k; i++)
-	CreateRandomVector(v, n, 1);
+		CreateRandomVector(v, n, 1);
 	t.stop();
-	//cout << "RandomVectorTest mersenne with n=" << to_string(n) << ": " << to_string(t.duration()) << "ms" << endl;
-	duration = t.duration();
-	timings = GetTimings(&duration);
-	PrintTimings(timings, "RandomVectorTest mersenne");
+	PrintTimings(MPIMethods::ReduceToMinMaxMean(t.duration()), "RandomVectorTest mersenne (" + to_string(n) + ")");
 
 	t.start();
 	for (int i = 0; i < k; i++)
+		CreateRandomVector(v, n, 2);
+	t.stop();
+	PrintTimings(MPIMethods::ReduceToMinMaxMean(t.duration()), "RandomVectorTest mersenne_64 (" + to_string(n) + ")");
+
+	t.start();
+	for (int i = 0; i < k; i++)
+		CreateRandomVector2D(v2D, n2D, 0);
+	t.stop();
+	PrintTimings(MPIMethods::ReduceToMinMaxMean(t.duration()), "RandomVectorTest2D rand (" + to_string(n2D) + "x" + to_string(n2D) + ")");
+
+	t.start();
+	for (int i = 0; i < k; i++)
+		CreateRandomVector2D(v2D, n2D, 1);
+	t.stop();
+	PrintTimings(MPIMethods::ReduceToMinMaxMean(t.duration()), "RandomVectorTest2D mersenne (" + to_string(n2D) + "x" + to_string(n2D) + ")");
+
+	t.start();
+	for (int i = 0; i < k; i++)
+		CreateRandomVector2D(v2D, n2D, 2);
+	t.stop();
+	PrintTimings(MPIMethods::ReduceToMinMaxMean(t.duration()), "RandomVectorTest2D mersenne_64 (" + to_string(n2D) + "x" + to_string(n2D) + ")");
+
+	if (processRank == rootRank)
+	{
+		cout << endl << "=====================" << endl << endl;
+	}
+
 	CreateRandomVector(v, n, 2);
-	t.stop();
-	//cout << "RandomVectorTest mersenne_64 with n=" << to_string(n) << ": " << to_string(t.duration()) << "ms" << endl;
-	duration = t.duration();
-	timings = GetTimings(&duration);
-	PrintTimings(timings, "RandomVectorTest mersenne_64");
-
 	t.start();
 	for (int i = 0; i < k; i++)
-	CreateRandomVector2D(v2D, n2D, 0);
+		MPIMethods::ReduceToAverage(v);
 	t.stop();
-	//cout << "RandomVectorTest2D rand with n=" << to_string(n) << ": " << to_string(t.duration()) << "ms" << endl;
-	duration = t.duration();
-	timings = GetTimings(&duration);
-	PrintTimings(timings, "RandomVectorTest2D rand");
+	PrintTimings(MPIMethods::ReduceToMinMaxMean(t.duration()), "MPIVectorToArrayTest (" + to_string(n) + ")");
 
-	t.start();
-	for (int i = 0; i < k; i++)
-	CreateRandomVector2D(v2D, n2D, 1);
-	t.stop();
-	//cout << "RandomVectorTest2D mersenne with n=" << to_string(n) << ": " << to_string(t.duration()) << "ms" << endl;
-	duration = t.duration();
-	timings = GetTimings(&duration);
-	PrintTimings(timings, "RandomVectorTest2D rand");
-
-	t.start();
-	for (int i = 0; i < k; i++)
 	CreateRandomVector2D(v2D, n2D, 2);
-	t.stop();
-	//cout << "RandomVectorTest2D mersenne_64 with n=" << to_string(n) << ": " << to_string(t.duration()) << "ms" << endl;
-	duration = t.duration();
-	timings = GetTimings(&duration);
-	PrintTimings(timings, "RandomVectorTest2D rand");
-
 	t.start();
 	for (int i = 0; i < k; i++)
-	MPIVectorToArrayTest(v);
+		MPIMethods::ReduceToAverage(v2D);
 	t.stop();
-	//cout << "MPIVectorToArrayTest with n=" << to_string(n) << ": " << to_string(t.duration()) << "ms" << endl;
-	duration = t.duration();
-	timings = GetTimings(&duration);
-	PrintTimings(timings, "MPIVectorToArrayTest");
+	PrintTimings(MPIMethods::ReduceToMinMaxMean(t.duration()), "MPIVector2DToArrayTest (" + to_string(n2D) + "x" + to_string(n2D) + ")");
+}
 
-	t.start();
-	for (int i = 0; i < k; i++)
-	MPIVector2DToArrayTest(v2D);
-	t.stop();
-	//cout << "MPIVector2DToArrayTest with n=" << to_string(n2D) << ": " << to_string(t.duration()) << "ms" << endl;
-	duration = t.duration();
-	timings = GetTimings(&duration);
-	PrintTimings(timings, "MPIVector2DToArrayTest");
+void TestMPI(int argc, char *argv[])
+{
+	MPI::Init(argc, argv);
+	processRank = MPI::COMM_WORLD.Get_rank();
+	numOfProcesses = MPI::COMM_WORLD.Get_size();
+
+	MPIMethods::numOfProcesses = numOfProcesses;
+	MPIMethods::processRank = processRank;
+	MPIMethods::rootRank = rootRank;
+
+	TestMPIData();
+	if (processRank == rootRank)
+	{
+		cout << endl << "=====================";
+		cout << endl << "=====================" << endl << endl;
+	}
+	TestMPITiming();
 
 	MPI::Finalize();
 }
+
+}
+
