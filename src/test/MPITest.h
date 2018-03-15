@@ -424,6 +424,12 @@ void TestMPI(int argc, char *argv[])
 	TestMPITiming(100, 100);
 	if (processRank == rootRank)
 	{
+		cout << endl << "==========TestMPITiming(500, 100)==========";
+		cout << endl << "===========================================" << endl << endl;
+	}
+	TestMPITiming(500, 100);
+	if (processRank == rootRank)
+	{
 		cout << endl << "==========TestMPITiming(1000, 100)==========";
 		cout << endl << "============================================" << endl << endl;
 	}

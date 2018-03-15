@@ -17,9 +17,9 @@ bool CheckDouble(double d1, double d2)
 
 void TestVectorDisplacement(double i1, double i2, double i3, double j1, double j2, double j3, double resultDisplacement, double result1, double result2, double result3)
 {
-	double* veci = new double[DIM];
-	double* vecj = new double[DIM];
-	double* vecij = new double[DIM];
+	vector<double> veci(DIM);
+	vector<double> vecj(DIM);
+	vector<double> vecij(DIM);
 	double vecDisplacement;
 
 	veci[0] = i1;
@@ -28,7 +28,7 @@ void TestVectorDisplacement(double i1, double i2, double i3, double j1, double j
 	vecj[0] = j1;
 	vecj[1] = j2;
 	vecj[2] = j3;
-	vecDisplacement = VectorDisplacementNIC(veci, vecj, vecij, DIM);
+	vecDisplacement = VectorDisplacementNIC(veci, vecj, vecij);
 	if (CheckDouble(resultDisplacement, vecDisplacement) &&
 		CheckDouble(result1, vecij[0]) &&
 		CheckDouble(result2, vecij[1]) &&
@@ -46,10 +46,6 @@ void TestVectorDisplacement(double i1, double i2, double i3, double j1, double j
 		cout << "vecij[0]: " << result3 << "=" << vecij[2] << endl;
 		cout << endl;
 	}
-
-	delete[] veci;
-	delete[] vecj;
-	delete[] vecij;
 }
 
 void TestVectorDisplacements()

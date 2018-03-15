@@ -58,17 +58,17 @@ public:
 
 	virtual void InitSystem() = 0;
 
-	virtual vector<double> GetCenterOfMass(double** R) = 0;
+	virtual vector<double> GetCenterOfMass(vector<vector<double> >& R) = 0;
 
-	virtual void CalculateExpectationValues(double** R, double* uR, double* uI, double phiR, double phiI) = 0;
+	virtual void CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI) = 0;
 
-	virtual void CalculateAdditionalSystemProperties(double** R, double* uR, double* uI, double phiR, double phiI) = 0;
+	virtual void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI) = 0;
 
-	virtual void CalculateWavefunction(double** R, double* uR, double* uI, double phiR, double phiI) = 0;
+	virtual void CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI) = 0;
 
-	virtual void CalculateWFChange(double** R, double* uR, double* uI, double phiR, double phiI, int changedParticleIndex, double* oldPosition) = 0;
+	virtual void CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition) = 0;
 
-	virtual double GetWFQuotient(double** R, double* uR, double* uI, double phiR, double phiI, int changedParticleIndex, double* oldPosition) = 0;
+	virtual double CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition) = 0;
 
 	virtual void AcceptMove() = 0;
 };

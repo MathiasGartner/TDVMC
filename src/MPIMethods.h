@@ -38,21 +38,12 @@ void BroadcastValues(double* data, int count)
 
 void BroadcastValues(vector<double>& data)
 {
-	double* valueArray = new double[data.size()];
-	for (unsigned int i = 0; i < data.size(); i++)
-	{
-		valueArray[i] = data[i];
-	}
-	MPI_Bcast(valueArray, data.size(), MPI_DOUBLE, rootRank, MPI_COMM_WORLD);
-	for (unsigned int i = 0; i < data.size(); i++)
-	{
-		data[i] = valueArray[i];
-	}
-	delete[] valueArray;
+	MPI_Bcast(data.data(), data.size(), MPI_DOUBLE, rootRank, MPI_COMM_WORLD);
 }
 
 void BroadcastValues(vector<vector<double> >& data)
 {
+	//TODO: if needed in TDVMC-calculations -> check performance
 	for (unsigned int i = 0; i < data.size(); i++)
 	{
 		BroadcastValues(data[i]);
@@ -140,33 +131,37 @@ void ReduceToAverage(vector<double>& data)
 
 void ReduceToAverage(vector<vector<double> >& data)
 {
-	//TODO: warum funtioniert diese methode nicht? ist extrem langsam wenn auf zusie 257 prozesse gestartet werden (für 256 noch ganz normal)
-	//for (unsigned int i = 0; i < data.size(); i++)
-	//{
-	//	if (processRank == rootRank)
-	//	{
-	//		cout << i << endl;
-	//	}
-	//	ReduceToAverage(data[i]);
-	//}
-	//TODO: effizientere methode möglich?
 	int size1 = data.size();
 	int size2 = data[0].size();
 	int totalSize = size1 * size2;
-	double* combinedValues = new double[totalSize];
-	for (int i = 0; i < totalSize; i++)
+	//TODO: besseres kriterium überlegen und auch auf anderen servern testen
+	//		der wert 500 ist für zusie bie 256 prozessen.
+	//		wie viele elemente insgesamt? quadratische matrix oder eher recht lange/breite matrix? ...
+	if (size2 > 500)
 	{
-		combinedValues[i] = data[i / size2][i % size2];
-	}
-	ReduceToAverage(combinedValues, totalSize);
-	if (processRank == rootRank)
-	{
-		for (int i = 0; i < totalSize; i++)
+		//TODO: warum funtioniert diese methode nicht? ist extrem langsam wenn auf zusie 257 prozesse gestartet werden (für 256 noch ganz normal)
+		for (unsigned int i = 0; i < data.size(); i++)
 		{
-			data[i / size2][i % size2] = combinedValues[i];
+			ReduceToAverage(data[i]);
 		}
 	}
-	delete[] combinedValues;
+	else
+	{
+		//TODO: funktioniert auch für >257 prozesse, ist aber langsamer. effizientere methode möglich?
+		vector<double> combinedValues(totalSize);
+		for (int i = 0; i < totalSize; i++)
+		{
+			combinedValues[i] = data[i / size2][i % size2];
+		}
+		ReduceToAverage(combinedValues);
+		if (processRank == rootRank)
+		{
+			for (int i = 0; i < totalSize; i++)
+			{
+				data[i / size2][i % size2] = combinedValues[i];
+			}
+		}
+	}
 }
 
 map<int, int> GatherHistogram(int data)

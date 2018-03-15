@@ -36,17 +36,15 @@ bool CopyFile(string filePathSource, string filePathNew);
 
 string PrintArrayValues(double* r, int length);
 
-double VectorDotProduct(double* v1, double* v2, int length);
-double VectorNorm2(vector<double> r);
-double VectorNorm2(double* r, int length);
-double VectorNorm(vector<double> r);
-double VectorNorm(double* r, int length);
-double VectorDisplacement(double* ri, double* rj, double* result, int length);
+double VectorDotProduct(vector<double>& v1, vector<double>& v2);
+double VectorNorm2(vector<double>& r);
+double VectorNorm(vector<double>& r);
+double VectorDisplacement(vector<double>& ri, vector<double>& rj, vector<double>& result);
 
 double GetCoordinateNIC(double r);
-void GetVectorNIC(double* r, double* rNIC, int length);
-void VectorDiffNIC(double* ri, double* rj, double* result, int length);
-double VectorDisplacementNIC(double* ri, double* rj, double* result, int length);
+void GetVectorNIC(vector<double>& r, vector<double>& rNIC);
+void VectorDiffNIC(vector<double>& ri, vector<double>& rj, vector<double>& result);
+double VectorDisplacementNIC(vector<double>& ri, vector<double>& rj, vector<double>& result);
 
 double Mean(vector<double>& v);
 vector<double> Mean(vector<vector<double> >& v);
@@ -54,7 +52,6 @@ vector<vector<double> > Mean(vector<vector<vector<double> > >& v);
 
 void CopyArray(double* original, double* copy, int dim);
 void Copy2DArray(double** original, double** copy, int dim1, int dim2);
-
 vector<double> ArrayToVector(double* arr, int length);
 
 void split(const string &s, char delim, vector<string> &elems);

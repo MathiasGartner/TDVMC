@@ -124,17 +124,17 @@ void HeBulk::InitSystem()
 	cout << "nodePointSpacing=" << nodePointSpacing << endl;
 }
 
-vector<double> HeBulk::GetCenterOfMass(double** R)
+vector<double> HeBulk::GetCenterOfMass(vector<vector<double> >& R)
 {
 	vector<double> com = {0, 0, 0};
 	return com;
 }
 
-void HeBulk::CalculateExpectationValues(double** R, double* uR, double* uI, double phiR, double phiI)
+void HeBulk::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
-	double* vecrni = new double[DIM];
-	double* evecrni = new double[DIM];
-	double* tmp = new double[4];
+	vector<double> vecrni(DIM);
+	vector<double> evecrni(DIM);
+	vector<double> tmp(4);
 	double temp;
 	double rni;
 	double interval;
@@ -163,8 +163,8 @@ void HeBulk::CalculateExpectationValues(double** R, double* uR, double* uI, doub
 
 	double kineticR = 0;
 	double kineticI = 0;
-	double* vecKineticSumR1 = new double[DIM];
-	double* vecKineticSumI1 = new double[DIM];
+	vector<double> vecKineticSumR1(DIM);
+	vector<double> vecKineticSumI1(DIM);
 	double kineticSumR1 = 0;
 	double kineticSumI1 = 0;
 	double kineticSumR1I1 = 0;
@@ -195,7 +195,7 @@ void HeBulk::CalculateExpectationValues(double** R, double* uR, double* uI, doub
 
 		for (int i = 0; i < N; i++)
 		{
-			rni = VectorDisplacementNIC(R[n], R[i], vecrni, DIM);
+			rni = VectorDisplacementNIC(R[n], R[i], vecrni);
 			if (rni < maxDistance)
 			{
 				//internal potential energy
@@ -326,9 +326,9 @@ void HeBulk::CalculateExpectationValues(double** R, double* uR, double* uI, doub
 		kineticSumR2 += uR[N_PARAM - 1] * temp;
 		kineticSumI2 += uI[N_PARAM - 1] * temp;
 
-		kineticSumR1I1 += 2.0 * VectorDotProduct(vecKineticSumR1, vecKineticSumI1, DIM);
-		kineticSumR1 += VectorNorm2(vecKineticSumR1, DIM);
-		kineticSumI1 += VectorNorm2(vecKineticSumI1, DIM);
+		kineticSumR1I1 += 2.0 * VectorDotProduct(vecKineticSumR1, vecKineticSumI1);
+		kineticSumR1 += VectorNorm2(vecKineticSumR1);
+		kineticSumI1 += VectorNorm2(vecKineticSumI1);
 	}
 
 	kineticR = -HBAR2_2M * (kineticSumR1 - kineticSumI1 + kineticSumR2);
@@ -370,15 +370,9 @@ void HeBulk::CalculateExpectationValues(double** R, double* uR, double* uI, doub
 	{
 		otherExpectationValues[i + grBinStartIndex] = grBins[i];
 	}
-
-	delete[] vecrni;
-	delete[] evecrni;
-	delete[] tmp;
-	delete[] vecKineticSumR1;
-	delete[] vecKineticSumI1;
 }
 
-void HeBulk::CalculateAdditionalSystemProperties(double** R, double* uR, double* uI, double phiR, double phiI)
+void HeBulk::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
     ClearVector(additionalSystemProperties);
 	CalculateExpectationValues(R, uR, uI, phiR, phiI);
@@ -387,7 +381,7 @@ void HeBulk::CalculateAdditionalSystemProperties(double** R, double* uR, double*
 		additionalSystemProperties[i] = otherExpectationValues[i];
 	}
 
-	double* vecrij = new double[DIM];
+	vector<double> vecrij(DIM);
 	vector<double> sumSCos;
 	vector<double> sumSSin;
 	vector<double> sk;
@@ -413,11 +407,9 @@ void HeBulk::CalculateAdditionalSystemProperties(double** R, double* uR, double*
 		sk[k] = (sumSCos[k] * sumSCos[k] + sumSSin[k] * sumSSin[k]) / ((double)(N * kValues[k].size()));
 		additionalSystemProperties[numOfOtherExpectationValues + k] = sk[k];
 	}
-
-	delete[] vecrij;
 }
 
-void HeBulk::CalculateWavefunction(double** R, double* uR, double* uI, double phiR, double phiI)
+void HeBulk::CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	double sum = 0;
 	double interval;
@@ -426,7 +418,7 @@ void HeBulk::CalculateWavefunction(double** R, double* uR, double* uI, double ph
 	double res2;
 	double res3;
 	double rni;
-	double* vecrni = new double[DIM];
+	vector<double> vecrni(DIM);
 
 	ClearVector(splineSums);
 	mcMillanSum = 0;
@@ -435,7 +427,7 @@ void HeBulk::CalculateWavefunction(double** R, double* uR, double* uI, double ph
 	{
 		for (int i = 0; i < n; i++)
 		{
-			rni = VectorDisplacementNIC(R[n], R[i], vecrni, DIM);
+			rni = VectorDisplacementNIC(R[n], R[i], vecrni);
 			if (rni < maxDistance)
 			{
 				if (rni < rijSplit)
@@ -472,11 +464,9 @@ void HeBulk::CalculateWavefunction(double** R, double* uR, double* uI, double ph
 	exponent = sum;
 
 	//cout << "sum=" << sum << "\t\tsumTmp=" << sumTmp << "\t\twf=" << value << endl;
-
-	delete[] vecrni;
 }
 
-void HeBulk::CalculateWFChange(double** R, double* uR, double* uI, double phiR, double phiI, int changedParticleIndex, double* oldPosition)
+void HeBulk::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
 	double sum = 0;
 	double mcMillanOld = 0;
@@ -487,7 +477,7 @@ void HeBulk::CalculateWFChange(double** R, double* uR, double* uI, double phiR, 
 	double res2;
 	double res3;
 	double rni;
-	double* vecrni = new double[DIM];
+	vector<double> vecrni(DIM);
 
 	ClearVector(sumOldPerBin);
 	ClearVector(sumNewPerBin);
@@ -495,7 +485,7 @@ void HeBulk::CalculateWFChange(double** R, double* uR, double* uI, double phiR, 
 	{
 		if (i != changedParticleIndex)
 		{
-			rni = VectorDisplacementNIC(R[i], oldPosition, vecrni, DIM);
+			rni = VectorDisplacementNIC(R[i], oldPosition, vecrni);
 			if (rni < maxDistance)
 			{
 				if (rni < rijSplit)
@@ -516,7 +506,7 @@ void HeBulk::CalculateWFChange(double** R, double* uR, double* uI, double phiR, 
 					sumOldPerBin[bin + 3] += 1.0 / 6.0 * res3;
 				}
 			}
-			rni = VectorDisplacementNIC(R[i], R[changedParticleIndex], vecrni, DIM);
+			rni = VectorDisplacementNIC(R[i], R[changedParticleIndex], vecrni);
 			if (rni < maxDistance)
 			{
 				if (rni < rijSplit)
@@ -558,11 +548,9 @@ void HeBulk::CalculateWFChange(double** R, double* uR, double* uI, double phiR, 
 	//wfNew = exp(sum) * exp(phiR);
 	wfNew = exp(sum);
 	exponentNew = sum;
-
-	delete[] vecrni;
 }
 
-double HeBulk::GetWFQuotient(double** R, double* uR, double* uI, double phiR, double phiI, int changedParticleIndex, double* oldPosition)
+double HeBulk::CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
 	CalculateWFChange(R, uR, uI, phiR, phiI, changedParticleIndex, oldPosition);
 	double wfQuotient = exp(2.0 * (exponentNew - exponent));

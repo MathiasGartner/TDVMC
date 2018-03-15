@@ -31,17 +31,17 @@ string PrintArrayValues(double* r, int length)
 	return s;
 }
 
-double VectorDotProduct(double* v1, double* v2, int length)
+double VectorDotProduct(vector<double>& v1, vector<double>& v2)
 {
 	double sum = 0;
-	for (int i = 0; i < length; i++)
+	for (unsigned int i = 0; i < v1.size(); i++)
 	{
 		sum += v1[i] * v2[i];
 	}
 	return sum;
 }
 
-double VectorNorm2(vector<double> r)
+double VectorNorm2(vector<double>& r)
 {
 	double sum = 0;
 	for (unsigned int i = 0; i < r.size(); i++)
@@ -51,38 +51,22 @@ double VectorNorm2(vector<double> r)
 	return sum;
 }
 
-double VectorNorm2(double* r, int length)
-{
-	double sum = 0;
-	for (int i = 0; i < length; i++)
-	{
-		sum += pow(r[i], 2);
-	}
-	return sum;
-}
-
-double VectorNorm(vector<double> r)
+double VectorNorm(vector<double>& r)
 {
 	double norm;
 	norm = sqrt(VectorNorm2(r));
 	return norm;
 }
 
-double VectorNorm(double* r, int length)
+double VectorDisplacement(vector<double>& ri, vector<double>& rj, vector<double>& result)
 {
 	double norm;
-	norm = sqrt(VectorNorm2(r, length));
-	return norm;
-}
-
-double VectorDisplacement(double* ri, double* rj, double* result, int length)
-{
-	double norm;
-	for (int i = 0; i < length; i++)
+	result.resize(ri.size());
+	for (unsigned int i = 0; i < ri.size(); i++)
 	{
 		result[i] = ri[i] - rj[i];
 	}
-	norm = VectorNorm(result, length);
+	norm = VectorNorm(result);
 	return norm;
 }
 
@@ -91,29 +75,31 @@ double GetCoordinateNIC(double r)
 	return r - LBOX * round(r / LBOX);
 }
 
-void GetVectorNIC(double* r, double* rNIC, int length)
+void GetVectorNIC(vector<double>& r, vector<double>& rNIC)
 {
-	for (int i = 0; i < length; i++)
+	rNIC.resize(r.size());
+	for (unsigned int i = 0; i < r.size(); i++)
 	{
 		rNIC[i] = GetCoordinateNIC(r[i]);
 	}
 }
 
-void VectorDiffNIC(double* ri, double* rj, double* result, int length)
+void VectorDiffNIC(vector<double>& ri, vector<double>& rj, vector<double>& result)
 {
 	double delta;
-	for (int i = 0; i < length; i++)
+	result.resize(ri.size());
+	for (unsigned int i = 0; i < ri.size(); i++)
 	{
 		delta = ri[i] - rj[i];
 		result[i] = GetCoordinateNIC(delta);
 	}
 }
 
-double VectorDisplacementNIC(double* ri, double* rj, double* result, int length)
+double VectorDisplacementNIC(vector<double>& ri, vector<double>& rj, vector<double>& result)
 {
 	double norm;
-	VectorDiffNIC(ri, rj, result, length);
-	norm = VectorNorm(result, length);
+	VectorDiffNIC(ri, rj, result);
+	norm = VectorNorm(result);
 	return norm;
 }
 
@@ -441,7 +427,7 @@ vector<vector<vector<double> > > ReadFromFile(string filePath, int headerlines)
 
 int get_cpu_id()
 {
-	/* Get the the current process' stat file from the proc filesystem */
+	//INFO: Get the the current process' stat file from the proc filesystem
 	int cpu_id = -1;
 	FILE* procfile = fopen("/proc/self/stat", "r");
 	long to_read = 8192;

@@ -121,6 +121,16 @@ double randomNormal(double sigma, double mu)
 	return randomNormal() * sigma + mu;
 }
 
+int randomInt(int maxValue)
+{
+	return ((int)floor(random01() * maxValue)) % maxValue;
+}
+
+int randomInt(int minValue, int maxValue)
+{
+	return randomInt(maxValue - minValue) + minValue;
+}
+
 void Log(string message)
 {
 	cout << "#" << setfill(' ') << setw(2) << processRank << "@" << get_cpu_id() << ": " << message << endl << flush;
@@ -166,7 +176,7 @@ void PrintConfig()
 
 void ReadConfig(string filePath)
 {
-	cout << "file exits: " << FileExist(filePath) << "." << endl;
+	//cout << "file exists: " << FileExist(filePath) << "." << endl;
 	Json::Value configData;
 	Json::Reader configReader;
 	ifstream configFile(filePath, ifstream::binary);
@@ -203,7 +213,7 @@ void ReadConfig(string filePath)
 	PARAM_PHII = !configData["PARAM_PHII"] ? PARAM_PHII : configData["PARAM_PHII"].asDouble();
 }
 
-void WriteConfig(string fileName, double* uR, double* uI, double phiR, double phiI)
+void WriteConfig(string fileName, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	ofstream configFile;
 	configFile.open(OUTPUT_DIRECTORY + fileName, ios::out);
@@ -303,7 +313,7 @@ void WriteConfigJson(string fileName, double* uR, double* uI, double phiR, doubl
 	configFile.close();
 }
 
-void WriteParticleInputFile(string fileName, double** R)
+void WriteParticleInputFile(string fileName, vector<vector<double> >& R)
 {
 	vector<vector<double> > particlePositionList = {{}};
 	for (int i = 0; i < N; i++)
@@ -362,10 +372,10 @@ void BroadcastConfig()
 	MPIMethods::BroadcastValue(&IMAGINARY_TIME);
 }
 
-void BroadcastNewParameters(double* uR, double* uI, double* phiR, double* phiI)
+void BroadcastNewParameters(vector<double>& uR, vector<double>& uI, double* phiR, double* phiI)
 {
-	MPIMethods::BroadcastValues(uR, N_PARAM);
-	MPIMethods::BroadcastValues(uI, N_PARAM);
+	MPIMethods::BroadcastValues(uR);
+	MPIMethods::BroadcastValues(uI);
 	MPIMethods::BroadcastValue(phiR);
 	MPIMethods::BroadcastValue(phiI);
 }
@@ -408,12 +418,12 @@ void PostSystemInit()
     AllAdditionalSystemProperties.resize(0);
 }
 
-void WriteParticlesToFile(double** R, string ending)
+void WriteParticlesToFile(vector<vector<double> >& R, string ending)
 {
-	WriteDataToFile(R, N, DIM, "position" + ending, "x, y, z");
+	WriteDataToFile(R, "position" + ending, "x, y, z");
 }
 
-bool LoadLastPositionsFromFile(string filename, double** R)
+bool LoadLastPositionsFromFile(string filename, vector<vector<double> >& R)
 {
 	bool successful = false;
 	string line;
@@ -453,7 +463,7 @@ bool LoadLastPositionsFromFile(string filename, double** R)
 	return successful;
 }
 
-void InitCoordinateConfiguration(double** R)
+void InitCoordinateConfiguration(vector<vector<double> >& R)
 {
 	string filename = "particleconfiguration_" + to_string(N);
 	if (!LoadLastPositionsFromFile(filename, R))
@@ -526,7 +536,7 @@ void InitCoordinateConfiguration(double** R)
 	}
 }
 
-void MoveCoordinatesToFirstCell(double** R)
+void MoveCoordinatesToFirstCell(vector<vector<double> >& R)
 {
 	for (int i = 0; i < N; i++)
 	{
@@ -537,7 +547,7 @@ void MoveCoordinatesToFirstCell(double** R)
 	}
 }
 
-void MoveCenterOfMassToZero(double** R)
+void MoveCenterOfMassToZero(vector<vector<double> >& R)
 {
 	vector<double> com;
 	com = sys->GetCenterOfMass(R);
@@ -550,26 +560,24 @@ void MoveCenterOfMassToZero(double** R)
 	}
 }
 
-void DoMetropolisStep(double** R, double* uR, double* uI, double phiR, double phiI)
+void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	double p;
 	bool sampleOkay = true;
-	int randomParticle = ((int)floor(random01() * N)) % N;
-	double* oldPosition = new double[DIM];
+	int randomParticle = randomInt(N-1);
+	vector<double> oldPosition(R[randomParticle]);
 	for (int i = 0; i < DIM; i++)
 	{
-		oldPosition[i] = R[randomParticle][i];
-		//R[randomParticle][i] += (random01() - 0.5) * MC_STEP;
 		R[randomParticle][i] += randomNormal(MC_STEP, 0.0);
 	}
-	double wfQuotient = sys->GetWFQuotient(R, uR, uI, phiR, phiI, randomParticle, oldPosition);
+	double wfQuotient = sys->CalculateWFQuotient(R, uR, uI, phiR, phiI, randomParticle, oldPosition);
 
-	if (wfQuotient == 0 || sys->GetWfNew() == 0 || sys->GetWf() == 0)
-	{
-		//cout << "something == 0 !!!!!!!!!!!!!!!!!!!!!!!!" << endl;
-		//cout << "wfQuotient=" << wfQuotient << ", wfNew=" << Sys::wfNew << ", wf=" << Sys::wf << ", nTrials=" << nTrials << endl;
-		//sleep(1);
-	}
+	//if (wfQuotient == 0 || sys->GetWfNew() == 0 || sys->GetWf() == 0)
+	//{
+	//	cout << "something == 0 !!!!!!!!!!!!!!!!!!!!!!!!" << endl;
+	//	cout << "wfQuotient=" << wfQuotient << ", wfNew=" << Sys::wfNew << ", wf=" << Sys::wf << ", nTrials=" << nTrials << endl;
+	//	sleep(1);
+	//}
 	if (!isfinite(wfQuotient) || !isfinite(sys->GetWfNew()) || !isfinite(sys->GetWf()))
 	{
 		//cout << "something != finite !!!!!!!!!!!!!!!!!!!!!!!!" << endl;
@@ -597,10 +605,9 @@ void DoMetropolisStep(double** R, double* uR, double* uI, double phiR, double ph
 		nAcceptances++;
 	}
 	nTrials++;
-	delete[] oldPosition;
 }
 
-void UpdateExpectationValues(double** R, double* uR, double* uI, double phiR, double phiI, bool intermediateStep = false)
+void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, bool intermediateStep = false)
 {
 	//vector<vector<double> > singlelocalOperators; // for all O_k
 	vector<double> singlelocalEnergyR; // for all E^R
@@ -693,7 +700,7 @@ void UpdateExpectationValues(double** R, double* uR, double* uI, double phiR, do
 	}
 }
 
-void ParallelUpdateExpectationValues(double** R, double* uR, double* uI, double phiR, double phiI, bool intermediateStep = false)
+void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, bool intermediateStep = false)
 {
 	Timer t;
 	double dblDuration;
@@ -720,16 +727,16 @@ void ParallelUpdateExpectationValues(double** R, double* uR, double* uI, double 
 	MPIMethods::ReduceToAverage(otherExpectationValues);
 }
 
-void PrintParameters(double* u)
+void PrintData(vector<double> data)
 {
-	for (int i = 0; i < N_PARAM; i++)
+	for (unsigned int i = 0; i < data.size(); i++)
 	{
-		cout << u[i] << ", ";
+		cout << data[i] << ", ";
 	}
 	cout << endl;
 }
 
-void NormalizeParameters(double* uR, double* uI, double *phiR, double *phiI)
+void NormalizeParameters(vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
 	//double sum = 0;
 	//double factor = 1;
@@ -929,7 +936,7 @@ void SolveForParametersDot(vector<vector<double> >& matrix, vector<double>& ener
 	}
 }
 
-void CalculateNextParametersEuler(double* uR, double* uI)
+void CalculateNextParametersEuler(vector<double>& uR, vector<double>& uI)
 {
 	if (processRank == rootRank)
 	{
@@ -959,7 +966,7 @@ void CalculateNextParametersEuler(double* uR, double* uI)
 	}
 }
 
-void CalculateNextParametersEuler(double* uR, double* uI, double *phiR, double *phiI)
+void CalculateNextParametersEuler(vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
 	if (processRank == rootRank)
 	{
@@ -993,7 +1000,7 @@ void CalculateNextParametersEuler(double* uR, double* uI, double *phiR, double *
 	}
 }
 
-void CalculateNextParametersPC(double** R, double* uR, double* uI, double *phiR, double *phiI)
+void CalculateNextParametersPC(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
 	vector<double> energiesReal; //rhs of the equation that corresponds to uDotR;
 	vector<double> energiesImag; //rhs of the equation that corresponds to uDotI;
@@ -1004,8 +1011,8 @@ void CalculateNextParametersPC(double** R, double* uR, double* uI, double *phiR,
 	double phiDotI = 0;
 
 	int PCsteps = 1;
-	double* tmpUR;
-	double* tmpUI;
+	vector<double> tmpUR(N_PARAM);
+	vector<double> tmpUI(N_PARAM);
 	double tmpPhiR = 0;
 	double tmpPhiI = 0;
 	vector<double> nextUDotR;
@@ -1013,8 +1020,7 @@ void CalculateNextParametersPC(double** R, double* uR, double* uI, double *phiR,
 	double nextPhiDotR = 0;
 	double nextPhiDotI = 0;
 
-	tmpUR = new double[N_PARAM];
-	tmpUI = new double[N_PARAM];
+	//TODO: is this initialization needed?
 	for (int i = 0; i < N_PARAM; i++)
 	{
 		tmpUR[i] = 0;
@@ -1065,19 +1071,17 @@ void CalculateNextParametersPC(double** R, double* uR, double* uI, double *phiR,
 	}
 	*phiR = tmpPhiR;
 	//*phiI = tmpPhiI;
-
-	delete[] tmpUR;
-	delete[] tmpUI;
 }
 
-void CalculateNextParametersRK4(double** R, double* uR, double* uI, double *phiR, double *phiI)
+//TODO: also update uI
+void CalculateNextParametersRK4(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
 	vector<double> energiesReal; //rhs of the equation that corresponds to uDotR;
 	vector<double> energiesImag; //rhs of the equation that corresponds to uDotI;
 	vector<vector<double> > matrix;
 
-	double* tmpUR;
-	double* tmpUI;
+	vector<double> tmpUR(N_PARAM);
+	vector<double> tmpUI(N_PARAM);
 	double tmpPhiR = 0;
 	double tmpPhiI = 0;
 
@@ -1086,8 +1090,7 @@ void CalculateNextParametersRK4(double** R, double* uR, double* uI, double *phiR
 	vector<double> phiDotR;
 	vector<double> phiDotI;
 
-	tmpUR = new double[N_PARAM];
-	tmpUI = new double[N_PARAM];
+	//TODO: is this initialization needed?
     for (int i = 0; i < N_PARAM; i++)
     {
             tmpUR[i] = 0;
@@ -1159,12 +1162,9 @@ void CalculateNextParametersRK4(double** R, double* uR, double* uI, double *phiR
 		*phiR = *phiR + ((phiDotR[0] + 2.0 * phiDotR[1] + 2.0 * phiDotR[2] + phiDotR[3]) / 6.0) * TIMESTEP;
 		//phiI = *phiI + ((phiDotI[0] + 2.0 * phiDotI[1] + 2.0 * phiDotI[2] + phiDotI[3]) / 6.0) * TIMESTEP;
 	}
-
-	delete[] tmpUR;
-	delete[] tmpUI;
 }
 
-void CalculateNextParameters(double** R, double* uR, double* uI)
+void CalculateNextParameters(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI)
 {
 	int type = 0;
 	if (type == 0)
@@ -1173,7 +1173,7 @@ void CalculateNextParameters(double** R, double* uR, double* uI)
 	}
 }
 
-void CalculateNextParameters(double** R, double* uR, double* uI, double *phiR, double *phiI)
+void CalculateNextParameters(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
 	Timer t;
 	if (processRank == rootRank)
@@ -1188,35 +1188,13 @@ void CalculateNextParameters(double** R, double* uR, double* uI, double *phiR, d
 	}
 	else if (type == 1)
 	{
-		double** Rcopy;
-		Rcopy = new double*[N];
-		for (int i = 0; i < N; i++)
-		{
-			Rcopy[i] = new double[DIM];
-		}
-		Copy2DArray(R, Rcopy, N, DIM);
+		vector<vector<double> >& Rcopy(R);
 		CalculateNextParametersPC(Rcopy, uR, uI, phiR, phiI);
-		for (int i = 0; i < N; i++)
-		{
-			delete[] Rcopy[i];
-		}
-		delete[] Rcopy;
 	}
 	else if (type == 2)
 	{
-		double** Rcopy;
-		Rcopy = new double*[N];
-		for (int i = 0; i < N; i++)
-		{
-			Rcopy[i] = new double[DIM];
-		}
-		Copy2DArray(R, Rcopy, N, DIM);
+		vector<vector<double> >& Rcopy(R);
 		CalculateNextParametersRK4(Rcopy, uR, uI, phiR, phiI);
-		for (int i = 0; i < N; i++)
-		{
-			delete[] Rcopy[i];
-		}
-		delete[] Rcopy;
 	}
 
 	if (processRank == rootRank)
@@ -1231,7 +1209,7 @@ void NormalizeWavefunction(double wf, double *phiR)
 	*phiR = *phiR - log(wf);
 }
 
-void CalculateAdditionalSystemProperties(double** R, double* uR, double* uI, double phiR, double phiI)
+void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	int percent = 0;
     ClearVector(additionalSystemProperties);
@@ -1275,14 +1253,14 @@ void CalculateAdditionalSystemProperties(double** R, double* uR, double* uI, dou
 	}
 }
 
-void ParallelCalculateAdditionalSystemProperties(double** R, double* uR, double* uI, double phiR, double phiI)
+void ParallelCalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	CalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
 
 	MPIMethods::ReduceToAverage(additionalSystemProperties);
 }
 
-void AlignCoordinates(double** R)
+void AlignCoordinates(vector<vector<double> >& R)
 {
 	if (sys->USE_NIC)
 	{
@@ -1345,19 +1323,16 @@ int mainMPI(int argc, char** argv)
 		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
 	}
 
-	double** R;
-	double* uR;
-	double* uI;
+	vector<vector<double> > R(N);
+	vector<double> uR(N_PARAM);
+	vector<double> uI(N_PARAM);
 	double phiR;
 	double phiI;
 
-	R = new double*[N];
-	for (int i = 0; i < N; i++)
+	for (unsigned int i = 0; i < R.size(); i++)
 	{
-		R[i] = new double[DIM];
+		R[i].resize(DIM);
 	}
-	uR = new double[N_PARAM];
-	uI = new double[N_PARAM];
 
 	InitCoordinateConfiguration(R); //TODO: only init files in main process (at least when read from file)
 	if (processRank == rootRank)
@@ -1371,13 +1346,13 @@ int mainMPI(int argc, char** argv)
 		phiI = PARAM_PHII;
 		//PrintParameters(uR);
 		//PrintParameters(uI);
-		WriteDataToFile(uR, N_PARAM, "parametersR0", "parameterR");
-		WriteDataToFile(uI, N_PARAM, "parametersI0", "parameterI");
+		WriteDataToFile(uR, "parametersR0", "parameterR");
+		WriteDataToFile(uI, "parametersI0", "parameterI");
 	}
 	if (processRank == rootRank)
 	{
 		cout << "PARAMS" << endl;
-		PrintParameters(uR);
+		PrintData(uR);
 	}
 
 	sys->InitSystem();
@@ -1396,8 +1371,8 @@ int mainMPI(int argc, char** argv)
 		{
 			if (processRank == rootRank)
 			{
-				uRList.push_back(ArrayToVector(uR, N_PARAM));
-				uIList.push_back(ArrayToVector(uI, N_PARAM));
+				uRList.push_back(uR);
+				uIList.push_back(uI);
 				phiRList.push_back(phiR);
 				phiIList.push_back(phiI);
 				if (uRList.size() > 105) //INFO: always keep the last few parameters in a list. at the end of the simulation the average of the last steps is calculated for a final value of the parameter
@@ -1432,8 +1407,8 @@ int mainMPI(int argc, char** argv)
 			cout << "localEnergyR/N=" << localEnergyR / (double)N << " (" << otherExpectationValues[0] / (double)N << " + " << otherExpectationValues[1] / (double)N << ")" << endl;
 			AllLocalEnergyR.push_back(localEnergyR);
 			AllOtherExpectationValues.push_back(otherExpectationValues);
-			AllParametersR.push_back(ArrayToVector(uR, N_PARAM));
-			AllParametersI.push_back(ArrayToVector(uI, N_PARAM));
+			AllParametersR.push_back(uR);
+			AllParametersI.push_back(uI);
 		}
 		if (sys->USE_NORMALIZATION_AND_PHASE)
 		{
@@ -1451,8 +1426,8 @@ int mainMPI(int argc, char** argv)
 		{
 			if (step % 100 == 0)
 			{
-				WriteDataToFile(uR, N_PARAM, "parametersR" + to_string(step), "parameterR, phiR=" + to_string(phiR) + ", wf=" + to_string(sys->GetWf()));
-				WriteDataToFile(uI, N_PARAM, "parametersI" + to_string(step), "parameterI, phiI=" + to_string(phiI));
+				WriteDataToFile(uR, "parametersR" + to_string(step), "parameterR, phiR=" + to_string(phiR) + ", wf=" + to_string(sys->GetWf()));
+				WriteDataToFile(uI, "parametersI" + to_string(step), "parameterI, phiI=" + to_string(phiI));
 			}
 			if (step % 100 == 0)
 			{
@@ -1472,8 +1447,8 @@ int mainMPI(int argc, char** argv)
 
 	if (processRank == rootRank)
 	{
-		PrintParameters(uR);
-		PrintParameters(uI);
+		PrintData(uR);
+		PrintData(uI);
 	}
 	//cout << "phiR=" << phiR << ", phiI=" << phiI << endl;
 
@@ -1544,14 +1519,6 @@ int mainMPI(int argc, char** argv)
 
 	sleep(10);
 	Log("free memory ...");
-
-	for (int i = 0; i < N; i++)
-	{
-		delete[] R[i];
-	}
-	delete[] R;
-	delete[] uR;
-	delete[] uI;
 	delete sys;
 
 	Log("finalize ...");

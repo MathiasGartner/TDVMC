@@ -56,17 +56,17 @@ public:
 
 	void InitSystem();
 
-	vector<double> GetCenterOfMass(double** R);
+	vector<double> GetCenterOfMass(vector<vector<double> >& R);
 
-	void CalculateExpectationValues(double** R, double* uR, double* uI, double phiR, double phiI);
+	void CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
 
-	void CalculateAdditionalSystemProperties(double** R, double* uR, double* uI, double phiR, double phiI);
+	void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
 
-	void CalculateWavefunction(double** R, double* uR, double* uI, double phiR, double phiI);
+	void CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
 
-	void CalculateWFChange(double** R, double* uR, double* uI, double phiR, double phiI, int changedParticleIndex, double* oldPosition);
+	void CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition);
 
-	double GetWFQuotient(double** R, double* uR, double* uI, double phiR, double phiI, int changedParticleIndex, double* oldPosition);
+	double CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition);
 
 	void AcceptMove();
 };

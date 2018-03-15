@@ -189,7 +189,7 @@ void HeDrop::InitSystem()
 	//cout << "nodePointSpacingShort=" << nodePointSpacingShort << ", nodePointSpacingLarge=" << nodePointSpacingLarge << ", rijSplit=" << rijSplit << ", rijSplineSplit=" << rijSplineSplit << ", rijTail=" << rijTail << endl;
 }
 
-vector<double> HeDrop::GetCenterOfMass(double** R)
+vector<double> HeDrop::GetCenterOfMass(vector<vector<double> >& R)
 {
 	vector<double> com = { 0, 0, 0 };
 	for (int i = 0; i < N; i++)
@@ -206,11 +206,11 @@ vector<double> HeDrop::GetCenterOfMass(double** R)
 	return com;
 }
 
-void HeDrop::CalculateExpectationValues(double** R, double* uR, double* uI, double phiR, double phiI)
+void HeDrop::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
-	double* vecrni = new double[DIM];
-	double* evecrni = new double[DIM];
-	double* tmp = new double[4];
+	vector<double> vecrni(DIM);
+	vector<double> evecrni(DIM);
+	vector<double> tmp(4);
 	double temp;
 	double rni;
 	double interval;
@@ -239,8 +239,8 @@ void HeDrop::CalculateExpectationValues(double** R, double* uR, double* uI, doub
 
 	double kineticR = 0;
 	double kineticI = 0;
-	double* vecKineticSumR1 = new double[DIM];
-	double* vecKineticSumI1 = new double[DIM];
+	vector<double> vecKineticSumR1(DIM);
+	vector<double> vecKineticSumI1(DIM);
 	double kineticSumR1 = 0;
 	double kineticSumI1 = 0;
 	double kineticSumR1I1 = 0;
@@ -278,7 +278,7 @@ void HeDrop::CalculateExpectationValues(double** R, double* uR, double* uI, doub
 
 		for (int i = 0; i < N; i++)
 		{
-			rni = VectorDisplacement(R[n], R[i], vecrni, DIM);
+			rni = VectorDisplacement(R[n], R[i], vecrni);
 			//if (rni < maxDistance)
 			{
 				//internal potential energy
@@ -487,9 +487,9 @@ void HeDrop::CalculateExpectationValues(double** R, double* uR, double* uI, doub
 		kineticSumR2 += uR[N_PARAM - 1] * temp;
 		kineticSumI2 += uI[N_PARAM - 1] * temp;
 
-		kineticSumR1I1 += 2.0 * VectorDotProduct(vecKineticSumR1, vecKineticSumI1, DIM);
-		kineticSumR1 += VectorNorm2(vecKineticSumR1, DIM);
-		kineticSumI1 += VectorNorm2(vecKineticSumI1, DIM);
+		kineticSumR1I1 += 2.0 * VectorDotProduct(vecKineticSumR1, vecKineticSumI1);
+		kineticSumR1 += VectorNorm2(vecKineticSumR1);
+		kineticSumI1 += VectorNorm2(vecKineticSumI1);
 	}
 
 	kineticR = -HBAR2_2M * (kineticSumR1 - kineticSumI1 + kineticSumR2);
@@ -541,15 +541,9 @@ void HeDrop::CalculateExpectationValues(double** R, double* uR, double* uI, doub
 	{
 		otherExpectationValues[i + grBinStartIndex] = grBins[i];
 	}
-
-	delete[] vecrni;
-	delete[] evecrni;
-	delete[] tmp;
-	delete[] vecKineticSumR1;
-	delete[] vecKineticSumI1;
 }
 
-void HeDrop::CalculateAdditionalSystemProperties(double** R, double* uR, double* uI, double phiR, double phiI)
+void HeDrop::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	ClearVector(additionalSystemProperties);
 	CalculateExpectationValues(R, uR, uI, phiR, phiI);
@@ -558,7 +552,7 @@ void HeDrop::CalculateAdditionalSystemProperties(double** R, double* uR, double*
 		additionalSystemProperties[i] = otherExpectationValues[i];
 	}
 
-	double* vecrij = new double[DIM];
+	vector<double> vecrij(DIM);
 	vector<double> sumSCos;
 	vector<double> sumSSin;
 	vector<double> sk;
@@ -600,7 +594,8 @@ void HeDrop::CalculateAdditionalSystemProperties(double** R, double* uR, double*
 	ClearVector(densityProfileBins);
 	for (int i = 0; i < N; i++)
 	{
-		r = VectorNorm(ArrayToVector(R[i], DIM) - com);
+		vector<double> diff = R[i] - com;
+		r = VectorNorm(diff);
 		r2Sum += r * r;
 		if (r < densityProfileMaxDistance)
 		{
@@ -615,11 +610,9 @@ void HeDrop::CalculateAdditionalSystemProperties(double** R, double* uR, double*
 		additionalSystemProperties[numOfOtherExpectationValues + numOfkValues + d] = densityProfileBins[d];
 	}
 	additionalSystemProperties[numOfAdditionalSystemProperties - 1] = r2Sum / (double) N;
-
-	delete[] vecrij;
 }
 
-void HeDrop::CalculateWavefunction(double** R, double* uR, double* uI, double phiR, double phiI)
+void HeDrop::CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	double sum = 0;
 	double interval;
@@ -628,7 +621,7 @@ void HeDrop::CalculateWavefunction(double** R, double* uR, double* uI, double ph
 	double res2;
 	double res3;
 	double rni;
-	double* vecrni = new double[DIM];
+	vector<double> vecrni(DIM);
 
 	ClearVector(splineSums);
 	mcMillanSum = 0;
@@ -640,7 +633,7 @@ void HeDrop::CalculateWavefunction(double** R, double* uR, double* uI, double ph
 	{
 		for (int i = 0; i < n; i++)
 		{
-			rni = VectorDisplacement(R[n], R[i], vecrni, DIM);
+			rni = VectorDisplacement(R[n], R[i], vecrni);
 			//if (rni < maxDistance)
 			{
 				if (rni < rijSplit)
@@ -701,11 +694,9 @@ void HeDrop::CalculateWavefunction(double** R, double* uR, double* uI, double ph
 
 	//cout << "sum=" << sum << "\t\tsumTmp=" << sumTmp << "\t\twf=" << value << endl;
 	//cout << "sum=" << sum << "\t\twf=" << wf << "\t\tlogSum=" << logSum << "\t\tlinearSum=" << linearSum << "\t\tphiR=" << phiR << endl;
-
-	delete[] vecrni;
 }
 
-void HeDrop::CalculateWFChange(double** R, double* uR, double* uI, double phiR, double phiI, int changedParticleIndex, double* oldPosition)
+void HeDrop::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
 	double sum = 0;
 	double mcMillanOld = 0;
@@ -722,7 +713,7 @@ void HeDrop::CalculateWFChange(double** R, double* uR, double* uI, double phiR, 
 	double res2;
 	double res3;
 	double rni;
-	double* vecrni = new double[DIM];
+	vector<double> vecrni(DIM);
 
 	ClearVector(sumOldPerBin);
 	ClearVector(sumNewPerBin);
@@ -730,7 +721,7 @@ void HeDrop::CalculateWFChange(double** R, double* uR, double* uI, double phiR, 
 	{
 		if (i != changedParticleIndex)
 		{
-			rni = VectorDisplacement(R[i], oldPosition, vecrni, DIM);
+			rni = VectorDisplacement(R[i], oldPosition, vecrni);
 			//if (rni < maxDistance)
 			{
 				if (rni < rijSplit)
@@ -764,7 +755,7 @@ void HeDrop::CalculateWFChange(double** R, double* uR, double* uI, double phiR, 
 					sumOldPerBin[bin + 3] += 1.0 / 6.0 * res3;
 				}
 			}
-			rni = VectorDisplacement(R[i], R[changedParticleIndex], vecrni, DIM);
+			rni = VectorDisplacement(R[i], R[changedParticleIndex], vecrni);
 			//if (rni < maxDistance)
 			{
 				if (rni < rijSplit)
@@ -831,11 +822,9 @@ void HeDrop::CalculateWFChange(double** R, double* uR, double* uI, double phiR, 
 
 	wfNew = exp(sum + phiR);
 	exponentNew = sum;
-
-	delete[] vecrni;
 }
 
-double HeDrop::GetWFQuotient(double** R, double* uR, double* uI, double phiR, double phiI, int changedParticleIndex, double* oldPosition)
+double HeDrop::CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
 	CalculateWFChange(R, uR, uI, phiR, phiI, changedParticleIndex, oldPosition);
 	double wfQuotient = exp(2.0 * (exponentNew - exponent));
