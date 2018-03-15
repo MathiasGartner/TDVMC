@@ -344,121 +344,30 @@ void WriteRandomGeneratorStatesToFile(string fileNamePrefix)
 
 void BroadcastConfig()
 {
-	char dir[200];
-	strcpy(dir, OUTPUT_DIRECTORY.c_str());
-	MPI_Bcast(dir, 200, MPI_CHAR, rootRank, MPI_COMM_WORLD);
-	OUTPUT_DIRECTORY = string(dir);
-	MPI_Bcast(&N, 1, MPI_INT, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(&DIM, 1, MPI_INT, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(&N_PARAM, 1, MPI_INT, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(&RHO, 1, MPI_DOUBLE, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(&RC, 1, MPI_DOUBLE, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(&MC_STEP, 1, MPI_DOUBLE, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(&MC_NSTEPS, 1, MPI_INT, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(&MC_NTHERMSTEPS, 1, MPI_INT, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(&MC_NINITIALIZATIONSTEPS, 1, MPI_INT, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(&MC_NADDITIONALSTEPS, 1, MPI_INT, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(&MC_NADDITIONALTHERMSTEPS, 1, MPI_INT, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(&MC_NADDITIONALINITIALIZATIONSTEPS, 1, MPI_INT, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(&TIMESTEP, 1, MPI_DOUBLE, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(&TOTALTIME, 1, MPI_DOUBLE, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(&IMAGINARY_TIME, 1, MPI_INT, rootRank, MPI_COMM_WORLD);
+	MPIMethods::BroadcastValue(&OUTPUT_DIRECTORY, 300);
+	MPIMethods::BroadcastValue(&N);
+	MPIMethods::BroadcastValue(&DIM);
+	MPIMethods::BroadcastValue(&N_PARAM);
+	MPIMethods::BroadcastValue(&RHO);
+	MPIMethods::BroadcastValue(&RC);
+	MPIMethods::BroadcastValue(&MC_STEP);
+	MPIMethods::BroadcastValue(&MC_NSTEPS);
+	MPIMethods::BroadcastValue(&MC_NTHERMSTEPS);
+	MPIMethods::BroadcastValue(&MC_NINITIALIZATIONSTEPS);
+	MPIMethods::BroadcastValue(&MC_NADDITIONALSTEPS);
+	MPIMethods::BroadcastValue(&MC_NADDITIONALTHERMSTEPS);
+	MPIMethods::BroadcastValue(&MC_NADDITIONALINITIALIZATIONSTEPS);
+	MPIMethods::BroadcastValue(&TIMESTEP);
+	MPIMethods::BroadcastValue(&TOTALTIME);
+	MPIMethods::BroadcastValue(&IMAGINARY_TIME);
 }
 
 void BroadcastNewParameters(double* uR, double* uI, double* phiR, double* phiI)
 {
-	//TODO: check if phiR and phiI are broadcasted correctly
-	MPI_Bcast(uR, N_PARAM, MPI_DOUBLE, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(uI, N_PARAM, MPI_DOUBLE, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(phiR, 1, MPI_DOUBLE, rootRank, MPI_COMM_WORLD);
-	MPI_Bcast(phiI, 1, MPI_DOUBLE, rootRank, MPI_COMM_WORLD);
-}
-
-void BroadcastValue(double* value)
-{
-	MPI_Bcast(value, 1, MPI_DOUBLE, rootRank, MPI_COMM_WORLD);
-}
-
-void BroadcastValues(double* values, int count)
-{
-	MPI_Bcast(values, count, MPI_DOUBLE, rootRank, MPI_COMM_WORLD);
-}
-
-void BroadcastValues(vector<double>& values)
-{
-	double* valueArray = new double[values.size()];
-	for (unsigned int i = 0; i < values.size(); i++)
-	{
-		valueArray[i] = values[i];
-	}
-	MPI_Bcast(valueArray, values.size(), MPI_DOUBLE, rootRank, MPI_COMM_WORLD);
-	for (unsigned int i = 0; i < values.size(); i++)
-	{
-		values[i] = valueArray[i];
-	}
-	delete[] valueArray;
-}
-
-vector<double> ReduceToMinMaxMean(double* data)
-{
-	vector<double> values = {};
-	double own = 0;
-	double min = 0;
-	double max = 0;
-	double sum = 0;
-
-	own = *data;
-	MPI_Reduce(&own, &min, 1, MPI_DOUBLE, MPI_MIN, rootRank, MPI_COMM_WORLD);
-	MPI_Reduce(&own, &max, 1, MPI_DOUBLE, MPI_MAX, rootRank, MPI_COMM_WORLD);
-	MPI_Reduce(&own, &sum, 1, MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
-	if (processRank == rootRank)
-	{
-		values = { min, max, sum / (double)numOfProcesses };
-	}
-	return values;
-}
-
-void ReduceValues(double* data)
-{
-	double ownValues;
-	double reducedValues;
-
-	ownValues = *data;
-	MPI_Reduce(&ownValues, &reducedValues, 1, MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
-	if (processRank == rootRank)
-	{
-		*data = reducedValues / (double)numOfProcesses;
-	}
-}
-
-void ReduceValues(vector<double>& data)
-{
-	double* ownValues = new double[data.size()];
-	double* reducedValues = new double[data.size()];
-
-	for (unsigned int i = 0; i < data.size(); i++)
-	{
-		ownValues[i] = data[i];
-	}
-	MPI_Reduce(ownValues, reducedValues, data.size(), MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
-	//INFO: only root process holds the average values from all processes.
-	if (processRank == rootRank)
-	{
-		for (unsigned int i = 0; i < data.size(); i++)
-		{
-			data[i] = reducedValues[i] / (double)numOfProcesses;
-		}
-	}
-	delete[] ownValues;
-	delete[] reducedValues;
-}
-
-void ReduceValues(vector<vector<double> >& data)
-{
-	for (unsigned int i = 0; i < data.size(); i++)
-	{
-		ReduceValues(data[i]);
-	}
+	MPIMethods::BroadcastValues(uR, N_PARAM);
+	MPIMethods::BroadcastValues(uI, N_PARAM);
+	MPIMethods::BroadcastValue(phiR);
+	MPIMethods::BroadcastValue(phiI);
 }
 
 void Init()
@@ -794,7 +703,7 @@ void ParallelUpdateExpectationValues(double** R, double* uR, double* uI, double 
 
 	t.stop();
 	dblDuration = (double)t.duration();
-	vector<double> timings = ReduceToMinMaxMean(&dblDuration);
+	vector<double> timings = MPIMethods::ReduceToMinMaxMean(dblDuration);
 	if (processRank == rootRank && !intermediateStep)
 	{
 		Log("duration: min = " + to_string(timings[0]) + " ms");
@@ -802,13 +711,13 @@ void ParallelUpdateExpectationValues(double** R, double* uR, double* uI, double 
 		Log("          <t> = " + to_string(timings[2]) + " ms");
 	}
 
-	ReduceValues(localOperators);
-	ReduceValues(&localEnergyR);
-	ReduceValues(&localEnergyI);
-	ReduceValues(localOperatorsMatrix);
-	ReduceValues(localOperatorlocalEnergyR);
-	ReduceValues(localOperatorlocalEnergyI);
-	ReduceValues(otherExpectationValues);
+	MPIMethods::ReduceToAverage(localOperators);
+	MPIMethods::ReduceToAverage(&localEnergyR);
+	MPIMethods::ReduceToAverage(&localEnergyI);
+	MPIMethods::ReduceToAverage(localOperatorsMatrix);
+	MPIMethods::ReduceToAverage(localOperatorlocalEnergyR);
+	MPIMethods::ReduceToAverage(localOperatorlocalEnergyI);
+	MPIMethods::ReduceToAverage(otherExpectationValues);
 }
 
 void PrintParameters(double* u)
@@ -1370,7 +1279,7 @@ void ParallelCalculateAdditionalSystemProperties(double** R, double* uR, double*
 {
 	CalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
 
-	ReduceValues(additionalSystemProperties);
+	MPIMethods::ReduceToAverage(additionalSystemProperties);
 }
 
 void AlignCoordinates(double** R)
@@ -1397,6 +1306,10 @@ int mainMPI(int argc, char** argv)
 	MPI_Comm_rank(MPI_COMM_WORLD, &processRank);
 	MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
 	MPI_Get_processor_name(processName, &processNameLength);
+
+	MPIMethods::numOfProcesses = numOfProcesses;
+	MPIMethods::processRank = processRank;
+	MPIMethods::rootRank = rootRank;
 
 	//Log("running on cpu " + to_string(get_cpu_id()));
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstring>
 #include "mpi.h"
 #include <vector>
 
@@ -11,6 +12,19 @@ namespace MPIMethods
 int numOfProcesses;
 int processRank;
 int rootRank;
+
+void BroadcastValue(string* data, int maxLength)
+{
+	char tmp[maxLength];
+	strcpy(tmp, (*data).c_str());
+	MPI_Bcast(tmp, maxLength, MPI_CHAR, rootRank, MPI_COMM_WORLD);
+	*data = string(tmp);
+}
+
+void BroadcastValue(int* data)
+{
+	MPI_Bcast(data, 1, MPI_INT, rootRank, MPI_COMM_WORLD);
+}
 
 void BroadcastValue(double* data)
 {
@@ -77,16 +91,25 @@ void ReduceToAverage(double* data)
 	}
 }
 
+void ReduceToAverage(double* data, int count)
+{
+	double* reducedValues = new double[count];
+	MPI_Reduce(data, reducedValues, count, MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
+	if (processRank == rootRank)
+	{
+		for (int i = 0; i < count; i++)
+		{
+			data[i] = reducedValues[i] / (double) numOfProcesses;
+		}
+	}
+	delete[] reducedValues;
+}
+
 void ReduceToAverage(vector<double>& data)
 {
-	double* ownValues = new double[data.size()];
-	double* reducedValues = new double[data.size()];
+	double* reducedValues = new double[data.size()]; //TODO: check on zusie what method is faster
 
-	for (unsigned int i = 0; i < data.size(); i++)
-	{
-		ownValues[i] = data[i];
-	}
-	MPI_Reduce(ownValues, reducedValues, data.size(), MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
+	MPI_Reduce(data.data(), reducedValues, data.size(), MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
 	//INFO: only root process holds the average values from all processes.
 	if (processRank == rootRank)
 	{
@@ -95,16 +118,71 @@ void ReduceToAverage(vector<double>& data)
 			data[i] = reducedValues[i] / (double) numOfProcesses;
 		}
 	}
-	delete[] ownValues;
+
 	delete[] reducedValues;
 }
 
+//INFO: is a little bit slower than ReduceToAverage with double* reducedValues
+//void ReduceToAverage(vector<double>& data)
+//{
+//	vector<double> reducedValues(data.size());
+//
+//	MPI_Reduce(data.data(), reducedValues.data(), data.size(), MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
+//	//INFO: only root process holds the average values from all processes.
+//	if (processRank == rootRank)
+//	{
+//		for (unsigned int i = 0; i < data.size(); i++)
+//		{
+//			data[i] = reducedValues[i] / (double) numOfProcesses;
+//		}
+//	}
+//}
+
 void ReduceToAverage(vector<vector<double> >& data)
 {
-	for (unsigned int i = 0; i < data.size(); i++)
+	//TODO: warum funtioniert diese methode nicht? ist extrem langsam wenn auf zusie 257 prozesse gestartet werden (für 256 noch ganz normal)
+	//for (unsigned int i = 0; i < data.size(); i++)
+	//{
+	//	if (processRank == rootRank)
+	//	{
+	//		cout << i << endl;
+	//	}
+	//	ReduceToAverage(data[i]);
+	//}
+	//TODO: effizientere methode möglich?
+	int size1 = data.size();
+	int size2 = data[0].size();
+	int totalSize = size1 * size2;
+	double* combinedValues = new double[totalSize];
+	for (int i = 0; i < totalSize; i++)
 	{
-		ReduceToAverage(data[i]);
+		combinedValues[i] = data[i / size2][i % size2];
 	}
+	ReduceToAverage(combinedValues, totalSize);
+	if (processRank == rootRank)
+	{
+		for (int i = 0; i < totalSize; i++)
+		{
+			data[i / size2][i % size2] = combinedValues[i];
+		}
+	}
+	delete[] combinedValues;
+}
+
+map<int, int> GatherHistogram(int data)
+{
+	vector<int> gatheredValues(numOfProcesses);
+	map<int, int> histogram;
+
+	MPI_Gather(&data, 1, MPI_INT, gatheredValues.data(), 1, MPI_INT, rootRank, MPI_COMM_WORLD);
+	if (processRank == rootRank)
+	{
+		for (int i = 0; i < numOfProcesses; i++)
+		{
+			histogram[gatheredValues[i]]++;
+		}
+	}
+	return histogram;
 }
 
 }
