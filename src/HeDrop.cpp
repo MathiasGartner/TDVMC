@@ -270,6 +270,10 @@ void HeDrop::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 	ClearVector(otherExpectationValues);
 	ClearVector(grBins);
 
+	//if (this->time > 5e-5)
+	{
+		rm += 0.12;
+	}
 	for (int n = 0; n < N; n++)
 	{
 		//external potential energy
@@ -298,7 +302,9 @@ void HeDrop::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 				//}
 				if (i < n)
 				{
-					double x = rni / (rm * (1.0 + 0.08 * pow(sin(6000.0 * this->time), 2)));
+					double rmFactor = 0.0;
+					double eFactor = 0.0;
+					double x = rni / (rm * (1.0 + rmFactor * pow(sin(6000.0 * this->time), 2)));
 					double x2 = pow(x, 2);
 					double xminus2 = 1.0 / x2;
 					double xminus6 = pow(xminus2, 3);
@@ -307,7 +313,7 @@ void HeDrop::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 					{
 						F = exp(-pow(d / x - 1, 2));
 					}
-					potentialIntern += (1.0 + 0.08 * pow(sin(6000.0 * this->time), 2)) * e * (a * exp(-alpha * x + beta * x2) - F * xminus6 * (c6 + xminus2 * (c8 + xminus2 * c10)));
+					potentialIntern += (1.0 + eFactor * pow(sin(6000.0 * this->time), 2)) * e * (a * exp(-alpha * x + beta * x2) - F * xminus6 * (c6 + xminus2 * (c8 + xminus2 * c10)));
 				}
 
 				//kinetic energy
@@ -323,7 +329,8 @@ void HeDrop::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 							mcMillanSumD[n][a] += -5.0 * rniMinus7 * vecrni[a];
 						}
 						mcMillanSumD2[n] += 20.0 * rniMinus7;
-					} else if (rni >= rijTail)
+					}
+					else if (rni >= rijTail)
 					{
 						for (int a = 0; a < DIM; a++)
 						{
@@ -338,7 +345,8 @@ void HeDrop::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 						constSumD2[n] += 0.0;
 						//logSumD2[n] += pow(rni, -2);
 						linearSumD2[n] += 2.0 / rni;
-					} else
+					}
+					else
 					{
 						double nps;
 						double nps2;

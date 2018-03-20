@@ -32,6 +32,16 @@ public:
 	IPhysicalSystem()
 	{
 		this->time = 0;
+		this->wf = 0;
+		this->wfNew = 0;
+		this->exponent = 0;
+		this->localEnergyR = 0;
+		this->localEnergyI = 0;
+		this->numOfOtherExpectationValues = 0;
+		this->numOfAdditionalSystemProperties = 0;
+		this->USE_NORMALIZATION_AND_PHASE = false;
+		this->USE_NIC = false;
+		this->USE_MOVE_COM_TO_ZERO = false;
 	}
 
 	virtual ~IPhysicalSystem()

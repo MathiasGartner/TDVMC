@@ -13,6 +13,11 @@ int numOfProcesses;
 int processRank;
 int rootRank;
 
+void Barrier()
+{
+	MPI_Barrier(MPI_COMM_WORLD);
+}
+
 void BroadcastValue(string* data, int maxLength)
 {
 	char tmp[maxLength];

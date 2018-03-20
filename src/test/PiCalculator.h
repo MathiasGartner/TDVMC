@@ -17,9 +17,9 @@ void CalculatePi(int argc, char *argv[]) {
 	double mypi, pi, x, y;
 	int total, inside;
 
-	MPI::Init(argc, argv);
-	size = MPI::COMM_WORLD.Get_size();
-	rank = MPI::COMM_WORLD.Get_rank();
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
 	total = 10000;
 	srand(rank + 1);
@@ -37,13 +37,13 @@ void CalculatePi(int argc, char *argv[]) {
 	mypi = ((double)inside) / ((double)total) * 4.0;
 	cout << "this is process# " << rank << " mypi=" << mypi << endl;
 
-	MPI::COMM_WORLD.Reduce(&mypi, &pi, 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI_Reduce(&mypi, &pi, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 	pi = pi / (double)size;
 	if (rank == 0)
 		cout << "pi is approximately " << pi << ", Error is "
 				<< fabs(pi - PI25DT) << endl;
 
-	MPI::Finalize();
+	MPI_Finalize();
 }
 
 }

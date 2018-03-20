@@ -389,9 +389,12 @@ void TestMPITiming(int multiplier, int nrOfRuns)
 
 void TestMPI(int argc, char *argv[])
 {
-	MPI::Init(argc, argv);
-	processRank = MPI::COMM_WORLD.Get_rank();
-	numOfProcesses = MPI::COMM_WORLD.Get_size();
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &processRank);
+    MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
+	//MPI::Init(argc, argv);
+	//processRank = MPI::COMM_WORLD.Get_rank();
+	//numOfProcesses = MPI::COMM_WORLD.Get_size();
 
 	MPIMethods::numOfProcesses = numOfProcesses;
 	MPIMethods::processRank = processRank;
@@ -440,7 +443,7 @@ void TestMPI(int argc, char *argv[])
 		cout << endl << "=====================" << endl << endl;
 	}
 
-	MPI::Finalize();
+	MPI_Finalize();
 }
 
 }

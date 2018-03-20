@@ -1,7 +1,11 @@
+
+#include "mpi.h"
+
 #include "Constants.h"
 #include <cstring>
 #include <ctime>
 #include <fstream>
+#include "GaussianWavepacket.h"
 #include "HeBulk.h"
 #include "HeDrop.h"
 #include <iomanip>
@@ -13,9 +17,9 @@
 //#undef SEEK_END
 //#undef SEEK_CUR
 
-#include "mpi.h"
 #include "MPIMethods.h"
 #include <signal.h>
+#include <sstream>
 #include <stdlib.h>
 #include <string>
 #include "test/MPITest.h"
@@ -31,6 +35,7 @@ using namespace std;
 IPhysicalSystem* sys;
 
 bool USE_MEAN_FOR_FINAL_PARAMETERS = false;
+bool USE_NORMALIZE_WF = true;
 
 string OUTPUT_DIRECTORY;
 string originalOutputDirectory;
@@ -51,6 +56,7 @@ double RC;          			//cutoff for WF and LJ
 double TIMESTEP;
 double TOTALTIME;
 int IMAGINARY_TIME;
+int ODE_SOLVER_TYPE;
 double LBOX;
 vector<double> PARAMS_REAL;
 vector<double> PARAMS_IMAGINARY;
@@ -123,7 +129,8 @@ double randomNormal(double sigma, double mu)
 
 int randomInt(int maxValue)
 {
-	return ((int)floor(random01() * maxValue)) % maxValue;
+	//TODO: test for maxValue > 0 is only needed for Gaussian wavepacket simulation where only one  particle is used
+	return maxValue > 0 ? ((int)floor(random01() * maxValue)) % maxValue : maxValue;
 }
 
 int randomInt(int minValue, int maxValue)
@@ -140,8 +147,10 @@ void CreateOutputDirectory(string filePath)
 {
 	//INFO: append config options to output directory path, create the directory and copy the config file
 	int tmp;
+	ostringstream strs;
+	strs << "step=" << MC_NSTEPS << "_therm=" << MC_NTHERMSTEPS << "_time=" << TIMESTEP;
 	originalOutputDirectory = OUTPUT_DIRECTORY;
-	OUTPUT_DIRECTORY = OUTPUT_DIRECTORY + "step=" + to_string(MC_NSTEPS) + "_therm=" + to_string(MC_NTHERMSTEPS) + "_time=" + to_string(TIMESTEP) + "/";
+	OUTPUT_DIRECTORY = OUTPUT_DIRECTORY + strs.str() + "/";
 	tmp = system(("rm -rf " + OUTPUT_DIRECTORY).c_str());
 	tmp = system(("mkdir " + OUTPUT_DIRECTORY).c_str());
 	CopyFile(filePath, OUTPUT_DIRECTORY + "vmc.config");
@@ -167,6 +176,7 @@ void PrintConfig()
 	cout << "TIMESTEP:" << TIMESTEP << endl;
 	cout << "TOTALTIME:" << TOTALTIME << endl;
 	cout << "IMAGINARY_TIME:" << IMAGINARY_TIME << endl;
+	cout << "ODE_SOLVER_TYPE:" << ODE_SOLVER_TYPE << endl;
 	cout << "PARAMS_REAL" << JoinVector(PARAMS_REAL) << endl;
 	cout << "PARAMS_IMAGINARY" << JoinVector(PARAMS_IMAGINARY) << endl;
 	cout << "PARAM_PHIR:" << PARAM_PHIR << endl;
@@ -198,6 +208,7 @@ void ReadConfig(string filePath)
 	TIMESTEP = !configData["TIMESTEP"] ? TIMESTEP : configData["TIMESTEP"].asDouble();
 	TOTALTIME = !configData["TOTALTIME"] ? TOTALTIME : configData["TOTALTIME"].asDouble();
 	IMAGINARY_TIME = !configData["IMAGINARY_TIME"] ? IMAGINARY_TIME : configData["IMAGINARY_TIME"].asInt();
+	ODE_SOLVER_TYPE = !configData["ODE_SOLVER_TYPE"] ? ODE_SOLVER_TYPE : configData["ODE_SOLVER_TYPE"].asInt();
 
 	Json::Value paramsR = configData["PARAMS_REAL"];
 	for (unsigned int i = 0; i < paramsR.size(); i++)
@@ -236,6 +247,7 @@ void WriteConfig(string fileName, vector<double>& uR, vector<double>& uI, double
 	configFile << "\t" << "\"" << "TIMESTEP" << "\"" << " : " << TIMESTEP << "," << endl;
 	configFile << "\t" << "\"" << "TOTALTIME" << "\"" << " : " << TOTALTIME << "," << endl;
 	configFile << "\t" << "\"" << "IMAGINARY_TIME" << "\"" << " : " << IMAGINARY_TIME << "," << endl;
+	configFile << "\t" << "\"" << "ODE_SOLVER_TYPE" << "\"" << " : " << ODE_SOLVER_TYPE << "," << endl;
 
 	configFile << "\t" << "\"" << "PARAMS_REAL" << "\"" << " : " << endl;
 	configFile << "\t" << "[" << endl;
@@ -296,6 +308,7 @@ void WriteConfigJson(string fileName, double* uR, double* uI, double phiR, doubl
     event["TIMESTEP"]  = TIMESTEP;
     event["TOTALTIME"]  = TOTALTIME;
     event["IMAGINARY_TIME"]  = IMAGINARY_TIME;
+    event["ODE_SOLVER_TYPE"]  = ODE_SOLVER_TYPE;
 
     for (int i = 0; i < N_PARAM; i++)
     {
@@ -370,6 +383,7 @@ void BroadcastConfig()
 	MPIMethods::BroadcastValue(&TIMESTEP);
 	MPIMethods::BroadcastValue(&TOTALTIME);
 	MPIMethods::BroadcastValue(&IMAGINARY_TIME);
+	MPIMethods::BroadcastValue(&ODE_SOLVER_TYPE);
 }
 
 void BroadcastNewParameters(vector<double>& uR, vector<double>& uI, double* phiR, double* phiI)
@@ -465,9 +479,21 @@ bool LoadLastPositionsFromFile(string filename, vector<vector<double> >& R)
 
 void InitCoordinateConfiguration(vector<vector<double> >& R)
 {
-	string filename = "particleconfiguration_" + to_string(N);
-	if (!LoadLastPositionsFromFile(filename, R))
+	int fileFound = 0;
+	if (processRank == rootRank)
 	{
+		string filename = "particleconfiguration_" + to_string(N);
+		if (LoadLastPositionsFromFile(filename, R))
+		{
+			fileFound = 1;
+		}
+	}
+	MPIMethods::BroadcastValue(&fileFound);
+	if (fileFound)
+	{
+		MPIMethods::BroadcastValues(R);
+	}
+	else {
 		if (processRank == rootRank)
 		{
 			cout << "LBOX=" << LBOX << endl;
@@ -1109,10 +1135,10 @@ void CalculateNextParametersRK4(vector<vector<double> >& R, vector<double>& uR, 
 		for (int i = 0; i < N_PARAM; i++)
 		{
 			tmpUR[i] = uR[i] + uDotR[0][i] * TIMESTEP / 2.0;
-			//tmpUI[i] = uI[i] + uDotI[0][i] * TIMESTEP / 2.0;
+			tmpUI[i] = uI[i] + uDotI[0][i] * TIMESTEP / 2.0;
 		}
 		tmpPhiR = *phiR + phiDotR[0] * TIMESTEP / 2.0;
-		//tmpPhiI = *phiI + phiDotI[0] * TIMESTEP / 2.0;
+		tmpPhiI = *phiI + phiDotI[0] * TIMESTEP / 2.0;
 	}
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
 	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
@@ -1125,10 +1151,10 @@ void CalculateNextParametersRK4(vector<vector<double> >& R, vector<double>& uR, 
 		for (int i = 0; i < N_PARAM; i++)
 		{
 			tmpUR[i] = uR[i] + uDotR[1][i] * TIMESTEP / 2.0;
-			//tmpUI[i] = uI[i] + uDotI[1][i] * TIMESTEP / 2.0;
+			tmpUI[i] = uI[i] + uDotI[1][i] * TIMESTEP / 2.0;
 		}
 		tmpPhiR = *phiR + phiDotR[1] * TIMESTEP / 2.0;
-		//tmpPhiI = *phiI + phiDotI[1] * TIMESTEP / 2.0;
+		tmpPhiI = *phiI + phiDotI[1] * TIMESTEP / 2.0;
 	}
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
 	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
@@ -1141,10 +1167,10 @@ void CalculateNextParametersRK4(vector<vector<double> >& R, vector<double>& uR, 
 		for (int i = 0; i < N_PARAM; i++)
 		{
 			tmpUR[i] = uR[i] + uDotR[2][i] * TIMESTEP;
-			//tmpUI[i] = uI[i] + uDotI[2][i] * TIMESTEP;
+			tmpUI[i] = uI[i] + uDotI[2][i] * TIMESTEP;
 		}
 		tmpPhiR = *phiR + phiDotR[2] * TIMESTEP;
-		//tmpPhiI = *phiI + phiDotI[2] * TIMESTEP;
+		tmpPhiI = *phiI + phiDotI[2] * TIMESTEP;
 	}
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
 	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
@@ -1157,10 +1183,10 @@ void CalculateNextParametersRK4(vector<vector<double> >& R, vector<double>& uR, 
 		for (int i = 0; i < N_PARAM; i++)
 		{
 			uR[i] = uR[i] + ((uDotR[0][i] + 2.0 * uDotR[1][i] + 2.0 * uDotR[2][i] + uDotR[3][i]) / 6.0) * TIMESTEP;
-			//uI[i] = uI[i] + ((uDotI[0][i] + 2.0 * uDotI[1][i] + 2.0 * uDotI[2][i] + uDotI[3][i]) / 6.0) * TIMESTEP;
+			uI[i] = uI[i] + ((uDotI[0][i] + 2.0 * uDotI[1][i] + 2.0 * uDotI[2][i] + uDotI[3][i]) / 6.0) * TIMESTEP;
 		}
 		*phiR = *phiR + ((phiDotR[0] + 2.0 * phiDotR[1] + 2.0 * phiDotR[2] + phiDotR[3]) / 6.0) * TIMESTEP;
-		//phiI = *phiI + ((phiDotI[0] + 2.0 * phiDotI[1] + 2.0 * phiDotI[2] + phiDotI[3]) / 6.0) * TIMESTEP;
+		*phiI = *phiI + ((phiDotI[0] + 2.0 * phiDotI[1] + 2.0 * phiDotI[2] + phiDotI[3]) / 6.0) * TIMESTEP;
 	}
 }
 
@@ -1181,17 +1207,16 @@ void CalculateNextParameters(vector<vector<double> >& R, vector<double>& uR, vec
 		t.start();
 	}
 
-	int type = 0;
-	if (type == 0)
+	if (ODE_SOLVER_TYPE == 0)
 	{
 		CalculateNextParametersEuler(uR, uI, phiR, phiI);
 	}
-	else if (type == 1)
+	else if (ODE_SOLVER_TYPE == 1)
 	{
 		vector<vector<double> >& Rcopy(R);
 		CalculateNextParametersPC(Rcopy, uR, uI, phiR, phiI);
 	}
-	else if (type == 2)
+	else if (ODE_SOLVER_TYPE == 2)
 	{
 		vector<vector<double> >& Rcopy(R);
 		CalculateNextParametersRK4(Rcopy, uR, uI, phiR, phiI);
@@ -1280,9 +1305,9 @@ int mainMPI(int argc, char** argv)
 	char processName[80];
 	int processNameLength;
 
-	MPI_Init(&argc, &argv);
-	MPI_Comm_rank(MPI_COMM_WORLD, &processRank);
-	MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &processRank);
+    MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
 	MPI_Get_processor_name(processName, &processNameLength);
 
 	MPIMethods::numOfProcesses = numOfProcesses;
@@ -1313,8 +1338,9 @@ int mainMPI(int argc, char** argv)
 	BroadcastConfig();
 	//PrintConfig();
 
-	sys = new HeDrop(configDirectory);
+	//sys = new HeDrop(configDirectory);
 	//sys = new HeBulk(configDirectory);
+	sys = new GaussianWavepacket(configDirectory);
 	Init();
 	if (processRank == rootRank)
 	{
@@ -1404,18 +1430,21 @@ int mainMPI(int argc, char** argv)
 			}
 			cout << "t=" << currentTime << endl;
 			//cout << "localEnergyR=" << localEnergyR << " (" << otherExpectationValues[0] << " + " << otherExpectationValues[1] << ")" << endl;
-			cout << "localEnergyR/N=" << localEnergyR / (double)N << " (" << otherExpectationValues[0] / (double)N << " + " << otherExpectationValues[1] / (double)N << ")" << endl;
+			//cout << "localEnergyR/N=" << localEnergyR / (double)N << " (" << otherExpectationValues[0] / (double)N << " + " << otherExpectationValues[1] / (double)N << ")" << endl;
+			cout << "localEnergyR/N=" << localEnergyR / (double)N << endl;
 			AllLocalEnergyR.push_back(localEnergyR);
 			AllOtherExpectationValues.push_back(otherExpectationValues);
 			AllParametersR.push_back(uR);
+			AllParametersR[AllParametersR.size() - 1].push_back(phiR);
 			AllParametersI.push_back(uI);
+			AllParametersI[AllParametersI.size() - 1].push_back(phiI);
 		}
 		if (sys->USE_NORMALIZATION_AND_PHASE)
 		{
 			CalculateNextParameters(R, uR, uI, &phiR, &phiI);
-			if (processRank == rootRank)
+			if (processRank == rootRank && USE_NORMALIZE_WF == true)
 			{
-				//NormalizeWavefunction(otherExpectationValues[2], &phiR);
+				NormalizeWavefunction(sys->GetWf(), &phiR);
 			}
 		}
 		else
@@ -1465,7 +1494,13 @@ int mainMPI(int argc, char** argv)
 		WriteDataToFile(AllParametersR, "AllParametersR100", "uR", 100);
 		WriteDataToFile(AllParametersI, "AllParametersI100", "uI", 100);
 	}
-	WriteRandomGeneratorStatesToFile("state");
+	if (processRank == rootRank)
+	{
+		int tmp = 0;
+		tmp = system(("mkdir " + OUTPUT_DIRECTORY + "random").c_str());
+	}
+	MPIMethods::Barrier();
+	WriteRandomGeneratorStatesToFile("random/state");
 	if (processRank == rootRank)
 	{
 		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
@@ -1543,8 +1578,9 @@ int main(int argc, char **argv) {
 	}
 	else if (argc == 1) //INFO: started without specifying config-file. used for local execution
 	{
-		configFilePath = "/home/gartner/Sources/TDVMC/config/drop_3.config";
-		//string configFilePath = "/home/gartner/Sources/TDVMC/config/drop_6.config";
+		//configFilePath = "/home/gartner/Sources/TDVMC/config/drop_3.config";
+		//configFilePath = "/home/gartner/Sources/TDVMC/config/drop_6.config";
+		configFilePath = "/home/gartner/Sources/TDVMC/config/wavepacket.config";
 		val = mainMPI(argc, argv);
 	}
 	else if (argc > 1)

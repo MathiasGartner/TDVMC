@@ -24,6 +24,7 @@ extern double RC;          			//cutoff for WF and LJ
 extern double TIMESTEP;
 extern double TOTALTIME;
 extern int IMAGINARY_TIME;
+extern int ODE_SOLVER_TYPE;
 
 extern double LBOX;				    //length of box
 

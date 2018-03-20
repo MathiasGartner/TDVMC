@@ -126,7 +126,7 @@ void HeBulk::InitSystem()
 
 vector<double> HeBulk::GetCenterOfMass(vector<vector<double> >& R)
 {
-	vector<double> com = {0, 0, 0};
+	vector<double> com = {0.0, 0.0, 0.0};
 	return com;
 }
 

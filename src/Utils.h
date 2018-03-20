@@ -10,7 +10,7 @@
 
 using namespace std;
 
-const int exportPrecision = 12;
+const int exportPrecision = 15;
 
 template<typename T> string JoinVector(const vector<T>& v, int everyNth = 1)
 {

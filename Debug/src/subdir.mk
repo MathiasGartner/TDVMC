@@ -4,6 +4,7 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
+../src/GaussianWavepacket.cpp \
 ../src/HeBulk.cpp \
 ../src/HeDrop.cpp \
 ../src/MathOperators.cpp \
@@ -11,6 +12,7 @@ CPP_SRCS += \
 ../src/Utils.cpp 
 
 OBJS += \
+./src/GaussianWavepacket.o \
 ./src/HeBulk.o \
 ./src/HeDrop.o \
 ./src/MathOperators.o \
@@ -18,6 +20,7 @@ OBJS += \
 ./src/Utils.o 
 
 CPP_DEPS += \
+./src/GaussianWavepacket.d \
 ./src/HeBulk.d \
 ./src/HeDrop.d \
 ./src/MathOperators.d \
