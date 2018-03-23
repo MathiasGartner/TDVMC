@@ -37,6 +37,7 @@ IPhysicalSystem* sys;
 bool USE_MEAN_FOR_FINAL_PARAMETERS = false;
 bool USE_NORMALIZE_WF = true;
 
+string SYSTEM_TYPE;
 string OUTPUT_DIRECTORY;
 string originalOutputDirectory;
 string configDirectory;
@@ -160,6 +161,7 @@ void CreateOutputDirectory(string filePath)
 void PrintConfig()
 {
 	Log("===== Configuration ====");
+	cout << "SYSTEM_TYPE:" << SYSTEM_TYPE << endl;
 	cout << "OUTPUT_DIRECTORY:" << OUTPUT_DIRECTORY << endl;
 	cout << "N:" << N << endl;
 	cout << "DIM:" << DIM << endl;
@@ -192,6 +194,7 @@ void ReadConfig(string filePath)
 	ifstream configFile(filePath, ifstream::binary);
 	configReader.parse(configFile, configData, false);
 
+	SYSTEM_TYPE = configData["SYSTEM_TYPE"] == 0 ? SYSTEM_TYPE : configData["SYSTEM_TYPE"].asString();
 	OUTPUT_DIRECTORY = configData["OUTPUT_DIRECTORY"] == 0 ? OUTPUT_DIRECTORY : configData["OUTPUT_DIRECTORY"].asString();
 	N = !configData["N"] ? N : configData["N"].asInt();
 	DIM = !configData["DIM"] ? DIM : configData["DIM"].asInt();
@@ -231,6 +234,7 @@ void WriteConfig(string fileName, vector<double>& uR, vector<double>& uI, double
 	configFile.precision(8);
 
 	configFile << "{" << endl;
+	configFile << "\t" << "\"" << "SYSTEM_TYPE" << "\"" << " : " << "\"" << SYSTEM_TYPE << "\"," << endl;
 	configFile << "\t" << "\"" << "OUTPUT_DIRECTORY" << "\"" << " : " << "\"" << originalOutputDirectory << "\"," << endl;
 	configFile << "\t" << "\"" << "N" << "\"" << " : " << N << "," << endl;
 	configFile << "\t" << "\"" << "DIM" << "\"" << " : " << DIM << "," << endl;
@@ -292,6 +296,7 @@ void WriteConfigJson(string fileName, double* uR, double* uI, double phiR, doubl
     Json::Value paramsR(Json::arrayValue);
     Json::Value paramsI(Json::arrayValue);
 
+    event["SYSTEM_TYPE"]  = SYSTEM_TYPE;
     event["OUTPUT_DIRECTORY"]  = OUTPUT_DIRECTORY;
     event["N"]  = N;
     event["DIM"]  = DIM;
@@ -367,6 +372,7 @@ void WriteRandomGeneratorStatesToFile(string fileNamePrefix)
 
 void BroadcastConfig()
 {
+	MPIMethods::BroadcastValue(&SYSTEM_TYPE, 300);
 	MPIMethods::BroadcastValue(&OUTPUT_DIRECTORY, 300);
 	MPIMethods::BroadcastValue(&N);
 	MPIMethods::BroadcastValue(&DIM);
@@ -1338,9 +1344,26 @@ int mainMPI(int argc, char** argv)
 	BroadcastConfig();
 	//PrintConfig();
 
-	//sys = new HeDrop(configDirectory);
-	//sys = new HeBulk(configDirectory);
-	sys = new GaussianWavepacket(configDirectory);
+	if (SYSTEM_TYPE == "HeDrop")
+	{
+		sys = new HeDrop(configDirectory);
+	}
+	else if (SYSTEM_TYPE == "HeBulk")
+	{
+		sys = new HeBulk(configDirectory);
+	}
+	else if (SYSTEM_TYPE == "GaussianWavepacket")
+	{
+		sys = new GaussianWavepacket(configDirectory);
+	}
+	else
+	{
+		if (processRank == rootRank)
+		{
+			Log("System type \"" + SYSTEM_TYPE + "\" not available.");
+		}
+		return 1;
+	}
 	Init();
 	if (processRank == rootRank)
 	{
@@ -1578,9 +1601,18 @@ int main(int argc, char **argv) {
 	}
 	else if (argc == 1) //INFO: started without specifying config-file. used for local execution
 	{
-		//configFilePath = "/home/gartner/Sources/TDVMC/config/drop_3.config";
-		//configFilePath = "/home/gartner/Sources/TDVMC/config/drop_6.config";
-		configFilePath = "/home/gartner/Sources/TDVMC/config/wavepacket.config";
+		if (SYSTEM_TYPE == "HeDrop")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/drop_3.config";
+		}
+		else if (SYSTEM_TYPE == "HeBulk")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/bulk_64.config";
+		}
+		else if (SYSTEM_TYPE == "GaussianWavepacket")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/wavepacket.config";
+		}
 		val = mainMPI(argc, argv);
 	}
 	else if (argc > 1)

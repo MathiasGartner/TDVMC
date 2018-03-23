@@ -8,6 +8,7 @@ using namespace std;
 
 const double HBAR2_2M = 6.0612686;  //hbar^2/2m
 
+extern string SYSTEM_TYPE;
 extern string OUTPUT_DIRECTORY;
 extern int N;           	    	//number of particles
 extern int DIM;     	         	//number of dimensions
