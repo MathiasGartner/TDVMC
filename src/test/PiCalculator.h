@@ -1,7 +1,8 @@
 #pragma once
 
-#include <math.h>
 #include "mpi.h"
+
+#include <math.h>
 #include <iostream>
 #include <stdlib.h>
 

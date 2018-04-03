@@ -1,10 +1,11 @@
 #pragma once
 
+#include "mpi.h"
+
 #include "../Constants.h"
 #include "../MPIMethods.h"
 #include "../Timer.h"
 #include "../Utils.h"
-#include "mpi.h"
 
 using namespace std;
 

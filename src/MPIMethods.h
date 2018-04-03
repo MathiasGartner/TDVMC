@@ -1,7 +1,8 @@
 #pragma once
 
-#include <cstring>
 #include "mpi.h"
+
+#include <cstring>
 #include <vector>
 
 using namespace std;

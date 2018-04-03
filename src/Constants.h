@@ -14,6 +14,7 @@ extern int N;           	    	//number of particles
 extern int DIM;     	         	//number of dimensions
 extern int N_PARAM;	        	  	//number of parameters of trial function
 extern double MC_STEP;
+extern double MC_STEP_OFFSET;
 extern int MC_NSTEPS;
 extern int MC_NTHERMSTEPS;
 extern int MC_NINITIALIZATIONSTEPS;

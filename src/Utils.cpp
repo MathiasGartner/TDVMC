@@ -46,7 +46,7 @@ double VectorNorm2(vector<double>& r)
 	double sum = 0;
 	for (unsigned int i = 0; i < r.size(); i++)
 	{
-		sum += pow(r[i], 2);
+		sum += r[i] * r[i];
 	}
 	return sum;
 }

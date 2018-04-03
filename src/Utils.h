@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Constants.h"
+
 #include <cstring>
 #include <fstream>
 #include <json/json.h>

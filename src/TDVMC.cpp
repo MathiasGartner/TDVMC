@@ -1,33 +1,34 @@
 
 #include "mpi.h"
 
+#include "BulkOnlySplines.h"
 #include "Constants.h"
-#include <cstring>
-#include <ctime>
-#include <fstream>
 #include "GaussianWavepacket.h"
 #include "HeBulk.h"
 #include "HeDrop.h"
-#include <iomanip>
-#include <json/json.h>
-#include <math.h>
 #include "MathOperators.h"
+#include "MPIMethods.h"
+#include "test/MPITest.h"
+#include "test/PiCalculator.h"
+#include "test/Tests.h"
+#include "Timer.h"
+#include "Utils.h"
 
 //#undef SEEK_SET
 //#undef SEEK_END
 //#undef SEEK_CUR
 
-#include "MPIMethods.h"
+#include <cstring>
+#include <ctime>
+#include <fstream>
+#include <iomanip>
+#include <json/json.h>
+#include <math.h>
 #include <signal.h>
 #include <sstream>
 #include <stdlib.h>
 #include <string>
-#include "test/MPITest.h"
-#include "test/PiCalculator.h"
-#include "test/Tests.h"
-#include "Timer.h"
 #include <unistd.h>
-#include "Utils.h"
 #include <vector>
 
 using namespace std;
@@ -46,6 +47,7 @@ int N;           	    		//number of particles
 int DIM;     	        	 	//number of dimensions
 int N_PARAM;	        	  	//number of parameters of trial function
 double MC_STEP;
+double MC_STEP_OFFSET;
 int MC_NSTEPS;
 int MC_NTHERMSTEPS;
 int MC_NINITIALIZATIONSTEPS;
@@ -169,6 +171,7 @@ void PrintConfig()
 	cout << "RHO:" << RHO << endl;
 	cout << "RC:" << RC << endl;
 	cout << "MC_STEP:" << MC_STEP << endl;
+	cout << "MC_STEP_OFFSET:" << MC_STEP_OFFSET << endl;
 	cout << "MC_NSTEPS:" << MC_NSTEPS << endl;
 	cout << "MC_NTHERMSTEPS:" << MC_NTHERMSTEPS << endl;
 	cout << "MC_NINITIALIZATIONSTEPS:" << MC_NINITIALIZATIONSTEPS << endl;
@@ -202,6 +205,7 @@ void ReadConfig(string filePath)
 	RHO = !configData["RHO"] ? RHO : configData["RHO"].asDouble();
 	RC = !configData["RC"] ? RC : configData["RC"].asDouble();
 	MC_STEP = !configData["MC_STEP"] ? MC_STEP : configData["MC_STEP"].asDouble();
+	MC_STEP_OFFSET = !configData["MC_STEP_OFFSET"] ? MC_STEP_OFFSET : configData["MC_STEP_OFFSET"].asDouble();
 	MC_NSTEPS = !configData["MC_NSTEPS"] ? MC_NSTEPS : configData["MC_NSTEPS"].asInt();
 	MC_NTHERMSTEPS = !configData["MC_NTHERMSTEPS"] ? MC_NTHERMSTEPS : configData["MC_NTHERMSTEPS"].asInt();
 	MC_NINITIALIZATIONSTEPS = !configData["MC_NINITIALIZATIONSTEPS"] ? MC_NINITIALIZATIONSTEPS : configData["MC_NINITIALIZATIONSTEPS"].asInt();
@@ -242,6 +246,7 @@ void WriteConfig(string fileName, vector<double>& uR, vector<double>& uI, double
 	configFile << "\t" << "\"" << "RHO" << "\"" << " : " << RHO << "," << endl;
 	configFile << "\t" << "\"" << "RC" << "\"" << " : " << RC << "," << endl;
 	configFile << "\t" << "\"" << "MC_STEP" << "\"" << " : " << MC_STEP << "," << endl;
+	configFile << "\t" << "\"" << "MC_STEP_OFFSET" << "\"" << " : " << MC_STEP_OFFSET << "," << endl;
 	configFile << "\t" << "\"" << "MC_NSTEPS" << "\"" << " : " << MC_NSTEPS << "," << endl;
 	configFile << "\t" << "\"" << "MC_NTHERMSTEPS" << "\"" << " : " << MC_NTHERMSTEPS << "," << endl;
 	configFile << "\t" << "\"" << "MC_NINITIALIZATIONSTEPS" << "\"" << " : " << MC_NINITIALIZATIONSTEPS << "," << endl;
@@ -304,6 +309,7 @@ void WriteConfigJson(string fileName, double* uR, double* uI, double phiR, doubl
     event["RHO"]  = RHO;
     event["RC"]  = RC;
     event["MC_STEP"]  = MC_STEP;
+    event["MC_STEP_OFFSET"]  = MC_STEP_OFFSET;
     event["MC_NSTEPS"]  = MC_NSTEPS;
     event["MC_NTHERMSTEPS"]  = MC_NTHERMSTEPS;
     event["MC_NINITIALIZATIONSTEPS"]  = MC_NINITIALIZATIONSTEPS;
@@ -380,6 +386,7 @@ void BroadcastConfig()
 	MPIMethods::BroadcastValue(&RHO);
 	MPIMethods::BroadcastValue(&RC);
 	MPIMethods::BroadcastValue(&MC_STEP);
+	MPIMethods::BroadcastValue(&MC_STEP_OFFSET);
 	MPIMethods::BroadcastValue(&MC_NSTEPS);
 	MPIMethods::BroadcastValue(&MC_NTHERMSTEPS);
 	MPIMethods::BroadcastValue(&MC_NINITIALIZATIONSTEPS);
@@ -600,7 +607,7 @@ void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<dou
 	vector<double> oldPosition(R[randomParticle]);
 	for (int i = 0; i < DIM; i++)
 	{
-		R[randomParticle][i] += randomNormal(MC_STEP, 0.0);
+		R[randomParticle][i] += randomNormal(MC_STEP, MC_STEP_OFFSET);
 	}
 	double wfQuotient = sys->CalculateWFQuotient(R, uR, uI, phiR, phiI, randomParticle, oldPosition);
 
@@ -1198,10 +1205,35 @@ void CalculateNextParametersRK4(vector<vector<double> >& R, vector<double>& uR, 
 
 void CalculateNextParameters(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI)
 {
-	int type = 0;
-	if (type == 0)
+	Timer t;
+	if (processRank == rootRank)
+	{
+		t.start();
+	}
+
+	if (ODE_SOLVER_TYPE == 0)
 	{
 		CalculateNextParametersEuler(uR, uI);
+	}
+	else if (ODE_SOLVER_TYPE == 1)
+	{
+		if (processRank == rootRank)
+		{
+			cout << "ODE_SOLVER_TYPE \"" << ODE_SOLVER_TYPE << "\" not available";
+		}
+	}
+	else if (ODE_SOLVER_TYPE == 2)
+	{
+		double tmpPhiR = 0;
+		double tmpPhiI = 0;
+		vector<vector<double> >& Rcopy(R);
+		CalculateNextParametersRK4(Rcopy, uR, uI, &tmpPhiR, &tmpPhiI);
+	}
+
+	if (processRank == rootRank)
+	{
+		t.stop();
+		Log("DGL duration = " + to_string(t.duration()) + " ms");
 	}
 }
 
@@ -1346,15 +1378,19 @@ int mainMPI(int argc, char** argv)
 
 	if (SYSTEM_TYPE == "HeDrop")
 	{
-		sys = new HeDrop(configDirectory);
+		sys = (IPhysicalSystem*)new HeDrop(configDirectory);
 	}
 	else if (SYSTEM_TYPE == "HeBulk")
 	{
-		sys = new HeBulk(configDirectory);
+		sys = (IPhysicalSystem*)new HeBulk(configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BulkOnlySplines")
+	{
+		sys = (IPhysicalSystem*)new BulkOnlySplines(configDirectory);
 	}
 	else if (SYSTEM_TYPE == "GaussianWavepacket")
 	{
-		sys = new GaussianWavepacket(configDirectory);
+		sys = (IPhysicalSystem*)new GaussianWavepacket(configDirectory);
 	}
 	else
 	{
@@ -1453,8 +1489,8 @@ int mainMPI(int argc, char** argv)
 			}
 			cout << "t=" << currentTime << endl;
 			//cout << "localEnergyR=" << localEnergyR << " (" << otherExpectationValues[0] << " + " << otherExpectationValues[1] << ")" << endl;
-			//cout << "localEnergyR/N=" << localEnergyR / (double)N << " (" << otherExpectationValues[0] / (double)N << " + " << otherExpectationValues[1] / (double)N << ")" << endl;
-			cout << "localEnergyR/N=" << localEnergyR / (double)N << endl;
+			cout << "localEnergyR/N=" << localEnergyR / (double)N << " (" << otherExpectationValues[0] / (double)N << " + " << otherExpectationValues[1] / (double)N << ")" << endl;
+			//cout << "localEnergyR/N=" << localEnergyR / (double)N << endl;
 			AllLocalEnergyR.push_back(localEnergyR);
 			AllOtherExpectationValues.push_back(otherExpectationValues);
 			AllParametersR.push_back(uR);
@@ -1563,8 +1599,8 @@ int mainMPI(int argc, char** argv)
 	{
 		WriteParticleInputFile("AAFinish_particleconfiguration_" + to_string(N), R);
 		cout << "phiR=" << phiR << endl;
-		cout << "log(additionalSystemProperties[2])=" << log(additionalSystemProperties[2]) << endl;
-		phiR = phiR - log(additionalSystemProperties[2]);
+		//cout << "log(additionalSystemProperties[2])=" << log(additionalSystemProperties[2]) << endl;
+		//phiR = phiR - log(additionalSystemProperties[2]);
 		cout << "phiR=" << phiR << endl;
 		WriteConfig("AAFinish_tVMC.config", uR, uI, phiR, phiI);
 
@@ -1601,6 +1637,7 @@ int main(int argc, char **argv) {
 	}
 	else if (argc == 1) //INFO: started without specifying config-file. used for local execution
 	{
+		SYSTEM_TYPE = "BulkOnlySplines";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/drop_3.config";
@@ -1608,6 +1645,10 @@ int main(int argc, char **argv) {
 		else if (SYSTEM_TYPE == "HeBulk")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/bulk_64.config";
+		}
+		else if (SYSTEM_TYPE == "BulkOnlySplines")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkGauss.config";
 		}
 		else if (SYSTEM_TYPE == "GaussianWavepacket")
 		{
