@@ -825,7 +825,7 @@ void BuildSystemOfEquationsForParametersNoPhi(vector<vector<double> >& matrix, v
 	}
 }
 
-void BuildSystemOfEquationsForParameters(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
+void BuildSystemOfEquationsForParametersIncludePhi(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
 {
 	energiesReal.resize(N_PARAM);
 	energiesImag.resize(N_PARAM);
@@ -855,6 +855,18 @@ void BuildSystemOfEquationsForParameters(vector<vector<double> >& matrix, vector
 	}
 }
 
+void BuildSystemOfEquationsForParameters(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
+{
+	if (sys->USE_NORMALIZATION_AND_PHASE)
+	{
+		BuildSystemOfEquationsForParametersIncludePhi(matrix, energiesReal, energiesImag);
+	}
+	else
+	{
+		BuildSystemOfEquationsForParametersNoPhi(matrix, energiesReal, energiesImag);
+	}
+}
+
 void PerformCholeskyDecomposition(vector<vector<double> >& matrix)
 {
 	double sum = 0;
@@ -880,46 +892,6 @@ void PerformCholeskyDecomposition(vector<vector<double> >& matrix)
 				cout << "!!!!! NOT POSITIVE SEMI DEFINITE !!!! @ i=" << i << ", j=" << j << endl;
 			}
 		}
-	}
-}
-
-void SolveForParametersDot(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag, vector<double>& resultReal, vector<double>& resultImag)
-{
-	double sumReal = 0;
-	double sumImag = 0;
-	vector<double> tmpReal;
-	vector<double> tmpImag;
-	tmpReal.resize(N_PARAM);
-	tmpImag.resize(N_PARAM);
-
-	resultReal.resize(N_PARAM);
-	resultImag.resize(N_PARAM);
-
-	for (int i = 0; i < N_PARAM; i++)
-	{
-		sumReal = 0;
-		sumImag = 0;
-		for (int j = 0; j < i; j++)
-		{
-			sumReal += matrix[i][j] * tmpReal[j];
-			sumImag += matrix[i][j] * tmpImag[j];
-		}
-		tmpReal[i] = 1.0 / matrix[i][i] * (energiesReal[i] - sumReal);
-		tmpImag[i] = 1.0 / matrix[i][i] * (energiesImag[i] - sumImag);
-	}
-
-	for (int i = N_PARAM - 1; i >= 0; i--)
-	{
-		sumReal = 0;
-		sumImag = 0;
-		for (int j = N_PARAM - 1; j > i; j--)
-		{
-			sumReal += matrix[j][i] * resultReal[j];
-			sumImag += matrix[j][i] * resultImag[j];
-		}
-		resultReal[i] = 1.0 / matrix[i][i] * (tmpReal[i] - sumReal);
-		resultImag[i] = 1.0 / matrix[i][i] * (tmpImag[i] - sumImag);
-		//cout << resultReal[i] << endl;
 	}
 }
 
@@ -963,7 +935,6 @@ void SolveForParametersDot(vector<vector<double> >& matrix, vector<double>& ener
 		resultImag[i] = 1.0 / matrix[i][i] * (tmpImag[i] - sumImag);
 		*resultPhiReal -= localOperators[i] * resultReal[i];
 		*resultPhiImag -= localOperators[i] * resultImag[i];
-		//cout << resultReal[i] << endl;
 	}
 	if (IMAGINARY_TIME == 0)
 	{
@@ -972,36 +943,6 @@ void SolveForParametersDot(vector<vector<double> >& matrix, vector<double>& ener
 	else
 	{
 		*resultPhiReal -= localEnergyR;
-	}
-}
-
-void CalculateNextParametersEuler(vector<double>& uR, vector<double>& uI)
-{
-	if (processRank == rootRank)
-	{
-		vector<double> energiesReal; //rhs of the equation that corresponds to uDotR;
-		vector<double> energiesImag; //rhs of the equation that corresponds to uDotI;
-		vector<vector<double> > matrix;
-		vector<double> uDotR;
-		vector<double> uDotI;
-
-		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
-
-		//WriteDataToFile(matrix, "BBmatrix", "BBmatrix");
-		//WriteDataToFile(energiesReal, "BBenergiesReal", "BBenergiesReal");
-		//WriteDataToFile(energiesImag, "BBenergiesImag", "BBenergiesImag");
-
-		PerformCholeskyDecomposition(matrix);
-		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR, uDotI);
-
-		//WriteDataToFile(matrix, "BBcholesky", "BBcholesky");
-		//WriteDataToFile(uDotR, "BBuDotR", "BBuDotR");
-
-		for (int i = 0; i < N_PARAM; i++)
-		{
-			uR[i] = uR[i] + uDotR[i] * TIMESTEP;
-			uI[i] = uI[i] + uDotI[i] * TIMESTEP;
-		}
 	}
 }
 
@@ -1112,7 +1053,6 @@ void CalculateNextParametersPC(vector<vector<double> >& R, vector<double>& uR, v
 	//*phiI = tmpPhiI;
 }
 
-//TODO: also update uI
 void CalculateNextParametersRK4(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
 	vector<double> energiesReal; //rhs of the equation that corresponds to uDotR;
@@ -1203,40 +1143,6 @@ void CalculateNextParametersRK4(vector<vector<double> >& R, vector<double>& uR, 
 	}
 }
 
-void CalculateNextParameters(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI)
-{
-	Timer t;
-	if (processRank == rootRank)
-	{
-		t.start();
-	}
-
-	if (ODE_SOLVER_TYPE == 0)
-	{
-		CalculateNextParametersEuler(uR, uI);
-	}
-	else if (ODE_SOLVER_TYPE == 1)
-	{
-		if (processRank == rootRank)
-		{
-			cout << "ODE_SOLVER_TYPE \"" << ODE_SOLVER_TYPE << "\" not available";
-		}
-	}
-	else if (ODE_SOLVER_TYPE == 2)
-	{
-		double tmpPhiR = 0;
-		double tmpPhiI = 0;
-		vector<vector<double> >& Rcopy(R);
-		CalculateNextParametersRK4(Rcopy, uR, uI, &tmpPhiR, &tmpPhiI);
-	}
-
-	if (processRank == rootRank)
-	{
-		t.stop();
-		Log("DGL duration = " + to_string(t.duration()) + " ms");
-	}
-}
-
 void CalculateNextParameters(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
 	Timer t;
@@ -1265,6 +1171,13 @@ void CalculateNextParameters(vector<vector<double> >& R, vector<double>& uR, vec
 		t.stop();
 		Log("DGL duration = " + to_string(t.duration()) + " ms");
 	}
+}
+
+void CalculateNextParameters(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI)
+{
+	double tmpPhiR = 0;
+	double tmpPhiI = 0;
+	CalculateNextParameters(R, uR, uI, &tmpPhiR, &tmpPhiI);
 }
 
 void NormalizeWavefunction(double wf, double *phiR)
@@ -1557,6 +1470,7 @@ int mainMPI(int argc, char** argv)
 	{
 		int tmp = 0;
 		tmp = system(("mkdir " + OUTPUT_DIRECTORY + "random").c_str());
+		cout << tmp << endl;
 	}
 	MPIMethods::Barrier();
 	WriteRandomGeneratorStatesToFile("random/state");
