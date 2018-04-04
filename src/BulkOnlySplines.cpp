@@ -142,7 +142,7 @@ void BulkOnlySplines::CalculateExpectationValues(vector<vector<double> >& R, vec
 	double potentialIntern = 0;
 
 	//Gauss potential
-	double a = this->time > 1e-04 ? 0.15 : 0.1;
+	double a = this->time > 1e-01 ? 0.15 : 0.1;
 	double b = 50.0;
 
 	double kineticR = 0;

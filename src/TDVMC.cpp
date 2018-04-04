@@ -1000,7 +1000,7 @@ void CalculateNextParametersEuler(vector<double>& uR, vector<double>& uI)
 		for (int i = 0; i < N_PARAM; i++)
 		{
 			uR[i] = uR[i] + uDotR[i] * TIMESTEP;
-			//uI[i] = uI[i] + uDotI[i] * TIMESTEP;
+			uI[i] = uI[i] + uDotI[i] * TIMESTEP;
 		}
 	}
 }
@@ -1378,19 +1378,19 @@ int mainMPI(int argc, char** argv)
 
 	if (SYSTEM_TYPE == "HeDrop")
 	{
-		sys = (IPhysicalSystem*)new HeDrop(configDirectory);
+		sys = new HeDrop(configDirectory);
 	}
 	else if (SYSTEM_TYPE == "HeBulk")
 	{
-		sys = (IPhysicalSystem*)new HeBulk(configDirectory);
+		sys = new HeBulk(configDirectory);
 	}
 	else if (SYSTEM_TYPE == "BulkOnlySplines")
 	{
-		sys = (IPhysicalSystem*)new BulkOnlySplines(configDirectory);
+		sys = new BulkOnlySplines(configDirectory);
 	}
 	else if (SYSTEM_TYPE == "GaussianWavepacket")
 	{
-		sys = (IPhysicalSystem*)new GaussianWavepacket(configDirectory);
+		sys = new GaussianWavepacket(configDirectory);
 	}
 	else
 	{
@@ -1613,7 +1613,8 @@ int mainMPI(int argc, char** argv)
 
 	sleep(10);
 	Log("free memory ...");
-	delete sys;
+	//TODO: how to properly delete the IPhysicalSystem pointer?
+	//delete sys;
 
 	Log("finalize ...");
 	MPI_Finalize();
@@ -1653,6 +1654,10 @@ int main(int argc, char **argv) {
 		else if (SYSTEM_TYPE == "GaussianWavepacket")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/wavepacket.config";
+		}
+		if (processRank == rootRank)
+		{
+			Log("configFilePath: " + configFilePath);
 		}
 		val = mainMPI(argc, argv);
 	}
