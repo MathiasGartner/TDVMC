@@ -5,6 +5,8 @@
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
 ../src/BulkOnlySplines.cpp \
+../src/BulkOnlySplinesQuadraticTail.cpp \
+../src/ConfigItem.cpp \
 ../src/GaussianWavepacket.cpp \
 ../src/HeBulk.cpp \
 ../src/HeDrop.cpp \
@@ -14,6 +16,8 @@ CPP_SRCS += \
 
 OBJS += \
 ./src/BulkOnlySplines.o \
+./src/BulkOnlySplinesQuadraticTail.o \
+./src/ConfigItem.o \
 ./src/GaussianWavepacket.o \
 ./src/HeBulk.o \
 ./src/HeDrop.o \
@@ -23,6 +27,8 @@ OBJS += \
 
 CPP_DEPS += \
 ./src/BulkOnlySplines.d \
+./src/BulkOnlySplinesQuadraticTail.d \
+./src/ConfigItem.d \
 ./src/GaussianWavepacket.d \
 ./src/HeBulk.d \
 ./src/HeDrop.d \

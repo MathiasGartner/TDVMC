@@ -142,8 +142,10 @@ void BulkOnlySplines::CalculateExpectationValues(vector<vector<double> >& R, vec
 	double potentialIntern = 0;
 
 	//Gauss potential
-	double a = this->time > 1e-01 ? 0.15 : 0.1;
-	double b = 50.0;
+	//double a = this->time > 1e-04 ? 0.15 : 0.1;
+	//double b = 50.0;
+	double a = 0.1;
+	double b = 100.0;
 
 	double kineticR = 0;
 	double kineticI = 0;
@@ -277,6 +279,7 @@ void BulkOnlySplines::CalculateExpectationValues(vector<vector<double> >& R, vec
 	//cout << "kineticSumR2=" << kineticSumR2 << endl;
 	//cout << "kineticSumI2=" << kineticSumI2 << endl;
 	//cout << "kineticSumR1I1=" << kineticSumR1I1 << endl;
+	//cout << "kineticR=" << kineticR << endl;
 
 	for (int i = 0; i < N_PARAM - 2; i++)
 	{

@@ -2,7 +2,8 @@
 
 using namespace std;
 
-HeDrop::HeDrop(string configDirectory) : IPhysicalSystem()
+HeDrop::HeDrop(string configDirectory) :
+		IPhysicalSystem()
 {
 	this->configDirectory = configDirectory;
 
@@ -356,7 +357,8 @@ void HeDrop::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 							bin = floor(interval);
 							res = interval - bin;
 							nps = nodePointSpacingShort;
-						} else
+						}
+						else
 						{
 							interval = (rni - rijSplineSplit) / nodePointSpacingLarge;
 							bin = floor(interval);
@@ -647,19 +649,22 @@ void HeDrop::CalculateWavefunction(vector<vector<double> >& R, vector<double>& u
 				if (rni < rijSplit)
 				{
 					mcMillanSum += pow(rni, -5.0);
-				} else if (rni >= rijTail)
+				}
+				else if (rni >= rijTail)
 				{
 					constSum += 1.0;
 					//logSum += log(rni);
 					linearSum += rni;
-				} else
+				}
+				else
 				{
 					if (rni < rijSplineSplit)
 					{
 						interval = (rni - rijSplit) / nodePointSpacingShort;
 						bin = floor(interval);
 						res = interval - bin;
-					} else
+					}
+					else
 					{
 						interval = (rni - rijSplineSplit) / nodePointSpacingLarge;
 						bin = floor(interval);
@@ -735,19 +740,22 @@ void HeDrop::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, v
 				if (rni < rijSplit)
 				{
 					mcMillanOld += pow(rni, -5.0);
-				} else if (rni >= rijTail)
+				}
+				else if (rni >= rijTail)
 				{
 					constOld += 1.0;
 					//logOld += log(rni);
 					linearOld += rni;
-				} else
+				}
+				else
 				{
 					if (rni < rijSplineSplit)
 					{
 						interval = (rni - rijSplit) / nodePointSpacingShort;
 						bin = floor(interval);
 						res = interval - bin;
-					} else
+					}
+					else
 					{
 						interval = (rni - rijSplineSplit) / nodePointSpacingLarge;
 						bin = floor(interval);
@@ -769,19 +777,22 @@ void HeDrop::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, v
 				if (rni < rijSplit)
 				{
 					mcMillanNew += pow(rni, -5.0);
-				} else if (rni >= rijTail)
+				}
+				else if (rni >= rijTail)
 				{
 					constNew += 1.0;
 					//logNew += log(rni);
 					linearNew += rni;
-				} else
+				}
+				else
 				{
 					if (rni < rijSplineSplit)
 					{
 						interval = (rni - rijSplit) / nodePointSpacingShort;
 						bin = floor(interval);
 						res = interval - bin;
-					} else
+					}
+					else
 					{
 						interval = (rni - rijSplineSplit) / nodePointSpacingLarge;
 						bin = floor(interval);
