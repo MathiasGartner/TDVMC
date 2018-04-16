@@ -2,6 +2,7 @@
 
 #include "BulkOnlySplines.h"
 #include "BulkOnlySplinesQuadraticTail.h"
+#include "BulkOnlySplinesQuadraticTailZeroAtBox.h"
 #include "ConfigItem.h"
 #include "Constants.h"
 #include "GaussianWavepacket.h"
@@ -45,10 +46,10 @@ bool USE_PARAMETER_ACCEPTANCE_CHECK = true;
 vector<ConfigItem> configItems;
 
 string SYSTEM_TYPE;
-string OUTPUT_DIRECTORY;
-string originalOutputDirectory;
+string OUTPUT_DIRECTORY;		//from config file
 string configDirectory;
 string configFilePath;
+string OUT_DIR;					//directory name generated from parameter settings
 int N;           	    		//number of particles
 int DIM;     	        	 	//number of dimensions
 int N_PARAM;	        	  	//number of parameters of trial function
@@ -219,13 +220,13 @@ void ReadRandomGeneratorStatesFromFile(string fileNamePrefix)
 
 void WriteRandomGeneratorStatesToFile(string fileNamePrefix)
 {
-	ofstream fGenerator(OUTPUT_DIRECTORY + fileNamePrefix + "_generator_" + to_string(processRank) + ".dat");
+	ofstream fGenerator(OUT_DIR + fileNamePrefix + "_generator_" + to_string(processRank) + ".dat");
 	fGenerator << generator;
 	fGenerator.close();
-	ofstream fUniform(OUTPUT_DIRECTORY + fileNamePrefix + "_uniform_" + to_string(processRank) + ".dat");
+	ofstream fUniform(OUT_DIR + fileNamePrefix + "_uniform_" + to_string(processRank) + ".dat");
 	fUniform << distUniform;
 	fUniform.close();
-	ofstream fNormal(OUTPUT_DIRECTORY + fileNamePrefix + "_normal_" + to_string(processRank) + ".dat");
+	ofstream fNormal(OUT_DIR + fileNamePrefix + "_normal_" + to_string(processRank) + ".dat");
 	fNormal << distNormal;
 	fNormal.close();
 }
@@ -289,7 +290,7 @@ void PrintConfig()
 void WriteConfig(string fileName, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	ofstream configFile;
-	configFile.open(OUTPUT_DIRECTORY + fileName, ios::out);
+	configFile.open(OUT_DIR + fileName, ios::out);
 	configFile.precision(8);
 
 	configFile << "{" << endl;
@@ -331,17 +332,16 @@ void BroadcastConfig()
 	}
 }
 
-void CreateOutputDirectory(string filePath)
+void CreateOutputDirectory()
 {
 	//INFO: append config options to output directory path, create the directory and copy the config file
 	int tmp;
 	ostringstream strs;
 	strs << "step=" << MC_NSTEPS << "_therm=" << MC_NTHERMSTEPS << "_time=" << TIMESTEP;
-	originalOutputDirectory = OUTPUT_DIRECTORY;
-	OUTPUT_DIRECTORY = OUTPUT_DIRECTORY + strs.str() + "/";
-	tmp = system(("rm -rf " + OUTPUT_DIRECTORY).c_str());
-	tmp = system(("mkdir " + OUTPUT_DIRECTORY).c_str());
-	CopyFile(filePath, OUTPUT_DIRECTORY + "vmc.config");
+	OUT_DIR = OUTPUT_DIRECTORY + strs.str() + "/";
+	tmp = system(("rm -rf " + OUT_DIR).c_str());
+	tmp = system(("mkdir " + OUT_DIR).c_str());
+	CopyFile(configFilePath, OUT_DIR + "vmc.config");
 	cout << tmp << endl;
 }
 
@@ -1265,6 +1265,7 @@ int mainMPI(int argc, char** argv)
 	MPIMethods::rootRank = rootRank;
 
 	//Log("running on cpu " + to_string(get_cpu_id()));
+	MPIMethods::GetCPUAllocation();
 
 	RegisterAllConfigItems();
 	if (processRank == rootRank)
@@ -1274,7 +1275,7 @@ int mainMPI(int argc, char** argv)
 		if (FileExist(configFilePath))
 		{
 			ReadConfig(configFilePath);
-			CreateOutputDirectory(configFilePath);
+			CreateOutputDirectory();
 			//PrintConfig();
 		}
 		else
@@ -1304,6 +1305,10 @@ int mainMPI(int argc, char** argv)
 	else if (SYSTEM_TYPE == "BulkOnlySplinesQuadraticTail")
 	{
 		sys = new BulkOnlySplinesQuadraticTail(configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BulkOnlySplinesQuadraticTailZeroAtBox")
+	{
+		sys = new BulkOnlySplinesQuadraticTailZeroAtBox(configDirectory);
 	}
 	else if (SYSTEM_TYPE == "GaussianWavepacket")
 	{
@@ -1339,7 +1344,7 @@ int mainMPI(int argc, char** argv)
 	InitCoordinateConfiguration(R);
 	if (processRank == rootRank)
 	{
-		WriteParticleInputFile(OUTPUT_DIRECTORY + "particleconfiguration.csv", R);
+		WriteParticleInputFile(OUT_DIR + "particleconfiguration.csv", R);
 	}
 	if (processRank == rootRank)
 	{
@@ -1523,7 +1528,7 @@ int mainMPI(int argc, char** argv)
 	if (processRank == rootRank)
 	{
 		int tmp = 0;
-		tmp = system(("mkdir " + OUTPUT_DIRECTORY + "random").c_str());
+		tmp = system(("mkdir " + OUT_DIR + "random").c_str());
 		cout << tmp << endl;
 	}
 	MPIMethods::Barrier();
@@ -1570,6 +1575,13 @@ int mainMPI(int argc, char** argv)
 		//cout << "log(additionalSystemProperties[2])=" << log(additionalSystemProperties[2]) << endl;
 		//phiR = phiR - log(additionalSystemProperties[2]);
 		cout << "phiR=" << phiR << endl;
+		for (int i = 0; i < N_PARAM; i++)
+		{
+			PARAMS_REAL[i] = uR[i];
+			PARAMS_IMAGINARY[i] = uI[i];
+		}
+		PARAM_PHIR = phiR;
+		PARAM_PHII = phiI;
 		WriteConfig("AAFinish_tVMC.config", uR, uI, phiR, phiI);
 
 		if (FileExist("./stop"))
@@ -1608,7 +1620,8 @@ int main(int argc, char **argv)
 	else if (argc == 1) //INFO: started without specifying config-file. used for local execution
 	{
 		//SYSTEM_TYPE = "BulkOnlySplinesQuadraticTail";
-		SYSTEM_TYPE = "BulkOnlySplines";
+		//SYSTEM_TYPE = "BulkOnlySplines";
+		SYSTEM_TYPE = "BulkOnlySplinesQuadraticTailZeroAtBox";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/drop_3.config";
@@ -1624,6 +1637,10 @@ int main(int argc, char **argv)
 		else if (SYSTEM_TYPE == "BulkOnlySplinesQuadraticTail")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkGaussQuadraticTail.config";
+		}
+		else if (SYSTEM_TYPE == "BulkOnlySplinesQuadraticTailZeroAtBox")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkGaussQuadraticTailZeroAtBox.config";
 		}
 		else if (SYSTEM_TYPE == "GaussianWavepacket")
 		{

@@ -6,6 +6,7 @@
 CPP_SRCS += \
 ../src/BulkOnlySplines.cpp \
 ../src/BulkOnlySplinesQuadraticTail.cpp \
+../src/BulkOnlySplinesQuadraticTailZeroAtBox.cpp \
 ../src/ConfigItem.cpp \
 ../src/GaussianWavepacket.cpp \
 ../src/HeBulk.cpp \
@@ -17,6 +18,7 @@ CPP_SRCS += \
 OBJS += \
 ./src/BulkOnlySplines.o \
 ./src/BulkOnlySplinesQuadraticTail.o \
+./src/BulkOnlySplinesQuadraticTailZeroAtBox.o \
 ./src/ConfigItem.o \
 ./src/GaussianWavepacket.o \
 ./src/HeBulk.o \
@@ -28,6 +30,7 @@ OBJS += \
 CPP_DEPS += \
 ./src/BulkOnlySplines.d \
 ./src/BulkOnlySplinesQuadraticTail.d \
+./src/BulkOnlySplinesQuadraticTailZeroAtBox.d \
 ./src/ConfigItem.d \
 ./src/GaussianWavepacket.d \
 ./src/HeBulk.d \

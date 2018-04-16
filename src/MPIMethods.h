@@ -186,4 +186,26 @@ map<int, int> GatherHistogram(int data)
 	return histogram;
 }
 
+void GetCPUAllocation()
+{
+	bool print = false;
+	int id = get_cpu_id();
+	map<int, int> histogram = MPIMethods::GatherHistogram(id);
+
+	for (auto const& h : histogram)
+	{
+		if (h.second > 1)
+		{
+			print = true;
+		}
+	}
+	if (print)
+	{
+		for (auto const& h : histogram)
+		{
+			cout << h.first << ":" << h.second << endl;
+		}
+	}
+}
+
 }

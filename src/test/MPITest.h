@@ -75,28 +75,6 @@ void PrintTimings(vector<double> timings, string message)
 	}
 }
 
-void GetCPUUsage()
-{
-	bool print = false;
-	int id = get_cpu_id();
-	map<int, int> histogram = MPIMethods::GatherHistogram(id);
-
-	for (auto const& h : histogram)
-	{
-		if (h.second > 1)
-		{
-			print = true;
-		}
-	}
-	if (print)
-	{
-		for (auto const& h : histogram)
-		{
-			cout << h.first << ":" << h.second << endl;
-		}
-	}
-}
-
 void TestMPIData()
 {
 	string str;
@@ -407,7 +385,7 @@ void TestMPI(int argc, char *argv[])
 		cout << endl << "=====================";
 		cout << endl << "=====================" << endl << endl;
 	}
-	GetCPUUsage();
+	MPIMethods::GetCPUAllocation();
 	if (processRank == rootRank)
 	{
 		cout << endl << "==========TestMPIData()==========";

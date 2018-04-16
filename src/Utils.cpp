@@ -297,8 +297,8 @@ void ClearVector(vector<vector<vector<vector<double> > > >& v)
 void WriteDataToFile(double* data, int n, string filename, string header)
 {
 	ofstream file;
-	//cout << OUTPUT_DIRECTORY << filename << ".csv" << endl;
-	file.open(OUTPUT_DIRECTORY + filename + ".csv", ios::out);
+	//cout << OUT_DIR << filename << ".csv" << endl;
+	file.open(OUT_DIR + filename + ".csv", ios::out);
 	file.precision(exportPrecision);
 	file << header << endl;
 	for (int i = 0; i < n; i++)
@@ -311,8 +311,8 @@ void WriteDataToFile(double* data, int n, string filename, string header)
 void WriteDataToFile(double** data, int n1, int n2, string filename, string header)
 {
 	ofstream file;
-	//cout << OUTPUT_DIRECTORY << filename << ".csv" << endl;
-	file.open(OUTPUT_DIRECTORY + filename + ".csv", ios::out);
+	//cout << OUT_DIR << filename << ".csv" << endl;
+	file.open(OUT_DIR + filename + ".csv", ios::out);
 	file.precision(exportPrecision);
 	file << header << endl;
 	for (int i = 0; i < n1; i++)
@@ -336,8 +336,8 @@ void WriteDataToFile(double** data, int n1, int n2, string filename, string head
 void WriteDataToFile(double data, string filename, string header)
 {
 	ofstream file;
-	//cout << OUTPUT_DIRECTORY << filename << ".csv" << endl;
-	file.open(OUTPUT_DIRECTORY + filename + ".csv", ios::out);
+	//cout << OUT_DIR << filename << ".csv" << endl;
+	file.open(OUT_DIR + filename + ".csv", ios::out);
 	file.precision(exportPrecision);
 	file << header << endl;
 	file << fixed << data << endl;
@@ -347,8 +347,8 @@ void WriteDataToFile(double data, string filename, string header)
 void WriteDataToFile(vector<double>& data, string filename, string header, int everyNth)
 {
 	ofstream file;
-	//cout << OUTPUT_DIRECTORY << filename << ".csv" << endl;
-	file.open(OUTPUT_DIRECTORY + filename + ".csv", ios::out);
+	//cout << OUT_DIR << filename << ".csv" << endl;
+	file.open(OUT_DIR + filename + ".csv", ios::out);
 	file.precision(exportPrecision);
 	file << header << endl;
 	for (unsigned int i = 0; i < data.size(); i += everyNth)
@@ -361,8 +361,8 @@ void WriteDataToFile(vector<double>& data, string filename, string header, int e
 void WriteDataToFile(vector<vector<double> >& data, string filename, string header, int everyNth, bool writeHeader)
 {
 	ofstream file;
-	//cout << OUTPUT_DIRECTORY << filename << ".csv" << endl;
-	file.open(OUTPUT_DIRECTORY + filename + ".csv", ios::out);
+	//cout << OUT_DIR << filename << ".csv" << endl;
+	file.open(OUT_DIR + filename + ".csv", ios::out);
 	file.precision(exportPrecision);
 	if (writeHeader)
 	{
@@ -378,8 +378,8 @@ void WriteDataToFile(vector<vector<double> >& data, string filename, string head
 void WriteDataToFile(vector<vector<vector<double> > >& data, string filename, string header)
 {
 	ofstream file;
-	//cout << OUTPUT_DIRECTORY << filename << ".csv" << endl;
-	file.open(OUTPUT_DIRECTORY + filename + ".m", ios::out);
+	//cout << OUT_DIR << filename << ".csv" << endl;
+	file.open(OUT_DIR + filename + ".m", ios::out);
 	file.precision(exportPrecision);
 	//file << header << endl;
 	file << "{" << endl;
