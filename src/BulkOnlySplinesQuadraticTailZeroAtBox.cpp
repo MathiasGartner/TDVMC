@@ -29,17 +29,14 @@ void BulkOnlySplinesQuadraticTailZeroAtBox::InitSystem()
 	nodePointSpacing2 = nodePointSpacing * nodePointSpacing;
 	double maxDistance2 = maxDistance * maxDistance;
 
-	numberOfSpecialParameters = 2;
+	numberOfSpecialParameters = 1;
 	numberOfStandardParameters = N_PARAM - numberOfSpecialParameters;
 
 	//cut off
-	a2_o13 = 2.0 * nodePointSpacing2 / rijSplit4 + 2.0 * nodePointSpacing / rijSplit3 + 1.0 / rijSplit2;
-	a2_o14 = -nodePointSpacing2 / rijSplit4 + 1.0 / rijSplit2;
-	a2_o15 = 2.0 * nodePointSpacing2 / rijSplit4 - 2.0 * nodePointSpacing / rijSplit3 + 1.0 / rijSplit2;
+	a2_o13 = (2.0 * nodePointSpacing2 + 2.0 * nodePointSpacing * rijSplit + rijSplit2) / rijSplit4 - 1.0 / maxDistance2;
+	a2_o14 = -(nodePointSpacing2 / rijSplit4) + 1.0 / rijSplit2 - 1.0 / maxDistance2;
+	a2_o15 = (2.0 * nodePointSpacing2 - 2.0 * nodePointSpacing * rijSplit + rijSplit2) / rijSplit4 - 1.0 / maxDistance2;
 	a2_const = -1.0 / maxDistance2;
-	ac_o13 = 1.0;
-	ac_o14 = 1.0;
-	ac_o15 = 1.0;
 
 	wf = 0.0;
 	exponent = 0.0;
@@ -267,16 +264,10 @@ void BulkOnlySplinesQuadraticTailZeroAtBox::CalculateExpectationValues(vector<ve
 		for (int a = 0; a < DIM; a++)
 		{
 			temp = (a2_o13 * splineSumsD[numberOfSplines - 3][n][a] + a2_o14 * splineSumsD[numberOfSplines - 2][n][a] + a2_o15 * splineSumsD[numberOfSplines - 1][n][a] + quadraticSumD[n][a]);
-			vecKineticSumR1[a] += uR[N_PARAM - 2] * temp;
-			vecKineticSumI1[a] += uI[N_PARAM - 2] * temp;
-			temp = (ac_o13 * splineSumsD[numberOfSplines - 3][n][a] + ac_o14 * splineSumsD[numberOfSplines - 2][n][a] + ac_o15 * splineSumsD[numberOfSplines - 1][n][a]);
 			vecKineticSumR1[a] += uR[N_PARAM - 1] * temp;
 			vecKineticSumI1[a] += uI[N_PARAM - 1] * temp;
 		}
 		temp = (a2_o13 * splineSumsD2[numberOfSplines - 3][n] + a2_o14 * splineSumsD2[numberOfSplines - 2][n] + a2_o15 * splineSumsD2[numberOfSplines - 1][n] + quadraticSumD2[n]);
-		kineticSumR2 += uR[N_PARAM - 2] * temp;
-		kineticSumI2 += uI[N_PARAM - 2] * temp;
-		temp = (ac_o13 * splineSumsD2[numberOfSplines - 3][n] + ac_o14 * splineSumsD2[numberOfSplines - 2][n] + ac_o15 * splineSumsD2[numberOfSplines - 1][n]);
 		kineticSumR2 += uR[N_PARAM - 1] * temp;
 		kineticSumI2 += uI[N_PARAM - 1] * temp;
 
@@ -304,8 +295,7 @@ void BulkOnlySplinesQuadraticTailZeroAtBox::CalculateExpectationValues(vector<ve
 	{
 		localOperators[i] = splineSums[i];
 	}
-	localOperators[N_PARAM - 2] = (a2_o13 * splineSums[numberOfSplines - 3] + a2_o14 * splineSums[numberOfSplines - 2] + a2_o15 * splineSums[numberOfSplines - 1] + quadraticSum + a2_const);
-	localOperators[N_PARAM - 1] = (ac_o13 * splineSums[numberOfSplines - 3] + ac_o14 * splineSums[numberOfSplines - 2] + ac_o15 * splineSums[numberOfSplines - 1]);
+	localOperators[N_PARAM - 1] = (a2_o13 * splineSums[numberOfSplines - 3] + a2_o14 * splineSums[numberOfSplines - 2] + a2_o15 * splineSums[numberOfSplines - 1] + quadraticSum + a2_const);
 	for (int k = 0; k < N_PARAM; k++)
 	{
 		for (int j = 0; j < N_PARAM; j++)
@@ -415,8 +405,7 @@ void BulkOnlySplinesQuadraticTailZeroAtBox::CalculateWavefunction(vector<vector<
 	{
 		sum += uR[i] * splineSums[i];
 	}
-	sum += uR[N_PARAM - 2] * (a2_o13 * splineSums[numberOfSplines - 3] + a2_o14 * splineSums[numberOfSplines - 2] + a2_o15 * splineSums[numberOfSplines - 1] + quadraticSum + a2_const);
-	sum += uR[N_PARAM - 1] * (ac_o13 * splineSums[numberOfSplines - 3] + ac_o14 * splineSums[numberOfSplines - 2] + ac_o15 * splineSums[numberOfSplines - 1]);
+	sum += uR[N_PARAM - 1] * (a2_o13 * splineSums[numberOfSplines - 3] + a2_o14 * splineSums[numberOfSplines - 2] + a2_o15 * splineSums[numberOfSplines - 1] + quadraticSum + a2_const);
 
 	wf = exp(sum);
 	exponent = sum;
@@ -496,8 +485,7 @@ void BulkOnlySplinesQuadraticTailZeroAtBox::CalculateWFChange(vector<vector<doub
 	{
 		sum += uR[i] * splineSumsNew[i];
 	}
-	sum += uR[N_PARAM - 2] * (a2_o13 * splineSumsNew[numberOfSplines - 3] + a2_o14 * splineSumsNew[numberOfSplines - 2] + a2_o15 * splineSumsNew[numberOfSplines - 1] + quadraticSumNew + a2_const);
-	sum += uR[N_PARAM - 1] * (ac_o13 * splineSumsNew[numberOfSplines - 3] + ac_o14 * splineSumsNew[numberOfSplines - 2] + ac_o15 * splineSumsNew[numberOfSplines - 1]);
+	sum += uR[N_PARAM - 1] * (a2_o13 * splineSumsNew[numberOfSplines - 3] + a2_o14 * splineSumsNew[numberOfSplines - 2] + a2_o15 * splineSumsNew[numberOfSplines - 1] + quadraticSumNew + a2_const);
 
 	wfNew = exp(sum);
 	exponentNew = sum;

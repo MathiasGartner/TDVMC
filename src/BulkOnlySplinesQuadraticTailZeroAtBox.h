@@ -49,9 +49,6 @@ private:
 	double a2_o14;
 	double a2_o15;
 	double a2_const;
-	double ac_o13;
-	double ac_o14;
-	double ac_o15;
 
 //Implementation of IPhysicalSystem
 public:
