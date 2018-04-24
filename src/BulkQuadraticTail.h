@@ -9,7 +9,7 @@
 
 using namespace std;
 
-class BulkOnlySplinesQuadraticTailZeroAtBox: public IPhysicalSystem
+class BulkQuadraticTail: public IPhysicalSystem
 {
 private:
 	string configDirectory;
@@ -45,21 +45,18 @@ private:
 	vector<double> sumOldPerBin;
 	vector<double> sumNewPerBin;
 
-	double a13_o13;
-	double a13_o14;
-	double a13_o15;
-	double a2_o13;
-	double a2_o14;
-	double a2_o15;
-	double a2_const;
+	vector<vector<double> > bcFactors; //factors according to the boundary conditions
 
 //Implementation of IPhysicalSystem
 public:
-	BulkOnlySplinesQuadraticTailZeroAtBox(string configDirectory);
+	BulkQuadraticTail(string configDirectory);
 
 	void InitSystem();
 
 	vector<double> GetCenterOfMass(vector<vector<double> >& R);
+
+	double GetTailCorrectionKinetic(double b);
+	double GetTailCorrectionPotential();
 
 	void CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
 

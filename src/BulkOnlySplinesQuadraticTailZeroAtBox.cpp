@@ -20,22 +20,24 @@ void BulkOnlySplinesQuadraticTailZeroAtBox::InitSystem()
 	rijSplit = 1.9;
 	double rijSplit2 = rijSplit * rijSplit;
 	double rijSplit3 = rijSplit2 * rijSplit;
-	double rijSplit4 = rijSplit3 * rijSplit;
 
-	numberOfSplines = N_PARAM + 1;
+	numberOfSplines = N_PARAM;
 	halfLength = LBOX / 2.0;
 	nodePointSpacing = rijSplit / (double) (numberOfSplines - 3.0);
 	maxDistance = halfLength;
 	nodePointSpacing2 = nodePointSpacing * nodePointSpacing;
 	double maxDistance2 = maxDistance * maxDistance;
 
-	numberOfSpecialParameters = 1;
+	numberOfSpecialParameters = 2;
 	numberOfStandardParameters = N_PARAM - numberOfSpecialParameters;
 
 	//cut off
-	a2_o13 = (2.0 * nodePointSpacing2 + 2.0 * nodePointSpacing * rijSplit + rijSplit2) / rijSplit4 - 1.0 / maxDistance2;
-	a2_o14 = -(nodePointSpacing2 / rijSplit4) + 1.0 / rijSplit2 - 1.0 / maxDistance2;
-	a2_o15 = (2.0 * nodePointSpacing2 - 2.0 * nodePointSpacing * rijSplit + rijSplit2) / rijSplit4 - 1.0 / maxDistance2;
+	a13_o13 = 1.0;
+	a13_o14 = -1.0 / 2.0;
+	a13_o15 = 1.0;
+	a2_o13 = 0.0;
+	a2_o14 = 1.0 / 2.0 * ((2.0 * nodePointSpacing + 3.0 * rijSplit) / rijSplit3 - 3.0 / maxDistance2);
+	a2_o15 = -4.0 * nodePointSpacing / rijSplit3;
 	a2_const = -1.0 / maxDistance2;
 
 	wf = 0.0;
@@ -263,10 +265,16 @@ void BulkOnlySplinesQuadraticTailZeroAtBox::CalculateExpectationValues(vector<ve
 		}
 		for (int a = 0; a < DIM; a++)
 		{
+			temp = (a13_o13 * splineSumsD[numberOfSplines - 3][n][a] + a13_o14 * splineSumsD[numberOfSplines - 2][n][a] + a13_o15 * splineSumsD[numberOfSplines - 1][n][a]);
+			vecKineticSumR1[a] += uR[N_PARAM - 2] * temp;
+			vecKineticSumI1[a] += uI[N_PARAM - 2] * temp;
 			temp = (a2_o13 * splineSumsD[numberOfSplines - 3][n][a] + a2_o14 * splineSumsD[numberOfSplines - 2][n][a] + a2_o15 * splineSumsD[numberOfSplines - 1][n][a] + quadraticSumD[n][a]);
 			vecKineticSumR1[a] += uR[N_PARAM - 1] * temp;
 			vecKineticSumI1[a] += uI[N_PARAM - 1] * temp;
 		}
+		temp = (a13_o13 * splineSumsD2[numberOfSplines - 3][n] + a13_o14 * splineSumsD2[numberOfSplines - 2][n] + a13_o15 * splineSumsD2[numberOfSplines - 1][n]);
+		kineticSumR2 += uR[N_PARAM - 2] * temp;
+		kineticSumI2 += uI[N_PARAM - 2] * temp;
 		temp = (a2_o13 * splineSumsD2[numberOfSplines - 3][n] + a2_o14 * splineSumsD2[numberOfSplines - 2][n] + a2_o15 * splineSumsD2[numberOfSplines - 1][n] + quadraticSumD2[n]);
 		kineticSumR2 += uR[N_PARAM - 1] * temp;
 		kineticSumI2 += uI[N_PARAM - 1] * temp;
@@ -295,7 +303,9 @@ void BulkOnlySplinesQuadraticTailZeroAtBox::CalculateExpectationValues(vector<ve
 	{
 		localOperators[i] = splineSums[i];
 	}
+	localOperators[N_PARAM - 2] = (a13_o13 * splineSums[numberOfSplines - 3] + a13_o14 * splineSums[numberOfSplines - 2] + a13_o15 * splineSums[numberOfSplines - 1]);
 	localOperators[N_PARAM - 1] = (a2_o13 * splineSums[numberOfSplines - 3] + a2_o14 * splineSums[numberOfSplines - 2] + a2_o15 * splineSums[numberOfSplines - 1] + quadraticSum + a2_const);
+
 	for (int k = 0; k < N_PARAM; k++)
 	{
 		for (int j = 0; j < N_PARAM; j++)
@@ -405,6 +415,7 @@ void BulkOnlySplinesQuadraticTailZeroAtBox::CalculateWavefunction(vector<vector<
 	{
 		sum += uR[i] * splineSums[i];
 	}
+	sum += uR[N_PARAM - 2] * (a13_o13 * splineSums[numberOfSplines - 3] + a13_o14 * splineSums[numberOfSplines - 2] + a13_o15 * splineSums[numberOfSplines - 1]);
 	sum += uR[N_PARAM - 1] * (a2_o13 * splineSums[numberOfSplines - 3] + a2_o14 * splineSums[numberOfSplines - 2] + a2_o15 * splineSums[numberOfSplines - 1] + quadraticSum + a2_const);
 
 	wf = exp(sum);
@@ -485,6 +496,7 @@ void BulkOnlySplinesQuadraticTailZeroAtBox::CalculateWFChange(vector<vector<doub
 	{
 		sum += uR[i] * splineSumsNew[i];
 	}
+	sum += uR[N_PARAM - 2] * (a13_o13 * splineSumsNew[numberOfSplines - 3] + a13_o14 * splineSumsNew[numberOfSplines - 2] + a13_o15 * splineSumsNew[numberOfSplines - 1]);
 	sum += uR[N_PARAM - 1] * (a2_o13 * splineSumsNew[numberOfSplines - 3] + a2_o14 * splineSumsNew[numberOfSplines - 2] + a2_o15 * splineSumsNew[numberOfSplines - 1] + quadraticSumNew + a2_const);
 
 	wfNew = exp(sum);

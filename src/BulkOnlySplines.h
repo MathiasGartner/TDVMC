@@ -23,6 +23,8 @@ private:
 	double maxDistance;
 	double nodePointSpacing;
 	double nodePointSpacing2;
+	int numberOfSpecialParameters;
+	int numberOfStandardParameters;
 
 	int grBinCount;
 	int grBinStartIndex;
@@ -41,10 +43,7 @@ private:
 	vector<vector<double> > sumNewPerBinForChangedParticle; //sumPerBinPerParticle[p1][p2][bin] -> p...particle, bin...bin
 	int changedParticleIndex;
 
-	double factorLastSpline;
-	double factorSecondLastSpline;
-	double factorLastSplinePhi;
-	double factorSecondLastSplinePhi;
+	vector<vector<double> > bcFactors; //factors according to the boundary conditions
 
 //Implementation of IPhysicalSystem
 public:

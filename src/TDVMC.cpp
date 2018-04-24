@@ -3,6 +3,8 @@
 #include "BulkOnlySplines.h"
 #include "BulkOnlySplinesQuadraticTail.h"
 #include "BulkOnlySplinesQuadraticTailZeroAtBox.h"
+#include "BulkQuadraticTail.h"
+#include "BulkQuadraticTailFixed.h"
 #include "ConfigItem.h"
 #include "Constants.h"
 #include "GaussianWavepacket.h"
@@ -256,11 +258,11 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("TOTALTIME", &TOTALTIME, ConfigItemType::DOUBLE));
 	configItems.push_back(ConfigItem("IMAGINARY_TIME", &IMAGINARY_TIME, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("ODE_SOLVER_TYPE", &ODE_SOLVER_TYPE, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("PARAMETER_ACCEPTANCE_CHECK_TYPE", &PARAMETER_ACCEPTANCE_CHECK_TYPE, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("PARAMS_REAL", PARAMS_REAL, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("PARAMS_IMAGINARY", PARAMS_IMAGINARY, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("PARAM_PHIR", &PARAM_PHIR, ConfigItemType::DOUBLE));
 	configItems.push_back(ConfigItem("PARAM_PHII", &PARAM_PHII, ConfigItemType::DOUBLE));
-	configItems.push_back(ConfigItem("PARAMETER_ACCEPTANCE_CHECK_TYPE", &PARAMETER_ACCEPTANCE_CHECK_TYPE, ConfigItemType::INT));
 }
 
 void ReadConfig(string filePath)
@@ -713,6 +715,9 @@ void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>&
 		Log("          max = " + to_string(timings[1]) + " ms");
 		Log("          <t> = " + to_string(timings[2]) + " ms");
 	}
+
+	Log("localOperators" + to_string(processRank));
+	WriteDataToFile(localOperators, "localOperators" + to_string(processRank), "localOperators");
 
 	MPIMethods::ReduceToAverage(localOperators);
 	MPIMethods::ReduceToAverage(&localEnergyR);
@@ -1214,6 +1219,10 @@ bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double
 		{
 			for (int p = 0; p < N_PARAM; p++)
 			{
+				if (!isfinite(uR[p]))
+				{
+					return false;
+				}
 				if (abs(1.0 - uR[p] / uRList.back()[p]) > threshold)
 				{
 					return false;
@@ -1286,6 +1295,7 @@ int mainMPI(int argc, char** argv)
 		}
 	}
 	configDirectory = configFilePath.substr(0, configFilePath.find_last_of("\\/")) + "/"; //TODO: restrict all file access to main process
+	MPIMethods::BroadcastValue(&OUT_DIR, 300);
 	//cout << "configDirectory=\"" << configDirectory << "\"" << endl;
 	BroadcastConfig();
 	//PrintConfig();
@@ -1301,6 +1311,14 @@ int mainMPI(int argc, char** argv)
 	else if (SYSTEM_TYPE == "BulkOnlySplines")
 	{
 		sys = new BulkOnlySplines(configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BulkQuadraticTail")
+	{
+		sys = new BulkQuadraticTail(configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BulkQuadraticTailFixed")
+	{
+		sys = new BulkQuadraticTailFixed(configDirectory);
 	}
 	else if (SYSTEM_TYPE == "BulkOnlySplinesQuadraticTail")
 	{
@@ -1424,11 +1442,16 @@ int mainMPI(int argc, char** argv)
 					WriteDataToFile(localOperatorsMatrix, "localOperatorsMatrix" + to_string(step), "localOperatorsMatrix");
 					WriteDataToFile(localOperatorlocalEnergyR, "localOperatorlocalEnergyR" + to_string(step), "localOperatorlocalEnergyR");
 					WriteDataToFile(localOperatorlocalEnergyI, "localOperatorlocalEnergyI" + to_string(step), "localOperatorlocalEnergyI");
-					WriteDataToFile(otherExpectationValues, "otherExpectationValues" + to_string(step), "Ekin, Epot, wf, g(r)_1, ..., g(r)_100");
+					WriteDataToFile(otherExpectationValues, "otherExpectationValues" + to_string(step), "Ekin, Ekin_cor, Epot, Epot_corr, wf, g(r)_1, ..., g(r)_100");
 				}
 				cout << "t=" << currentTime << endl;
 				//cout << "localEnergyR=" << localEnergyR << " (" << otherExpectationValues[0] << " + " << otherExpectationValues[1] << ")" << endl;
-				cout << "localEnergyR/N=" << localEnergyR / (double) N << " (" << otherExpectationValues[0] / (double) N << " + " << otherExpectationValues[1] / (double) N << ")" << endl;
+				cout << "localEnergyR/N=" << localEnergyR / (double) N << " (" <<
+						otherExpectationValues[0] / (double) N << " + " <<
+						otherExpectationValues[1] / (double) N << " + " <<
+						//otherExpectationValues[2] / (double) N << " + " <<
+						//otherExpectationValues[3] / (double) N << ")" <<
+						endl;
 				//cout << "localEnergyR/N=" << localEnergyR / (double)N << endl;
 				AllLocalEnergyR.push_back(localEnergyR);
 				AllOtherExpectationValues.push_back(otherExpectationValues);
@@ -1497,10 +1520,29 @@ int mainMPI(int argc, char** argv)
 				WriteDataToFile(AllParametersI, "AllParametersI", "uI", 100);
 			}
 		}
-		if (FileExist("./stop"))
+
+		//INFO: check if simulation should be cancelled
+		int cancel = 0;
+		if (processRank == rootRank)
 		{
-			cout << "Detected stop-file!" << endl;
-			cout << "Finishing simulation at t=" << currentTime << endl;
+			if (FileExist("./stop"))
+			{
+				Log("Detected stop-file!", WARNING);
+				cancel = 1;
+			}
+			if (!isfinite(localEnergyR))
+			{
+				Log("Energy not finite", ERROR);
+				cancel = 2;
+			}
+			if (cancel != 0)
+			{
+				Log("Finishing simulation at t=" + to_string(currentTime));
+			}
+		}
+		MPIMethods::BroadcastValue(&cancel);
+		if (cancel != 0)
+		{
 			TOTALTIME = currentTime;
 		}
 	}
@@ -1570,6 +1612,7 @@ int mainMPI(int argc, char** argv)
 	AlignCoordinates(R);
 	if (processRank == rootRank)
 	{
+		MC_NSTEPS = mc_nsteps_original;
 		WriteParticleInputFile("AAFinish_particleconfiguration_" + to_string(N), R);
 		cout << "phiR=" << phiR << endl;
 		//cout << "log(additionalSystemProperties[2])=" << log(additionalSystemProperties[2]) << endl;
@@ -1620,8 +1663,10 @@ int main(int argc, char **argv)
 	else if (argc == 1) //INFO: started without specifying config-file. used for local execution
 	{
 		//SYSTEM_TYPE = "BulkOnlySplinesQuadraticTail";
-		//SYSTEM_TYPE = "BulkOnlySplines";
-		SYSTEM_TYPE = "BulkOnlySplinesQuadraticTailZeroAtBox";
+		SYSTEM_TYPE = "BulkOnlySplines";
+		//SYSTEM_TYPE = "BulkOnlySplinesQuadraticTailZeroAtBox";
+		//SYSTEM_TYPE = "BulkQuadraticTail";
+		//SYSTEM_TYPE = "BulkQuadraticTailFixed";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/drop_3.config";
@@ -1633,6 +1678,14 @@ int main(int argc, char **argv)
 		else if (SYSTEM_TYPE == "BulkOnlySplines")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkGauss.config";
+		}
+		else if (SYSTEM_TYPE == "BulkQuadraticTail")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkQuadraticTail.config";
+		}
+		else if (SYSTEM_TYPE == "BulkQuadraticTailFixed")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkQuadraticTailFixed.config";
 		}
 		else if (SYSTEM_TYPE == "BulkOnlySplinesQuadraticTail")
 		{

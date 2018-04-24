@@ -1,40 +1,45 @@
-#include "BulkOnlySplines.h"
+#include "BulkQuadraticTail.h"
 
-BulkOnlySplines::BulkOnlySplines(string configDirectory) : IPhysicalSystem()
+BulkQuadraticTail::BulkQuadraticTail(string configDirectory) : IPhysicalSystem()
 {
 	this->configDirectory = configDirectory;
 
-	this->USE_NORMALIZATION_AND_PHASE = false;
+	this->USE_NORMALIZATION_AND_PHASE = true;
 	this->USE_NIC = true;
 	this->USE_MOVE_COM_TO_ZERO = false;
 }
 
-void BulkOnlySplines::InitSystem()
+void BulkQuadraticTail::InitSystem()
 {
 	grBinCount = 100;
-	grBinStartIndex = 3;
 	numOfkValues = 300;
-	numOfOtherExpectationValues = 3 + grBinCount;
+	grBinStartIndex = 5;
+	numOfOtherExpectationValues = grBinStartIndex + grBinCount;
 	numOfAdditionalSystemProperties = numOfOtherExpectationValues + numOfkValues;
+
+	rijSplit = 1.9;
+	double rijSplit2 = rijSplit * rijSplit;
+	double rijSplit3 = rijSplit2 * rijSplit;
+	double rijSplit4 = rijSplit3 * rijSplit;
 
 	numberOfSplines = N_PARAM + 1;
 	halfLength = LBOX / 2.0;
-	nodePointSpacing = halfLength / (double) (numberOfSplines - 3.0);
+	nodePointSpacing = rijSplit / (double) (numberOfSplines - 3.0);
 	maxDistance = halfLength;
 	nodePointSpacing2 = nodePointSpacing * nodePointSpacing;
 
 	//cut off
 	bcFactors.push_back({
 		1.0,
-		-1.0 / 2.0,
+		1.0,
 		1.0,
 		0.0
 	});
 	bcFactors.push_back({
-		0.0,
-		-3.0 / 2.0,
-		0.0,
-		1.0
+		(2.0 * nodePointSpacing2 + 2.0 * nodePointSpacing * rijSplit + rijSplit2) / rijSplit4,
+		(-1.0 * nodePointSpacing2 + rijSplit2) / rijSplit4,
+		(2.0 * nodePointSpacing2 - 2.0 * nodePointSpacing * rijSplit + rijSplit2) / rijSplit4,
+		0.0
 	});
 	numberOfSpecialParameters = bcFactors.size();
 	numberOfStandardParameters = N_PARAM - numberOfSpecialParameters;
@@ -56,6 +61,15 @@ void BulkOnlySplines::InitSystem()
 	{
 		k.resize(N);
 	}
+	quadraticSum = 0;
+	quadraticSumD.resize(N);
+	for (auto &n : quadraticSumD)
+	{
+		n.resize(DIM);
+	}
+	ClearVector(quadraticSumD);
+	quadraticSumD2.resize(N);
+	ClearVector(quadraticSumD2);
 
 	localEnergyR = 0;
 	localEnergyI = 0;
@@ -78,25 +92,10 @@ void BulkOnlySplines::InitSystem()
 
 	wfNew = 0.0;
 	exponentNew = 0.0;
+	quadraticSumNew = 0.0;
 	splineSumsNew.resize(numberOfSplines);
 	sumOldPerBin.resize(numberOfSplines);
 	sumNewPerBin.resize(numberOfSplines);
-
-	this->changedParticleIndex = -1;
-	sumPerBinPerParticle.resize(N - 1);
-	for(unsigned int i = 0; i < sumPerBinPerParticle.size(); i++)
-	{
-		sumPerBinPerParticle[i].resize(i + 1);
-		for(unsigned int j = 0; j < sumPerBinPerParticle.size(); j++)
-		{
-			sumPerBinPerParticle[i][j].resize(numberOfSplines);
-		}
-	}
-	sumNewPerBinForChangedParticle.resize(N);
-	for (auto &row : sumNewPerBinForChangedParticle)
-	{
-		row.resize(numberOfSplines);
-	}
 
 	grBins.resize(grBinCount);
 	ClearVector(grBins);
@@ -126,17 +125,33 @@ void BulkOnlySplines::InitSystem()
 		}
 	}
 
-	cout << "maxDistance=" << maxDistance << endl;
-	cout << "nodePointSpacing=" << nodePointSpacing << endl;
+	cout << "maxDistance=" << maxDistance << " nodePointSpacing=" << nodePointSpacing << " LBOX=" << LBOX << endl;
 }
 
-vector<double> BulkOnlySplines::GetCenterOfMass(vector<vector<double> >& R)
+vector<double> BulkQuadraticTail::GetCenterOfMass(vector<vector<double> >& R)
 {
 	vector<double> com = {0.0, 0.0, 0.0};
 	return com;
 }
 
-void BulkOnlySplines::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+double BulkQuadraticTail::GetTailCorrectionKinetic(double b)
+{
+	double value = 0;
+	double maxDistance2 = maxDistance * maxDistance;
+	double maxDistance3 = maxDistance2 * maxDistance;
+	value = -(4.0 * b * M_PI * (2.0 * b + 3.0 * maxDistance2)) / (3.0 * maxDistance3);
+	value *= N;
+	return value;
+}
+
+double BulkQuadraticTail::GetTailCorrectionPotential()
+{
+	double value = 0.0;
+	//INFO: potential(rijSplit=1.9) is on the order of 10^-77. so no correction is needed
+	return value;
+}
+
+void BulkQuadraticTail::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	vector<double> vecrni(DIM);
 	vector<double> evecrni(DIM);
@@ -172,6 +187,8 @@ void BulkOnlySplines::CalculateExpectationValues(vector<vector<double> >& R, vec
 
 	ClearVector(splineSumsD);
 	ClearVector(splineSumsD2);
+	ClearVector(quadraticSumD);
+	ClearVector(quadraticSumD2);
 
 	localEnergyR = 0;
 	localEnergyI = 0;
@@ -204,30 +221,42 @@ void BulkOnlySplines::CalculateExpectationValues(vector<vector<double> >& R, vec
 				//		otherwise values are calculated multiple times
 				if (i != n) //TODO: also include in (i < n) branch -> then only loop over i < n in "for (int i = 0; i < N; i++)"
 				{
-					interval = rni / nodePointSpacing;
-					bin = int(interval);
-					res = interval - bin;
-					res2 = res * res;
+					if (rni < rijSplit)
+					{
+						interval = rni / nodePointSpacing;
+						bin = int(interval);
+						res = interval - bin;
+						res2 = res * res;
 
-					tmp[0] = -1.0 / 2.0 * (1.0 - 2.0 * res + res2);
-					tmp[1] = 1.0 / 6.0 * (-12.0 * res + 9.0 * res2);
-					tmp[2] = 1.0 / 6.0 * (3.0 + 6.0 * res - 9.0 * res2);
-					tmp[3] = 1.0 / 2.0 * res2;
-					for (int a = 0; a < DIM; a++)
-					{
-						evecrni[a] = vecrni[a] / rni;
-					}
-					for (int a = 0; a < DIM; a++)
-					{
-						for (int b = 0; b < 4; b++)
+						tmp[0] = -1.0 / 2.0 * (1.0 - 2.0 * res + res2);
+						tmp[1] = 1.0 / 6.0 * (-12.0 * res + 9.0 * res2);
+						tmp[2] = 1.0 / 6.0 * (3.0 + 6.0 * res - 9.0 * res2);
+						tmp[3] = 1.0 / 2.0 * res2;
+						for (int a = 0; a < DIM; a++)
 						{
-							splineSumsD[bin + b][n][a] += tmp[b] * evecrni[a] / nodePointSpacing;
+							evecrni[a] = vecrni[a] / rni;
 						}
+						for (int a = 0; a < DIM; a++)
+						{
+							for (int b = 0; b < 4; b++)
+							{
+								splineSumsD[bin + b][n][a] += tmp[b] * evecrni[a] / nodePointSpacing;
+							}
+						}
+						splineSumsD2[bin][n] += 1.0 / nodePointSpacing2 * (1.0 - res) + 2.0 / (nodePointSpacing * rni) * tmp[0];
+						splineSumsD2[bin + 1][n] += 1.0 / nodePointSpacing2 * (1.0 / 6.0 * (-12.0 + 18.0 * res)) + 2.0 / (nodePointSpacing * rni) * tmp[1];
+						splineSumsD2[bin + 2][n] += 1.0 / nodePointSpacing2 * (1.0 / 6.0 * (6.0 - 18.0 * res)) + 2.0 / (nodePointSpacing * rni) * tmp[2];
+						splineSumsD2[bin + 3][n] += 1.0 / nodePointSpacing2 * (res) + 2.0 / (nodePointSpacing * rni) * tmp[3];
 					}
-					splineSumsD2[bin][n] += 1.0 / nodePointSpacing2 * (1.0 - res) + 2.0 / (nodePointSpacing * rni) * tmp[0];
-					splineSumsD2[bin + 1][n] += 1.0 / nodePointSpacing2 * (1.0 / 6.0 * (-12.0 + 18.0 * res)) + 2.0 / (nodePointSpacing * rni) * tmp[1];
-					splineSumsD2[bin + 2][n] += 1.0 / nodePointSpacing2 * (1.0 / 6.0 * (6.0 - 18.0 * res)) + 2.0 / (nodePointSpacing * rni) * tmp[2];
-					splineSumsD2[bin + 3][n] += 1.0 / nodePointSpacing2 * (res) + 2.0 / (nodePointSpacing * rni) * tmp[3];
+					else
+					{
+						double rniMinus4 = 1.0 / (rni * rni * rni * rni);
+						for (int a = 0; a < DIM; a++)
+						{
+							quadraticSumD[n][a] += -2.0 * rniMinus4 * vecrni[a];
+						}
+						quadraticSumD2[n] += 2.0 * rniMinus4;
+					}
 				}
 			}
 			//binning for g(r)
@@ -260,14 +289,14 @@ void BulkOnlySplines::CalculateExpectationValues(vector<vector<double> >& R, vec
 			temp = (bcFactors[0][0] * splineSumsD[numberOfSplines - 3][n][a] + bcFactors[0][1] * splineSumsD[numberOfSplines - 2][n][a] + bcFactors[0][2] * splineSumsD[numberOfSplines - 1][n][a]);
 			vecKineticSumR1[a] += uR[N_PARAM - 2] * temp;
 			vecKineticSumI1[a] += uI[N_PARAM - 2] * temp;
-			temp = (bcFactors[1][0] * splineSumsD[numberOfSplines - 3][n][a] + bcFactors[1][1] * splineSumsD[numberOfSplines - 2][n][a] + bcFactors[1][2] * splineSumsD[numberOfSplines - 1][n][a]);
+			temp = (bcFactors[1][0] * splineSumsD[numberOfSplines - 3][n][a] + bcFactors[1][1] * splineSumsD[numberOfSplines - 2][n][a] + bcFactors[1][2] * splineSumsD[numberOfSplines - 1][n][a] + quadraticSumD[n][a]);
 			vecKineticSumR1[a] += uR[N_PARAM - 1] * temp;
 			vecKineticSumI1[a] += uI[N_PARAM - 1] * temp;
 		}
 		temp = (bcFactors[0][0] * splineSumsD2[numberOfSplines - 3][n] + bcFactors[0][1] * splineSumsD2[numberOfSplines - 2][n] + bcFactors[0][2] * splineSumsD2[numberOfSplines - 1][n]);
 		kineticSumR2 += uR[N_PARAM - 2] * temp;
 		kineticSumI2 += uI[N_PARAM - 2] * temp;
-		temp = (bcFactors[1][0] * splineSumsD2[numberOfSplines - 3][n] + bcFactors[1][1] * splineSumsD2[numberOfSplines - 2][n] + bcFactors[1][2] * splineSumsD2[numberOfSplines - 1][n]);
+		temp = (bcFactors[1][0] * splineSumsD2[numberOfSplines - 3][n] + bcFactors[1][1] * splineSumsD2[numberOfSplines - 2][n] + bcFactors[1][2] * splineSumsD2[numberOfSplines - 1][n] + quadraticSumD2[n]);
 		kineticSumR2 += uR[N_PARAM - 1] * temp;
 		kineticSumI2 += uI[N_PARAM - 1] * temp;
 
@@ -279,7 +308,12 @@ void BulkOnlySplines::CalculateExpectationValues(vector<vector<double> >& R, vec
 	kineticR = - (kineticSumR1 - kineticSumI1 + kineticSumR2);
 	kineticI = - (kineticSumR1I1 + kineticSumI2);
 
-	localEnergyR = kineticR + potentialIntern + potentialExtern;
+	double kineticTailCorrection = GetTailCorrectionKinetic(uR[N_PARAM - 1]);
+	double potentialTailCorrection = GetTailCorrectionPotential();
+	//cout << "kinetic TailCorrection=" << kineticTailCorrection << endl;
+	//cout << "potential TailCorrection=" << potentialTailCorrection << endl;
+
+	localEnergyR = kineticR + potentialIntern + potentialExtern + kineticTailCorrection + potentialTailCorrection;
 	localEnergyI = kineticI;
 
 	//cout << "potentialExtern=" << potentialExtern << endl;
@@ -295,8 +329,9 @@ void BulkOnlySplines::CalculateExpectationValues(vector<vector<double> >& R, vec
 	{
 		localOperators[i] = splineSums[i];
 	}
-	localOperators[N_PARAM - 2] = (bcFactors[0][0] * splineSums[numberOfSplines - 3] + bcFactors[0][1] * splineSums[numberOfSplines - 2] + bcFactors[0][2] * splineSums[numberOfSplines - 1] +bcFactors[0][3]);
-	localOperators[N_PARAM - 1] = (bcFactors[1][0] * splineSums[numberOfSplines - 3] + bcFactors[1][1] * splineSums[numberOfSplines - 2] + bcFactors[1][2] * splineSums[numberOfSplines - 1] +bcFactors[1][3]);
+	localOperators[N_PARAM - 2] = (bcFactors[0][0] * splineSums[numberOfSplines - 3] + bcFactors[0][1] * splineSums[numberOfSplines - 2] + bcFactors[0][2] * splineSums[numberOfSplines - 1] + bcFactors[0][3]);
+	localOperators[N_PARAM - 1] = (bcFactors[1][0] * splineSums[numberOfSplines - 3] + bcFactors[1][1] * splineSums[numberOfSplines - 2] + bcFactors[1][2] * splineSums[numberOfSplines - 1] + bcFactors[1][3] + quadraticSum);
+
 	for (int k = 0; k < N_PARAM; k++)
 	{
 		for (int j = 0; j < N_PARAM; j++)
@@ -308,15 +343,17 @@ void BulkOnlySplines::CalculateExpectationValues(vector<vector<double> >& R, vec
 	}
 
 	otherExpectationValues[0] = kineticR;
-	otherExpectationValues[1] = potentialIntern;
-	otherExpectationValues[2] = wf;
+	otherExpectationValues[1] = kineticTailCorrection;
+	otherExpectationValues[2] = potentialIntern;
+	otherExpectationValues[3] = potentialTailCorrection;
+	otherExpectationValues[4] = wf;
 	for (int i = 0; i < grBinCount; i++)
 	{
 		otherExpectationValues[i + grBinStartIndex] = grBins[i];
 	}
 }
 
-void BulkOnlySplines::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void BulkQuadraticTail::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
     ClearVector(additionalSystemProperties);
 	CalculateExpectationValues(R, uR, uI, phiR, phiI);
@@ -353,7 +390,7 @@ void BulkOnlySplines::CalculateAdditionalSystemProperties(vector<vector<double> 
 	}
 }
 
-void BulkOnlySplines::CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void BulkQuadraticTail::CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	double sum = 0;
 	double interval;
@@ -366,7 +403,7 @@ void BulkOnlySplines::CalculateWavefunction(vector<vector<double> >& R, vector<d
 	double tmp;
 
 	ClearVector(splineSums);
-	ClearVector(sumPerBinPerParticle);
+	quadraticSum = 0;
 
 	for (int n = 0; n < N; n++)
 	{
@@ -375,27 +412,30 @@ void BulkOnlySplines::CalculateWavefunction(vector<vector<double> >& R, vector<d
 			rni = VectorDisplacementNIC(R[n], R[i], vecrni);
 			if (rni < maxDistance)
 			{
-				interval = rni / nodePointSpacing;
-				bin = int(interval); //INFO: same as floor(interval) for positive values of "interval" but a little bit faster
-				res = interval - bin;
-				res2 = res * res;
-				res3 = res2 * res;
+				if (rni < rijSplit)
+				{
+					interval = rni / nodePointSpacing;
+					bin = int(interval); //INFO: same as floor(interval) for positive values of "interval" but a little bit faster
+					res = interval - bin;
+					res2 = res * res;
+					res3 = res2 * res;
 
-				tmp = -1.0 / 6.0 * (-1.0 + 3.0 * res - 3.0 * res2 + res3);
-				splineSums[bin] += tmp;
-				sumPerBinPerParticle[n - 1][i][bin] = tmp;
+					tmp = -1.0 / 6.0 * (-1.0 + 3.0 * res - 3.0 * res2 + res3);
+					splineSums[bin] += tmp;
 
-				tmp = 1.0 / 6.0 * (4.0 - 6.0 * res2 + 3.0 * res3);;
-				splineSums[bin + 1] += tmp;
-				sumPerBinPerParticle[n - 1][i][bin + 1] = tmp;
+					tmp = 1.0 / 6.0 * (4.0 - 6.0 * res2 + 3.0 * res3);;
+					splineSums[bin + 1] += tmp;
 
-				tmp = 1.0 / 6.0 * (1.0 + 3.0 * res + 3.0 * res2 - 3.0 * res3);
-				splineSums[bin + 2] += tmp;
-				sumPerBinPerParticle[n - 1][i][bin + 2] = tmp;
+					tmp = 1.0 / 6.0 * (1.0 + 3.0 * res + 3.0 * res2 - 3.0 * res3);
+					splineSums[bin + 2] += tmp;
 
-				tmp = 1.0 / 6.0 * res3;
-				splineSums[bin + 3] += tmp;
-				sumPerBinPerParticle[n - 1][i][bin + 3] = tmp;
+					tmp = 1.0 / 6.0 * res3;
+					splineSums[bin + 3] += tmp;
+				}
+				else
+				{
+					quadraticSum += 1.0 / (rni * rni);
+				}
 			}
 		}
 	}
@@ -404,88 +444,17 @@ void BulkOnlySplines::CalculateWavefunction(vector<vector<double> >& R, vector<d
 		sum += uR[i] * splineSums[i];
 	}
 	sum += uR[N_PARAM - 2] * (bcFactors[0][0] * splineSums[numberOfSplines - 3] + bcFactors[0][1] * splineSums[numberOfSplines - 2] + bcFactors[0][2] * splineSums[numberOfSplines - 1] + bcFactors[0][3]);
-	sum += uR[N_PARAM - 1] * (bcFactors[1][0] * splineSums[numberOfSplines - 3] + bcFactors[1][1] * splineSums[numberOfSplines - 2] + bcFactors[1][2] * splineSums[numberOfSplines - 1] + bcFactors[1][3]);
+	sum += uR[N_PARAM - 1] * (bcFactors[1][0] * splineSums[numberOfSplines - 3] + bcFactors[1][1] * splineSums[numberOfSplines - 2] + bcFactors[1][2] * splineSums[numberOfSplines - 1] + bcFactors[1][3] + quadraticSum);
 
-	wf = exp(sum);
+	wf = exp(sum + phiR);
 	exponent = sum;
 }
 
-void BulkOnlySplines::CalculateWFChange2(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
+void BulkQuadraticTail::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
 	double sum = 0;
-	double interval;
-	int bin;
-	double res;
-	double res2;
-	double res3;
-	double rni;
-	vector<double> vecrni(DIM);
-	double tmp;
-
-	ClearVector(sumOldPerBin);
-	ClearVector(sumNewPerBin);
-	ClearVector(sumNewPerBinForChangedParticle);
-	this->changedParticleIndex = changedParticleIndex;
-	for (int i = 0; i < N; i++)
-	{
-		if (i != changedParticleIndex)
-		{
-			if (i > changedParticleIndex)
-			{
-				sumOldPerBin += sumPerBinPerParticle[i - 1][changedParticleIndex];
-			}
-			else
-			{
-				sumOldPerBin += sumPerBinPerParticle[changedParticleIndex - 1][i];
-			}
-
-			rni = VectorDisplacementNIC(R[i], R[changedParticleIndex], vecrni);
-			if (rni < maxDistance)
-			{
-				interval = rni / nodePointSpacing;
-				bin = int(interval);
-				res = interval - bin;
-				res2 = res * res;
-				res3 = res2 * res;
-
-				tmp = -1.0 / 6.0 * (-1.0 + 3.0 * res - 3.0 * res2 + res3);
-				sumNewPerBin[bin] += tmp;
-				sumNewPerBinForChangedParticle[i][bin] = tmp;
-
-				tmp = 1.0 / 6.0 * (4.0 - 6.0 * res2 + 3.0 * res3);
-				sumNewPerBin[bin + 1] += tmp;
-				sumNewPerBinForChangedParticle[i][bin + 1] = tmp;
-
-				tmp = 1.0 / 6.0 * (1.0 + 3.0 * res + 3.0 * res2 - 3.0 * res3);
-				sumNewPerBin[bin + 2] += tmp;
-				sumNewPerBinForChangedParticle[i][bin + 2] = tmp;
-
-				tmp = 1.0 / 6.0 * res3;
-				sumNewPerBin[bin + 3] += tmp;
-				sumNewPerBinForChangedParticle[i][bin + 3] = tmp;
-			}
-		}
-	}
-
-	for (int i = 0; i < numberOfSplines; i++)
-	{
-		splineSumsNew[i] = max(0.0, splineSums[i] - sumOldPerBin[i] + sumNewPerBin[i]);
-	}
-
-	for (int i = 0; i < numberOfStandardParameters; i++)
-	{
-		sum += uR[i] * splineSumsNew[i];
-	}
-	sum += uR[N_PARAM - 2] * (bcFactors[0][0] * splineSumsNew[numberOfSplines - 3] + bcFactors[0][1] * splineSumsNew[numberOfSplines - 2] + bcFactors[0][2] * splineSumsNew[numberOfSplines - 1] + bcFactors[0][3]);
-	sum += uR[N_PARAM - 1] * (bcFactors[1][0] * splineSumsNew[numberOfSplines - 3] + bcFactors[1][1] * splineSumsNew[numberOfSplines - 2] + bcFactors[1][2] * splineSumsNew[numberOfSplines - 1] + bcFactors[1][3]);
-
-	wfNew = exp(sum);
-	exponentNew = sum;
-}
-
-void BulkOnlySplines::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
-{
-	double sum = 0;
+	double quadraticOld = 0;
+	double quadraticNew = 0;
 	double interval;
 	int bin;
 	double res;
@@ -503,34 +472,49 @@ void BulkOnlySplines::CalculateWFChange(vector<vector<double> >& R, vector<doubl
 			rni = VectorDisplacementNIC(R[i], oldPosition, vecrni);
 			if (rni < maxDistance)
 			{
-				interval = rni / nodePointSpacing;
-				bin = int(interval);
-				res = interval - bin;
-				res2 = res * res;
-				res3 = res2 * res;
+				if (rni < rijSplit)
+				{
+					interval = rni / nodePointSpacing;
+					bin = int(interval);
+					res = interval - bin;
+					res2 = res * res;
+					res3 = res2 * res;
 
-				sumOldPerBin[bin] += -1.0 / 6.0 * (-1.0 + 3.0 * res - 3.0 * res2 + res3);
-				sumOldPerBin[bin + 1] += 1.0 / 6.0 * (4.0 - 6.0 * res2 + 3.0 * res3);
-				sumOldPerBin[bin + 2] += 1.0 / 6.0 * (1.0 + 3.0 * res + 3.0 * res2 - 3.0 * res3);
-				sumOldPerBin[bin + 3] += 1.0 / 6.0 * res3;
+					sumOldPerBin[bin] += -1.0 / 6.0 * (-1.0 + 3.0 * res - 3.0 * res2 + res3);
+					sumOldPerBin[bin + 1] += 1.0 / 6.0 * (4.0 - 6.0 * res2 + 3.0 * res3);
+					sumOldPerBin[bin + 2] += 1.0 / 6.0 * (1.0 + 3.0 * res + 3.0 * res2 - 3.0 * res3);
+					sumOldPerBin[bin + 3] += 1.0 / 6.0 * res3;
+				}
+				else
+				{
+					quadraticOld += 1.0 / (rni * rni);
+				}
 			}
 			rni = VectorDisplacementNIC(R[i], R[changedParticleIndex], vecrni);
 			if (rni < maxDistance)
 			{
-				interval = rni / nodePointSpacing;
-				bin = int(interval);
-				res = interval - bin;
-				res2 = res * res;
-				res3 = res2 * res;
+				if (rni < rijSplit)
+				{
+					interval = rni / nodePointSpacing;
+					bin = int(interval);
+					res = interval - bin;
+					res2 = res * res;
+					res3 = res2 * res;
 
-				sumNewPerBin[bin] += -1.0 / 6.0 * (-1.0 + 3.0 * res - 3.0 * res2 + res3);
-				sumNewPerBin[bin + 1] += 1.0 / 6.0 * (4.0 - 6.0 * res2 + 3.0 * res3);
-				sumNewPerBin[bin + 2] += 1.0 / 6.0 * (1.0 + 3.0 * res + 3.0 * res2 - 3.0 * res3);
-				sumNewPerBin[bin + 3] += 1.0 / 6.0 * res3;
+					sumNewPerBin[bin] += -1.0 / 6.0 * (-1.0 + 3.0 * res - 3.0 * res2 + res3);
+					sumNewPerBin[bin + 1] += 1.0 / 6.0 * (4.0 - 6.0 * res2 + 3.0 * res3);
+					sumNewPerBin[bin + 2] += 1.0 / 6.0 * (1.0 + 3.0 * res + 3.0 * res2 - 3.0 * res3);
+					sumNewPerBin[bin + 3] += 1.0 / 6.0 * res3;
+				}
+				else
+				{
+					quadraticNew += 1.0 / (rni * rni);
+				}
 			}
 		}
 	}
 
+	quadraticSumNew = max(0.0, quadraticSum - quadraticOld + quadraticNew);
 	for (int i = 0; i < numberOfSplines; i++)
 	{
 		splineSumsNew[i] = max(0.0, splineSums[i] - sumOldPerBin[i] + sumNewPerBin[i]);
@@ -541,13 +525,13 @@ void BulkOnlySplines::CalculateWFChange(vector<vector<double> >& R, vector<doubl
 		sum += uR[i] * splineSumsNew[i];
 	}
 	sum += uR[N_PARAM - 2] * (bcFactors[0][0] * splineSumsNew[numberOfSplines - 3] + bcFactors[0][1] * splineSumsNew[numberOfSplines - 2] + bcFactors[0][2] * splineSumsNew[numberOfSplines - 1] + bcFactors[0][3]);
-	sum += uR[N_PARAM - 1] * (bcFactors[1][0] * splineSumsNew[numberOfSplines - 3] + bcFactors[1][1] * splineSumsNew[numberOfSplines - 2] + bcFactors[1][2] * splineSumsNew[numberOfSplines - 1] + bcFactors[1][3]);
+	sum += uR[N_PARAM - 1] * (bcFactors[1][0] * splineSumsNew[numberOfSplines - 3] + bcFactors[1][1] * splineSumsNew[numberOfSplines - 2] + bcFactors[1][2] * splineSumsNew[numberOfSplines - 1] + bcFactors[1][3] + quadraticSumNew);
 
-	wfNew = exp(sum);
+	wfNew = exp(sum + phiR);
 	exponentNew = sum;
 }
 
-double BulkOnlySplines::CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
+double BulkQuadraticTail::CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
 	CalculateWFChange(R, uR, uI, phiR, phiI, changedParticleIndex, oldPosition);
 	double wfQuotient = exp(2.0 * (exponentNew - exponent));
@@ -557,20 +541,10 @@ double BulkOnlySplines::CalculateWFQuotient(vector<vector<double> >& R, vector<d
 	return wfQuotient;
 }
 
-void BulkOnlySplines::AcceptMove()
+void BulkQuadraticTail::AcceptMove()
 {
 	wf = wfNew;
 	exponent = exponentNew;
+	quadraticSum = quadraticSumNew;
 	splineSums = splineSumsNew;
-	//for (int i = 0; i < N - 1; i++)
-	//{
-	//	if (i > this->changedParticleIndex)
-	//	{
-	//		sumPerBinPerParticle[i - 1][this->changedParticleIndex] = sumNewPerBinForChangedParticle[i];
-	//	}
-	//	else if(i < this->changedParticleIndex)
-	//	{
-	//		sumPerBinPerParticle[this->changedParticleIndex - 1][i] = sumNewPerBinForChangedParticle[i];
-	//	}
-	//}
 }

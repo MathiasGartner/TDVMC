@@ -73,7 +73,7 @@ string ConfigItem::getJsonString()
 	}
 	else if (this->type == ARR_DOUBLE)
 	{
-		s = "[ " + JoinVector(*variableArrDouble) + " ]";
+		s = "\n\t[\n\t\t " + JoinVector(*variableArrDouble) + "\n\t]";
 	}
 	return s;
 }
