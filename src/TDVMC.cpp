@@ -1,10 +1,9 @@
 #include "mpi.h"
 
+#include "BulkSplines.h"
 #include "BulkOnlySplines.h"
-#include "BulkOnlySplinesQuadraticTail.h"
-#include "BulkOnlySplinesQuadraticTailZeroAtBox.h"
-#include "BulkQuadraticTail.h"
-#include "BulkQuadraticTailFixed.h"
+#include "BulkOnlySplinesOriginal.h"
+#include "BulkQT.h"
 #include "ConfigItem.h"
 #include "Constants.h"
 #include "GaussianWavepacket.h"
@@ -14,6 +13,7 @@
 #include "MPIMethods.h"
 #include "Timer.h"
 #include "Utils.h"
+#include "VMCSampler.h"
 
 #include "test/MPITest.h"
 #include "test/PiCalculator.h"
@@ -44,6 +44,7 @@ IPhysicalSystem* sys;
 bool USE_MEAN_FOR_FINAL_PARAMETERS = false;
 bool USE_NORMALIZE_WF = true;
 bool USE_PARAMETER_ACCEPTANCE_CHECK = true;
+bool USE_ADJUST_PARAMETERS = false;
 
 vector<ConfigItem> configItems;
 
@@ -75,6 +76,7 @@ vector<double> PARAMS_IMAGINARY;
 double PARAM_PHIR;
 double PARAM_PHII;
 int PARAMETER_ACCEPTANCE_CHECK_TYPE;
+int WRITE_EVERY_NTH_STEP_TO_FILE;
 
 int numOfProcesses = 1;
 int rootRank = 0;
@@ -259,6 +261,7 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("IMAGINARY_TIME", &IMAGINARY_TIME, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("ODE_SOLVER_TYPE", &ODE_SOLVER_TYPE, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("PARAMETER_ACCEPTANCE_CHECK_TYPE", &PARAMETER_ACCEPTANCE_CHECK_TYPE, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("WRITE_EVERY_NTH_STEP_TO_FILE", &WRITE_EVERY_NTH_STEP_TO_FILE, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("PARAMS_REAL", PARAMS_REAL, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("PARAMS_IMAGINARY", PARAMS_IMAGINARY, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("PARAM_PHIR", &PARAM_PHIR, ConfigItemType::DOUBLE));
@@ -626,6 +629,7 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 	ClearVector(otherExpectationValues);
 
 	sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
+
 	if (processRank == rootRank && !intermediateStep)
 	{
 		cout << "exponent=" << sys->GetExponent() << "\t\twf=" << sys->GetWf() << "\t\tphiR=" << phiR << endl;
@@ -653,6 +657,7 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 		//singlelocalOperatorsMatrix.push_back(Sys::localOperatorsMatrix);
 		//singlelocalOperatorlocalEnergyR.push_back(Sys::localOperatorlocalEnergyR);
 		//singlelocalOperatorlocalEnergyI.push_back(Sys::localOperatorlocalEnergyI);
+		//WriteDataToFile(singlelocalEnergyR.back(), "singlelocalEnergyR", "er");
 
 		//INFO: calculate contribution to average value
 		localOperators += sys->GetLocalOperators() / mc_nsteps;
@@ -716,8 +721,8 @@ void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>&
 		Log("          <t> = " + to_string(timings[2]) + " ms");
 	}
 
-	Log("localOperators" + to_string(processRank));
-	WriteDataToFile(localOperators, "localOperators" + to_string(processRank), "localOperators");
+	//Log("localOperators" + to_string(processRank));
+	//WriteDataToFile(localOperators, "localOperators" + to_string(processRank), "localOperators");
 
 	MPIMethods::ReduceToAverage(localOperators);
 	MPIMethods::ReduceToAverage(&localEnergyR);
@@ -726,6 +731,37 @@ void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>&
 	MPIMethods::ReduceToAverage(localOperatorlocalEnergyR);
 	MPIMethods::ReduceToAverage(localOperatorlocalEnergyI);
 	MPIMethods::ReduceToAverage(otherExpectationValues);
+
+	//BulkOnlySplines* s = dynamic_cast<BulkOnlySplines*>(sys);
+	//vector<vector<double> > localKineticEnergiesD1 = Mean(s->allLocalKineticEnergiesD1);
+	//vector<double> localKineticEnergiesD2 = Mean(s->allLocalKineticEnergiesD2);
+	//if (processRank == rootRank)
+	//{
+	//	WriteDataToFile(s->allER1, "BB_allER1", to_string(Mean(s->allER1)));
+	//	WriteDataToFile(s->allER2, "BB_allER2", to_string(Mean(s->allER2)));
+	//	WriteDataToFile(s->allER1new, "BB_allER1new", to_string(Mean(s->allER1new)));
+	//	WriteDataToFile(s->allER2new, "BB_allER2new", to_string(Mean(s->allER2new)));
+	//	WriteDataToFile(s->splineSumsD, "BB_splineSumsD", "test");
+	//	WriteDataToFile(s->splineSumsD2, "BB_splineSumsD2", "test");
+	//	WriteDataToFile(s->allLocalKineticEnergiesD1, "BB_Original_localKineticEnergiesD1", "test");
+	//	WriteDataToFile(s->allLocalKineticEnergiesD2, "BB_Original_localKineticEnergiesD2", "test");
+	//	WriteDataToFile(localKineticEnergiesD1, "BB_Mean_localKineticEnergiesD1", "test", 1);
+	//	WriteDataToFile(localKineticEnergiesD2, "BB_Mean_localKineticEnergiesD2", to_string(Sum(localKineticEnergiesD2)), 1);
+	//	auto t = OuterSum(s->allLocalKineticEnergiesD2);
+	//	WriteDataToFile(t, "BB_OuterSum_allLocalKineticEnergiesD2", "outersum", 1);
+	//	auto g = OuterSum(s->splineSumsOnlyD2);
+	//	WriteDataToFile(g, "BB_splineSumsOnlyD2", to_string(Sum(g)), 1);
+	//}
+	//auto os2 = OuterSum(s->allLocalKineticEnergiesD2);
+	//MPIMethods::ReduceToAverage(os2);
+	////MPIMethods::ReduceToAverage(localKineticEnergiesD1);
+	////MPIMethods::ReduceToAverage(localKineticEnergiesD2);
+	//if (processRank == rootRank)
+	//{
+	//	WriteDataToFile(localKineticEnergiesD1, "BB_localKineticEnergiesD1", "test", 1);
+	//	WriteDataToFile(localKineticEnergiesD2, "BB_localKineticEnergiesD2", to_string(Sum(localKineticEnergiesD2)), 1);
+	//	WriteDataToFile(os2, "BB_OuterSum_allLocalKineticEnergiesD2_Reduced", to_string(Sum(os2)), 1);
+	//}
 }
 
 void NormalizeParameters(vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
@@ -823,6 +859,7 @@ void BuildSystemOfEquationsForParameters(vector<vector<double> >& matrix, vector
 void PerformCholeskyDecomposition(vector<vector<double> >& matrix)
 {
 	double sum = 0;
+	bool logged = false;
 	for (int i = 0; i < N_PARAM; i++)
 	{
 		for (int j = 0; j <= i; j++)
@@ -842,7 +879,11 @@ void PerformCholeskyDecomposition(vector<vector<double> >& matrix)
 			}
 			else
 			{
-				Log("!!!!! NOT POSITIVE SEMI DEFINITE !!!! @ i=" + to_string(i) + ", j=" + to_string(j), ERROR);
+				if (!logged)
+				{
+					Log("!!!!! NOT POSITIVE SEMI DEFINITE !!!! @ i=" + to_string(i) + ", j=" + to_string(j), ERROR);
+					logged = true;
+				}
 			}
 		}
 	}
@@ -1138,6 +1179,16 @@ void NormalizeWavefunction(double wf, double *phiR)
 	*phiR = *phiR - log(wf);
 }
 
+void AdjustParameters(vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
+{
+	//double last = uR.back() + 0.00908425;
+	//for (unsigned int i = 0; i < uR.size(); i++)
+	//{
+	//	uR[i] += -last;
+	//}
+	uR[uR.size() - 1] = 0.0;
+}
+
 void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	int percent = 0;
@@ -1214,6 +1265,19 @@ bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double
 	}
 	else if (PARAMETER_ACCEPTANCE_CHECK_TYPE == 1)
 	{
+		if (uRList.size() > 1)
+		{
+			for (int p = 0; p < N_PARAM; p++)
+			{
+				if (!isfinite(uR[p]))
+				{
+					return false;
+				}
+			}
+		}
+	}
+	else if (PARAMETER_ACCEPTANCE_CHECK_TYPE == 2)
+	{
 		double threshold = 0.05;
 		if (uRList.size() > 1)
 		{
@@ -1230,7 +1294,7 @@ bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double
 			}
 		}
 	}
-	else if (PARAMETER_ACCEPTANCE_CHECK_TYPE == 2)
+	else if (PARAMETER_ACCEPTANCE_CHECK_TYPE == 3)
 	{
 		unsigned int lastNValues = 10;
 		double value = 0;
@@ -1308,25 +1372,21 @@ int mainMPI(int argc, char** argv)
 	{
 		sys = new HeBulk(configDirectory);
 	}
+	else if (SYSTEM_TYPE == "BulkSplines")
+	{
+		sys = new BulkSplines(configDirectory);
+	}
 	else if (SYSTEM_TYPE == "BulkOnlySplines")
 	{
 		sys = new BulkOnlySplines(configDirectory);
 	}
-	else if (SYSTEM_TYPE == "BulkQuadraticTail")
+	else if (SYSTEM_TYPE == "BulkOnlySplinesOriginal")
 	{
-		sys = new BulkQuadraticTail(configDirectory);
+		sys = new BulkOnlySplinesOriginal(configDirectory);
 	}
-	else if (SYSTEM_TYPE == "BulkQuadraticTailFixed")
+	else if (SYSTEM_TYPE == "BulkQT")
 	{
-		sys = new BulkQuadraticTailFixed(configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BulkOnlySplinesQuadraticTail")
-	{
-		sys = new BulkOnlySplinesQuadraticTail(configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BulkOnlySplinesQuadraticTailZeroAtBox")
-	{
-		sys = new BulkOnlySplinesQuadraticTailZeroAtBox(configDirectory);
+		sys = new BulkQT(configDirectory);
 	}
 	else if (SYSTEM_TYPE == "GaussianWavepacket")
 	{
@@ -1343,9 +1403,9 @@ int mainMPI(int argc, char** argv)
 	Init();
 	if (processRank == rootRank)
 	{
-		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
-		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
-		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
+		//cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
+		//cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
+		//cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
 	}
 
 	vector<vector<double> > R(N);
@@ -1375,6 +1435,12 @@ int mainMPI(int argc, char** argv)
 		phiI = PARAM_PHII;
 		//PrintData(uR);
 		//PrintData(uI);
+
+		if (processRank == rootRank)// && USE_ADJUST_PARAMETERS == true)
+		{
+			//AdjustParameters(uR, uI, &phiR, &phiI);
+		}
+
 		WriteDataToFile(uR, "parametersR0", "parameterR");
 		WriteDataToFile(uI, "parametersI0", "parameterI");
 	}
@@ -1385,6 +1451,7 @@ int mainMPI(int argc, char** argv)
 	int step = 0;
 	int acceptNewParams;
 	int nrOfAcceptParameterTrials;
+
 	for (currentTime = 0; currentTime <= TOTALTIME; currentTime += TIMESTEP)
 	{
 		acceptNewParams = 0;
@@ -1402,7 +1469,6 @@ int mainMPI(int argc, char** argv)
 			{
 				uRListDiffs.push_back(uRList.back() - uR);
 				uIListDiffs.push_back(uIList.back() - uI);
-				;
 				phiRListDiffs.push_back(phiRList.back() - phiR);
 				phiIListDiffs.push_back(phiIList.back() - phiI);
 			}
@@ -1434,7 +1500,7 @@ int mainMPI(int argc, char** argv)
 			ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
 			if (processRank == rootRank)
 			{
-				if (step % 100 == 0)
+				if (step % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
 				{
 					WriteDataToFile(localOperators, "localOperators" + to_string(step), "localOperators");
 					WriteDataToFile(localEnergyR, "localEnergyR" + to_string(step), "localEnergyR");
@@ -1472,6 +1538,10 @@ int mainMPI(int argc, char** argv)
 			{
 				CalculateNextParameters(R, uR, uI);
 			}
+			if (processRank == rootRank && USE_ADJUST_PARAMETERS == true)
+			{
+				AdjustParameters(uR, uI, &phiR, &phiI);
+			}
 			if (USE_PARAMETER_ACCEPTANCE_CHECK)
 			{
 				if (processRank == rootRank)
@@ -1507,17 +1577,17 @@ int mainMPI(int argc, char** argv)
 
 		if (processRank == rootRank)
 		{
-			if (step % 100 == 0)
+			if (step % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
 			{
 				WriteDataToFile(uR, "parametersR" + to_string(step), "parameterR, phiR=" + to_string(phiR) + ", wf=" + to_string(sys->GetWf()));
 				WriteDataToFile(uI, "parametersI" + to_string(step), "parameterI, phiI=" + to_string(phiI));
 			}
-			if (step % 100 == 0)
+			if (step % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
 			{
-				WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER", 100);
-				WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", "kinetic, potential, wf, g(r)", 100);
-				WriteDataToFile(AllParametersR, "AllParametersR", "uR", 100);
-				WriteDataToFile(AllParametersI, "AllParametersI", "uI", 100);
+				WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER", WRITE_EVERY_NTH_STEP_TO_FILE);
+				WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", "kinetic, potential, wf, g(r)", WRITE_EVERY_NTH_STEP_TO_FILE);
+				WriteDataToFile(AllParametersR, "AllParametersR", "uR", WRITE_EVERY_NTH_STEP_TO_FILE);
+				WriteDataToFile(AllParametersI, "AllParametersI", "uI", WRITE_EVERY_NTH_STEP_TO_FILE);
 			}
 		}
 
@@ -1647,6 +1717,45 @@ int mainMPI(int argc, char** argv)
 	return 0;
 }
 
+void startVMCSampler()
+{
+	int processRank = 0;
+	VMCSampler::generator = mt19937_64(processRank + 1);
+
+	LBOX = 4;
+	N = 64;
+	DIM = 3;
+	N_PARAM = 100;
+	MC_NSTEPS = 500;
+	MC_NTHERMSTEPS = 50;
+	MC_NINITIALIZATIONSTEPS = 10;
+	int numberOfSplines = N_PARAM + 2;
+	double halfLength = LBOX / 2.0;
+	VMCSampler::nodePointSpacing = halfLength / (double) (numberOfSplines - 3.0);
+
+	vector<vector<double> > energies;
+	//double e1 = VMCSampler::GetEnergy();
+
+	for (int i = 0; i < MC_NINITIALIZATIONSTEPS; i++)
+	{
+		VMCSampler::DoMetropolisStep();
+	}
+	for (int i = 0; i < MC_NSTEPS; i++)
+	{
+		for (int j = 0; j < MC_NTHERMSTEPS; j++)
+		{
+			VMCSampler::DoMetropolisStep();
+		}
+		double e = VMCSampler::GetEnergy();
+		energies.push_back({e, -VMCSampler::energy1 / (double)N, -VMCSampler::energy2 / (double)N, -VMCSampler::energy2_1 / (double)N, -VMCSampler::energy2_2 / (double)N});
+		cout << JoinVector(energies.back()) << endl;
+	}
+
+	vector<double> energy = Mean(energies);
+
+	cout << "E=" << JoinVector(energy) << endl;
+}
+
 int main(int argc, char **argv)
 {
 	int val = -1;
@@ -1655,6 +1764,9 @@ int main(int argc, char **argv)
 	//cout << "#################################################" << endl;
 	//Log("start");
 
+	//startVMCSampler();
+	//return 0;
+
 	if (argc == 0) //INFO: started with pbs on mach
 	{
 		configFilePath = "/home/k3501/k354522/tVMC/bin/tVMC.config";
@@ -1662,11 +1774,10 @@ int main(int argc, char **argv)
 	}
 	else if (argc == 1) //INFO: started without specifying config-file. used for local execution
 	{
-		//SYSTEM_TYPE = "BulkOnlySplinesQuadraticTail";
-		SYSTEM_TYPE = "BulkOnlySplines";
-		//SYSTEM_TYPE = "BulkOnlySplinesQuadraticTailZeroAtBox";
-		//SYSTEM_TYPE = "BulkQuadraticTail";
-		//SYSTEM_TYPE = "BulkQuadraticTailFixed";
+		//SYSTEM_TYPE = "BulkOnlySplines";
+		//SYSTEM_TYPE = "BulkOnlySplinesOriginal";
+		//SYSTEM_TYPE = "BulkQT";
+		SYSTEM_TYPE = "BulkSplines";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/drop_3.config";
@@ -1675,25 +1786,23 @@ int main(int argc, char **argv)
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/bulk_64.config";
 		}
+		else if (SYSTEM_TYPE == "BulkSplines")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkSplines.config";
+		}
 		else if (SYSTEM_TYPE == "BulkOnlySplines")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkGauss.config";
 		}
-		else if (SYSTEM_TYPE == "BulkQuadraticTail")
+		else if (SYSTEM_TYPE == "BulkOnlySplinesOriginal")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkQuadraticTail.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/BulkOnlySplinesOriginal.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/test64.config";
 		}
-		else if (SYSTEM_TYPE == "BulkQuadraticTailFixed")
+		else if (SYSTEM_TYPE == "BulkQT")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkQuadraticTailFixed.config";
-		}
-		else if (SYSTEM_TYPE == "BulkOnlySplinesQuadraticTail")
-		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkGaussQuadraticTail.config";
-		}
-		else if (SYSTEM_TYPE == "BulkOnlySplinesQuadraticTailZeroAtBox")
-		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkGaussQuadraticTailZeroAtBox.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/bulkQT.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/test64.config";
 		}
 		else if (SYSTEM_TYPE == "GaussianWavepacket")
 		{

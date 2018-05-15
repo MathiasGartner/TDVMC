@@ -20,6 +20,15 @@ vector<double>& operator-=(vector<double>& v1, const vector<double>& v2)
 	return v1;
 }
 
+vector<double>& operator*=(vector<double>& v, double x)
+{
+	for (unsigned int i = 0; i < v.size(); i++)
+	{
+		v[i] *= x;
+	}
+	return v;
+}
+
 vector<double>& operator/=(vector<double>& v, double x)
 {
 	for (unsigned int i = 0; i < v.size(); i++)
@@ -39,6 +48,12 @@ vector<double> operator-(vector<double> v1, const vector<double>& v2)
 {
 	v1 -= v2;
 	return v1;
+}
+
+vector<double> operator*(vector<double> v, double x)
+{
+	v *= x;
+	return v;
 }
 
 vector<double> operator/(vector<double> v, double x)

@@ -103,6 +103,42 @@ double VectorDisplacementNIC(vector<double>& ri, vector<double>& rj, vector<doub
 	return norm;
 }
 
+double Sum(vector<double>& v)
+{
+	double sum = 0;
+	for (double d : v)
+	{
+		sum += d;
+	}
+	return sum;
+}
+
+vector<double> Sum(vector<vector<double> >& v)
+{
+	vector<double> sums;
+	for (auto w : v)
+	{
+		sums.push_back(Sum(w));
+	}
+	return sums;
+}
+
+vector<double> OuterSum(vector<vector<double> >& v)
+{
+	vector<double> sums;
+	double sum;
+	for (unsigned int i = 0; i < v[0].size(); i++)
+	{
+		sum = 0;
+		for(unsigned int j = 0; j < v.size(); j++)
+		{
+			sum += v[j][i];
+		}
+		sums.push_back(sum);
+	}
+	return sums;
+}
+
 double Mean(vector<double>& v)
 {
 	double mean;

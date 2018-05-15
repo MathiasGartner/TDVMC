@@ -9,9 +9,9 @@
 
 using namespace std;
 
-class BulkOnlySplines: public IPhysicalSystem
+class BulkSplines : public IPhysicalSystem
 {
-public:
+private:
 	string configDirectory;
 
 	int	numberOfSplines;
@@ -39,25 +39,13 @@ public:
 	vector<double> splineSumsNew; //indices: k (bin); for <O_k>
 	vector<double> sumOldPerBin;
 	vector<double> sumNewPerBin;
-	vector<vector<vector<double> > > sumPerBinPerParticle; //sumPerBinPerParticle[p1][p2][bin] -> p1...particle1, p2...particle2, bin...bin
-	vector<vector<double> > sumNewPerBinForChangedParticle; //sumPerBinPerParticle[p1][p2][bin] -> p...particle, bin...bin
 	int changedParticleIndex;
 
 	vector<vector<double> > bcFactors; //factors according to the boundary conditions
 
-public:
-	vector<vector<vector<double> > > allLocalKineticEnergiesD1;
-	vector<vector<double> > allLocalKineticEnergiesD2;
-	vector<double> allER1;
-	vector<double> allER2;
-	vector<double> allER1new;
-	vector<double> allER2new;
-
-	vector<vector<double> > splineSumsOnlyD2;
-
 //Implementation of IPhysicalSystem
 public:
-	BulkOnlySplines(string configDirectory);
+	BulkSplines(string configDirectory);
 
 	void InitSystem();
 
@@ -70,10 +58,8 @@ public:
 	void CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
 
 	void CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition);
-	void CalculateWFChange2(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition);
 
 	double CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition);
 
 	void AcceptMove();
 };
-

@@ -11,7 +11,7 @@
 
 using namespace std;
 
-const int exportPrecision = 15;
+const int exportPrecision = 25;
 
 template<typename T> string JoinVector(const vector<T>& v, int everyNth = 1)
 {
@@ -47,6 +47,9 @@ void GetVectorNIC(vector<double>& r, vector<double>& rNIC);
 void VectorDiffNIC(vector<double>& ri, vector<double>& rj, vector<double>& result);
 double VectorDisplacementNIC(vector<double>& ri, vector<double>& rj, vector<double>& result);
 
+double Sum(vector<double>& v);
+vector<double> Sum(vector<vector<double> >& v);
+vector<double> OuterSum(vector<vector<double> >& v);
 double Mean(vector<double>& v);
 vector<double> Mean(vector<vector<double> >& v);
 vector<vector<double> > Mean(vector<vector<vector<double> > >& v);

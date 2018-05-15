@@ -5,10 +5,11 @@
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
 ../src/BulkOnlySplines.cpp \
-../src/BulkOnlySplinesQuadraticTail.cpp \
-../src/BulkOnlySplinesQuadraticTailZeroAtBox.cpp \
-../src/BulkQuadraticTail.cpp \
-../src/BulkQuadraticTailFixed.cpp \
+../src/BulkOnlySplinesOriginal.cpp \
+../src/BulkQT.cpp \
+../src/BulkSplines.cpp \
+../src/BulkSplinesInterface.cpp \
+../src/BulkSplinesNamespace.cpp \
 ../src/ConfigItem.cpp \
 ../src/GaussianWavepacket.cpp \
 ../src/HeBulk.cpp \
@@ -19,10 +20,11 @@ CPP_SRCS += \
 
 OBJS += \
 ./src/BulkOnlySplines.o \
-./src/BulkOnlySplinesQuadraticTail.o \
-./src/BulkOnlySplinesQuadraticTailZeroAtBox.o \
-./src/BulkQuadraticTail.o \
-./src/BulkQuadraticTailFixed.o \
+./src/BulkOnlySplinesOriginal.o \
+./src/BulkQT.o \
+./src/BulkSplines.o \
+./src/BulkSplinesInterface.o \
+./src/BulkSplinesNamespace.o \
 ./src/ConfigItem.o \
 ./src/GaussianWavepacket.o \
 ./src/HeBulk.o \
@@ -33,10 +35,11 @@ OBJS += \
 
 CPP_DEPS += \
 ./src/BulkOnlySplines.d \
-./src/BulkOnlySplinesQuadraticTail.d \
-./src/BulkOnlySplinesQuadraticTailZeroAtBox.d \
-./src/BulkQuadraticTail.d \
-./src/BulkQuadraticTailFixed.d \
+./src/BulkOnlySplinesOriginal.d \
+./src/BulkQT.d \
+./src/BulkSplines.d \
+./src/BulkSplinesInterface.d \
+./src/BulkSplinesNamespace.d \
 ./src/ConfigItem.d \
 ./src/GaussianWavepacket.d \
 ./src/HeBulk.d \
