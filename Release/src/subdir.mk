@@ -7,9 +7,8 @@ CPP_SRCS += \
 ../src/BulkOnlySplines.cpp \
 ../src/BulkOnlySplinesOriginal.cpp \
 ../src/BulkQT.cpp \
+../src/BulkQTPhi.cpp \
 ../src/BulkSplines.cpp \
-../src/BulkSplinesInterface.cpp \
-../src/BulkSplinesNamespace.cpp \
 ../src/ConfigItem.cpp \
 ../src/GaussianWavepacket.cpp \
 ../src/HeBulk.cpp \
@@ -22,9 +21,8 @@ OBJS += \
 ./src/BulkOnlySplines.o \
 ./src/BulkOnlySplinesOriginal.o \
 ./src/BulkQT.o \
+./src/BulkQTPhi.o \
 ./src/BulkSplines.o \
-./src/BulkSplinesInterface.o \
-./src/BulkSplinesNamespace.o \
 ./src/ConfigItem.o \
 ./src/GaussianWavepacket.o \
 ./src/HeBulk.o \
@@ -37,9 +35,8 @@ CPP_DEPS += \
 ./src/BulkOnlySplines.d \
 ./src/BulkOnlySplinesOriginal.d \
 ./src/BulkQT.d \
+./src/BulkQTPhi.d \
 ./src/BulkSplines.d \
-./src/BulkSplinesInterface.d \
-./src/BulkSplinesNamespace.d \
 ./src/ConfigItem.d \
 ./src/GaussianWavepacket.d \
 ./src/HeBulk.d \

@@ -4,6 +4,7 @@
 #include "BulkOnlySplines.h"
 #include "BulkOnlySplinesOriginal.h"
 #include "BulkQT.h"
+#include "BulkQTPhi.h"
 #include "ConfigItem.h"
 #include "Constants.h"
 #include "GaussianWavepacket.h"
@@ -111,6 +112,8 @@ vector<vector<double> > AllOtherExpectationValues;
 vector<vector<double> > AllParametersR;
 vector<vector<double> > AllParametersI;
 vector<vector<double> > AllAdditionalSystemProperties;
+
+vector<vector<vector<double> > > mcSamples;
 
 mt19937_64 generator;
 //default_random_engine generator;
@@ -391,6 +394,8 @@ void Init()
 	mc_nsteps = (double) MC_NSTEPS;
 	mc_nsteps_original = MC_NSTEPS;
 	mc_nadditionalsteps = (double) MC_NADDITIONALSTEPS;
+
+	mcSamples.resize(MC_NSTEPS);
 }
 
 void PostSystemInit()
@@ -609,6 +614,7 @@ void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<dou
 
 void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, bool intermediateStep = false)
 {
+	int stepMultiplicationFactor = 10;
 	//vector<vector<double> > singlelocalOperators; // for all O_k
 	vector<double> singlelocalEnergyR; // for all E^R
 	//vector<double> singlelocalEnergyI; // for all E^I
@@ -616,6 +622,7 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 	//vector<vector<double> > singlelocalOperatorlocalEnergyR; // for all O_k E^R
 	//vector<vector<double> > singlelocalOperatorlocalEnergyI; // for all O_k E^I
 
+	MC_NSTEPS *= (sys->GetStep() % WRITE_EVERY_NTH_STEP_TO_FILE == 0 ? stepMultiplicationFactor : 1);
 	mc_nsteps = (double) MC_NSTEPS;
 	ClearVector(localOperators);
 	localEnergyR = 0;
@@ -649,6 +656,11 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 		}
 
 		sys->CalculateExpectationValues(R, uR, uI, phiR, phiI);
+
+		if (i < mc_nsteps_original)
+		{
+			mcSamples[i] = R;
+		}
 
 		//INFO: consumes too much memory
 		//singlelocalOperators.push_back(Sys::localOperators);
@@ -701,6 +713,8 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 	{
 		cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
 	}
+
+	MC_NSTEPS /= (sys->GetStep() % WRITE_EVERY_NTH_STEP_TO_FILE == 0 ? stepMultiplicationFactor : 1);
 }
 
 void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, bool intermediateStep = false)
@@ -762,6 +776,78 @@ void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>&
 	//	WriteDataToFile(localKineticEnergiesD2, "BB_localKineticEnergiesD2", to_string(Sum(localKineticEnergiesD2)), 1);
 	//	WriteDataToFile(os2, "BB_OuterSum_allLocalKineticEnergiesD2_Reduced", to_string(Sum(os2)), 1);
 	//}
+}
+
+void UpdateExpectationValuesForGivenSamples(vector<vector<vector<double> > >& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+	int count = samples.size();
+	double dblCount = (double) count;
+
+	ClearVector(localOperators);
+	localEnergyR = 0;
+	localEnergyI = 0;
+	for (auto &row : localOperatorsMatrix)
+	{
+		ClearVector(row);
+	}
+	ClearVector(localOperatorlocalEnergyR);
+	ClearVector(localOperatorlocalEnergyI);
+	ClearVector(otherExpectationValues);
+
+	for (int i = 0; i < count; i++)
+	{
+		sys->CalculateWavefunction(samples[i], uR, uI, phiR, phiI);
+		sys->CalculateExpectationValues(samples[i], uR, uI, phiR, phiI);
+
+		//INFO: calculate contribution to average value
+		localOperators += sys->GetLocalOperators() / dblCount;
+		localEnergyR += sys->GetLocalEnergyR() / dblCount;
+		localEnergyI += sys->GetLocalEnergyI() / dblCount;
+		localOperatorsMatrix += sys->GetLocalOperatorsMatrix() / dblCount;
+		localOperatorlocalEnergyR += sys->GetLocalOperatorlocalEnergyR() / dblCount;
+		localOperatorlocalEnergyI += sys->GetLocalOperatorlocalEnergyI() / dblCount;
+		otherExpectationValues += sys->GetOtherExpectationValues() / dblCount;
+
+		if ((10 * i) % count == 0)
+		{
+			//cout << (i / (double)MC_NSTEPS * 100.0) << "%" << endl;
+			if (processRank == rootRank)
+			{
+				cout << "." << flush;
+			}
+		}
+	}
+	if (processRank == rootRank)
+	{
+		cout << endl;
+	}
+}
+
+void ParallelUpdateExpectationValuesForGivenSamples(vector<vector<vector<double> > >& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+	//Timer t;
+	//double dblDuration;
+	//t.start();
+
+	UpdateExpectationValuesForGivenSamples(samples, uR, uI, phiR, phiI);
+
+	//t.stop();
+	//dblDuration = (double) t.duration();
+	//vector<double> timings = MPIMethods::ReduceToMinMaxMean(dblDuration);
+	//if (processRank == rootRank)
+	//{
+	//	Log("duration: min = " + to_string(timings[0]) + " ms");
+	//	Log("          max = " + to_string(timings[1]) + " ms");
+	//	Log("          <t> = " + to_string(timings[2]) + " ms");
+	//}
+
+	MPIMethods::ReduceToAverage(localOperators);
+	MPIMethods::ReduceToAverage(&localEnergyR);
+	MPIMethods::ReduceToAverage(&localEnergyI);
+	MPIMethods::ReduceToAverage(localOperatorsMatrix);
+	MPIMethods::ReduceToAverage(localOperatorlocalEnergyR);
+	MPIMethods::ReduceToAverage(localOperatorlocalEnergyI);
+	MPIMethods::ReduceToAverage(otherExpectationValues);
 }
 
 void NormalizeParameters(vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
@@ -852,7 +938,8 @@ void BuildSystemOfEquationsForParameters(vector<vector<double> >& matrix, vector
 	}
 	else
 	{
-		BuildSystemOfEquationsForParametersNoPhi(matrix, energiesReal, energiesImag);
+		//BuildSystemOfEquationsForParametersNoPhi(matrix, energiesReal, energiesImag);
+		BuildSystemOfEquationsForParametersIncludePhi(matrix, energiesReal, energiesImag);
 	}
 }
 
@@ -1137,6 +1224,96 @@ void CalculateNextParametersRK4(vector<vector<double> >& R, vector<double>& uR, 
 	}
 }
 
+void CalculateNextParametersRK4ReuseSamples(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
+{
+	vector<double> energiesReal; //rhs of the equation that corresponds to uDotR;
+	vector<double> energiesImag; //rhs of the equation that corresponds to uDotI;
+	vector<vector<double> > matrix;
+
+	vector<double> tmpUR(N_PARAM);
+	vector<double> tmpUI(N_PARAM);
+	double tmpPhiR = 0;
+	double tmpPhiI = 0;
+
+	vector<vector<double> > uDotR;
+	vector<vector<double> > uDotI;
+	vector<double> phiDotR;
+	vector<double> phiDotI;
+
+	//TODO: is this initialization needed?
+	for (int i = 0; i < N_PARAM; i++)
+	{
+		tmpUR[i] = 0;
+		tmpUI[i] = 0;
+	}
+	uDotR.resize(4);
+	uDotI.resize(4);
+	phiDotR.resize(4);
+	phiDotI.resize(4);
+
+	if (processRank == rootRank)
+	{
+		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
+		PerformCholeskyDecomposition(matrix);
+		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR[0], uDotI[0], &(phiDotR[0]), &(phiDotI[0]));
+		for (int i = 0; i < N_PARAM; i++)
+		{
+			tmpUR[i] = uR[i] + uDotR[0][i] * TIMESTEP / 2.0;
+			tmpUI[i] = uI[i] + uDotI[0][i] * TIMESTEP / 2.0;
+		}
+		tmpPhiR = *phiR + phiDotR[0] * TIMESTEP / 2.0;
+		tmpPhiI = *phiI + phiDotI[0] * TIMESTEP / 2.0;
+	}
+	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
+	ParallelUpdateExpectationValuesForGivenSamples(mcSamples, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
+
+	if (processRank == rootRank)
+	{
+		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
+		PerformCholeskyDecomposition(matrix);
+		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR[1], uDotI[1], &(phiDotR[1]), &(phiDotI[1]));
+		for (int i = 0; i < N_PARAM; i++)
+		{
+			tmpUR[i] = uR[i] + uDotR[1][i] * TIMESTEP / 2.0;
+			tmpUI[i] = uI[i] + uDotI[1][i] * TIMESTEP / 2.0;
+		}
+		tmpPhiR = *phiR + phiDotR[1] * TIMESTEP / 2.0;
+		tmpPhiI = *phiI + phiDotI[1] * TIMESTEP / 2.0;
+	}
+	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
+	ParallelUpdateExpectationValuesForGivenSamples(mcSamples, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
+
+	if (processRank == rootRank)
+	{
+		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
+		PerformCholeskyDecomposition(matrix);
+		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR[2], uDotI[2], &(phiDotR[2]), &(phiDotI[2]));
+		for (int i = 0; i < N_PARAM; i++)
+		{
+			tmpUR[i] = uR[i] + uDotR[2][i] * TIMESTEP;
+			tmpUI[i] = uI[i] + uDotI[2][i] * TIMESTEP;
+		}
+		tmpPhiR = *phiR + phiDotR[2] * TIMESTEP;
+		tmpPhiI = *phiI + phiDotI[2] * TIMESTEP;
+	}
+	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
+	ParallelUpdateExpectationValuesForGivenSamples(mcSamples, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
+
+	if (processRank == rootRank)
+	{
+		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
+		PerformCholeskyDecomposition(matrix);
+		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR[3], uDotI[3], &(phiDotR[3]), &(phiDotI[3]));
+		for (int i = 0; i < N_PARAM; i++)
+		{
+			uR[i] = uR[i] + ((uDotR[0][i] + 2.0 * uDotR[1][i] + 2.0 * uDotR[2][i] + uDotR[3][i]) / 6.0) * TIMESTEP;
+			uI[i] = uI[i] + ((uDotI[0][i] + 2.0 * uDotI[1][i] + 2.0 * uDotI[2][i] + uDotI[3][i]) / 6.0) * TIMESTEP;
+		}
+		*phiR = *phiR + ((phiDotR[0] + 2.0 * phiDotR[1] + 2.0 * phiDotR[2] + phiDotR[3]) / 6.0) * TIMESTEP;
+		*phiI = *phiI + ((phiDotI[0] + 2.0 * phiDotI[1] + 2.0 * phiDotI[2] + phiDotI[3]) / 6.0) * TIMESTEP;
+	}
+}
+
 void CalculateNextParameters(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
 	Timer t;
@@ -1158,6 +1335,11 @@ void CalculateNextParameters(vector<vector<double> >& R, vector<double>& uR, vec
 	{
 		vector<vector<double> >& Rcopy(R);
 		CalculateNextParametersRK4(Rcopy, uR, uI, phiR, phiI);
+	}
+	else if (ODE_SOLVER_TYPE == 3)
+	{
+		vector<vector<double> >& Rcopy(R);
+		CalculateNextParametersRK4ReuseSamples(Rcopy, uR, uI, phiR, phiI);
 	}
 
 	if (processRank == rootRank)
@@ -1186,7 +1368,9 @@ void AdjustParameters(vector<double>& uR, vector<double>& uI, double *phiR, doub
 	//{
 	//	uR[i] += -last;
 	//}
-	uR[uR.size() - 1] = 0.0;
+	//uR[uR.size() - 1] = 0.0;
+	//uR[0] = uR[2];
+	//uR[1] = uR[2];
 }
 
 void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
@@ -1386,7 +1570,8 @@ int mainMPI(int argc, char** argv)
 	}
 	else if (SYSTEM_TYPE == "BulkQT")
 	{
-		sys = new BulkQT(configDirectory);
+		//sys = new BulkQT(configDirectory);
+		sys = new BulkQTPhi(configDirectory);
 	}
 	else if (SYSTEM_TYPE == "GaussianWavepacket")
 	{
@@ -1396,7 +1581,7 @@ int mainMPI(int argc, char** argv)
 	{
 		if (processRank == rootRank)
 		{
-			Log("System type \"" + SYSTEM_TYPE + "\" not available.");
+			Log("System type \"" + SYSTEM_TYPE + "\" not available.", ERROR);
 		}
 		return 1;
 	}
@@ -1461,6 +1646,7 @@ int mainMPI(int argc, char** argv)
 		nTrials = 0;
 		step++;
 		sys->SetTime(currentTime);
+		sys->SetStep(step);
 
 		BroadcastNewParameters(uR, uI, &phiR, &phiI);
 		if (processRank == rootRank)
@@ -1776,8 +1962,8 @@ int main(int argc, char **argv)
 	{
 		//SYSTEM_TYPE = "BulkOnlySplines";
 		//SYSTEM_TYPE = "BulkOnlySplinesOriginal";
-		//SYSTEM_TYPE = "BulkQT";
-		SYSTEM_TYPE = "BulkSplines";
+		SYSTEM_TYPE = "BulkQT";
+		//SYSTEM_TYPE = "BulkSplines";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/drop_3.config";

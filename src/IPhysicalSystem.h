@@ -8,6 +8,7 @@ class IPhysicalSystem
 {
 protected:
 	double time;
+	int step;
 	double wf;
 	double wfNew;
 	double exponent;
@@ -32,6 +33,7 @@ public:
 	IPhysicalSystem()
 	{
 		this->time = 0;
+		this->step = 0;
 		this->wf = 0;
 		this->wfNew = 0;
 		this->exponent = 0;
@@ -50,6 +52,8 @@ public:
 
 	double GetTime() { return time; }
 	void SetTime(double time) { this->time = time; }
+	int GetStep() { return step; }
+	void SetStep(double step) { this->step = step; }
 	double GetWf() { return wf; }
 	double GetWfNew() { return wfNew; }
 	double GetExponent() { return exponent; }

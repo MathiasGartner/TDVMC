@@ -26,9 +26,9 @@ void BulkSplines::InitSystem()
 	//cut off
 	bcFactors.push_back({
 		1.0,
+		-1.0 / 2.0,
 		1.0,
-		1.0,
-		-1.0
+		0.0
 	});
 	numberOfSpecialParameters = bcFactors.size();
 	numberOfStandardParameters = N_PARAM - numberOfSpecialParameters;

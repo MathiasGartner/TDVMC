@@ -387,7 +387,7 @@ void WriteDataToFile(vector<double>& data, string filename, string header, int e
 	file.open(OUT_DIR + filename + ".csv", ios::out);
 	file.precision(exportPrecision);
 	file << header << endl;
-	for (unsigned int i = 0; i < data.size(); i += everyNth)
+	for (unsigned int i = everyNth - 1; i < data.size(); i += everyNth)
 	{
 		file << fixed << data[i] << endl;
 	}
@@ -404,7 +404,7 @@ void WriteDataToFile(vector<vector<double> >& data, string filename, string head
 	{
 		file << header << endl;
 	}
-	for (unsigned int i = 0; i < data.size(); i += everyNth)
+	for (unsigned int i = everyNth - 1; i < data.size(); i += everyNth)
 	{
 		file << fixed << JoinVector(data[i]) << endl;
 	}

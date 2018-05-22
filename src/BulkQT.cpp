@@ -138,6 +138,7 @@ double BulkQT::GetTailCorrectionKinetic(double param)
 	double maxDistance3 = maxDistance2 * maxDistance;
 	value = -(4.0 * b * M_PI * (2.0 * b + 3.0 * maxDistance2)) / (3.0 * maxDistance3);
 	value *= N;
+	value *= 2.0;
 	return value;
 }
 
@@ -164,9 +165,8 @@ void BulkQT::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 	double potentialIntern = 0;
 
 	//Gauss potential
-	//double a = this->time > 1e-04 ? 0.15 : 0.1;
-	//double b = 50.0;
-	double a = 0.1;
+	double a = this->time > 1e-04 ? 0.15 : 0.1;
+	//double a = 0.05;
 	double b = 100.0;
 
 	double kineticR = 0;
@@ -268,7 +268,7 @@ void BulkQT::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 		for (int a = 0; a < DIM; a++)
 		{
 			vecKineticSumR1[a] = 0.0;
-			//vecKineticSumI1[a] = 0.0;
+			vecKineticSumI1[a] = 0.0;
 		}
 
 		for (int k = 0; k < numberOfStandardParameters; k++)
@@ -276,20 +276,20 @@ void BulkQT::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 			for (int a = 0; a < DIM; a++)
 			{
 				vecKineticSumR1[a] += uR[k] * splineSumsD[k][n][a];
-				//vecKineticSumI1[a] += uI[k] * splineSumsD[k][n][a];
+				vecKineticSumI1[a] += uI[k] * splineSumsD[k][n][a];
 			}
 			kineticSumR2 += uR[k] * splineSumsD2[k][n];
-			//kineticSumI2 += uI[k] * splineSumsD2[k][n];
+			kineticSumI2 += uI[k] * splineSumsD2[k][n];
 		}
 		for (int a = 0; a < DIM; a++)
 		{
 			temp = (bcFactors[0][0] * splineSumsD[numberOfSplines - 3][n][a] + bcFactors[0][1] * splineSumsD[numberOfSplines - 2][n][a] + bcFactors[0][2] * splineSumsD[numberOfSplines - 1][n][a] + bcFactors[0][3] * quadraticSumD[n][a]);
 			vecKineticSumR1[a] += uR[N_PARAM - 1] * temp;
-			//vecKineticSumI1[a] += uI[N_PARAM - 1] * temp;
+			vecKineticSumI1[a] += uI[N_PARAM - 1] * temp;
 		}
 		temp = (bcFactors[0][0] * splineSumsD2[numberOfSplines - 3][n] + bcFactors[0][1] * splineSumsD2[numberOfSplines - 2][n] + bcFactors[0][2] * splineSumsD2[numberOfSplines - 1][n] + bcFactors[0][3] * quadraticSumD2[n]);
 		kineticSumR2 += uR[N_PARAM - 1] * temp;
-		//kineticSumI2 += uI[N_PARAM - 1] * temp;
+		kineticSumI2 += uI[N_PARAM - 1] * temp;
 
 		kineticSumR1I1 += 2.0 * VectorDotProduct(vecKineticSumR1, vecKineticSumI1);
 		kineticSumR1 += VectorNorm2(vecKineticSumR1);
