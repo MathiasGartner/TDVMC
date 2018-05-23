@@ -130,9 +130,9 @@ void BulkSplines::CalculateExpectationValues(vector<vector<double> >& R, vector<
 	double potentialIntern = 0;
 
 	//Gauss potential
-	//double a = this->time > 1e-04 ? 0.15 : 0.1;
+	double a = this->time > 1e-04 ? 0.15 : 0.1;
 	//double b = 50.0;
-	double a = 0.1;
+	//double a = 0.1;
 	double b = 100.0;
 
 	double kineticR = 0;
@@ -220,7 +220,7 @@ void BulkSplines::CalculateExpectationValues(vector<vector<double> >& R, vector<
 		for (int a = 0; a < DIM; a++)
 		{
 			vecKineticSumR1[a] = 0.0;
-			//vecKineticSumI1[a] = 0.0;
+			vecKineticSumI1[a] = 0.0;
 		}
 
 		for (int k = 0; k < numberOfStandardParameters; k++)
@@ -228,10 +228,10 @@ void BulkSplines::CalculateExpectationValues(vector<vector<double> >& R, vector<
 			for (int a = 0; a < DIM; a++)
 			{
 				vecKineticSumR1[a] += uR[k] * splineSumsD[k][n][a];
-				//vecKineticSumI1[a] += uI[k] * splineSumsD[k][n][a];
+				vecKineticSumI1[a] += uI[k] * splineSumsD[k][n][a];
 			}
 			kineticSumR2 += uR[k] * splineSumsD2[k][n];
-			//kineticSumI2 += uI[k] * splineSumsD2[k][n];
+			kineticSumI2 += uI[k] * splineSumsD2[k][n];
 		}
 		for (int i = 0; i < numberOfSpecialParameters; i++)
 		{
@@ -239,11 +239,11 @@ void BulkSplines::CalculateExpectationValues(vector<vector<double> >& R, vector<
 			{
 				temp = (bcFactors[i][0] * splineSumsD[numberOfSplines - 3][n][a] + bcFactors[i][1] * splineSumsD[numberOfSplines - 2][n][a] + bcFactors[i][2] * splineSumsD[numberOfSplines - 1][n][a]);
 				vecKineticSumR1[a] += uR[N_PARAM - (numberOfSpecialParameters - i)] * temp;
-				//vecKineticSumI1[a] += uI[N_PARAM - 1] * temp;
+				vecKineticSumI1[a] += uI[N_PARAM - 1] * temp;
 			}
 			temp = (bcFactors[i][0] * splineSumsD2[numberOfSplines - 3][n] + bcFactors[i][1] * splineSumsD2[numberOfSplines - 2][n] + bcFactors[i][2] * splineSumsD2[numberOfSplines - 1][n]);
 			kineticSumR2 += uR[N_PARAM - (numberOfSpecialParameters - i)] * temp;
-			//kineticSumI2 += uI[N_PARAM - 1] * temp;
+			kineticSumI2 += uI[N_PARAM - 1] * temp;
 		}
 
 		kineticSumR1I1 += 2.0 * VectorDotProduct(vecKineticSumR1, vecKineticSumI1);

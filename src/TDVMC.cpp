@@ -1,8 +1,7 @@
 #include "mpi.h"
 
 #include "BulkSplines.h"
-#include "BulkOnlySplines.h"
-#include "BulkOnlySplinesOriginal.h"
+#include "BulkSplinesPhi.h"
 #include "BulkQT.h"
 #include "BulkQTPhi.h"
 #include "ConfigItem.h"
@@ -42,11 +41,6 @@ using namespace std;
 
 IPhysicalSystem* sys;
 
-bool USE_MEAN_FOR_FINAL_PARAMETERS = false;
-bool USE_NORMALIZE_WF = true;
-bool USE_PARAMETER_ACCEPTANCE_CHECK = true;
-bool USE_ADJUST_PARAMETERS = false;
-
 vector<ConfigItem> configItems;
 
 string SYSTEM_TYPE;
@@ -76,8 +70,13 @@ vector<double> PARAMS_REAL;
 vector<double> PARAMS_IMAGINARY;
 double PARAM_PHIR;
 double PARAM_PHII;
+int USE_PARAMETER_ACCEPTANCE_CHECK;
 int PARAMETER_ACCEPTANCE_CHECK_TYPE;
 int WRITE_EVERY_NTH_STEP_TO_FILE;
+int MC_NSTEP_MULTIPLICATION_FACTOR_FOR_WRITE_DATA;
+int USE_MEAN_FOR_FINAL_PARAMETERS;
+int USE_NORMALIZE_WF;
+int USE_ADJUST_PARAMETERS;
 
 int numOfProcesses = 1;
 int rootRank = 0;
@@ -263,12 +262,17 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("TOTALTIME", &TOTALTIME, ConfigItemType::DOUBLE));
 	configItems.push_back(ConfigItem("IMAGINARY_TIME", &IMAGINARY_TIME, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("ODE_SOLVER_TYPE", &ODE_SOLVER_TYPE, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("USE_PARAMETER_ACCEPTANCE_CHECK", &USE_PARAMETER_ACCEPTANCE_CHECK, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("PARAMETER_ACCEPTANCE_CHECK_TYPE", &PARAMETER_ACCEPTANCE_CHECK_TYPE, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("WRITE_EVERY_NTH_STEP_TO_FILE", &WRITE_EVERY_NTH_STEP_TO_FILE, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("MC_NSTEP_MULTIPLICATION_FACTOR_FOR_WRITE_DATA", &MC_NSTEP_MULTIPLICATION_FACTOR_FOR_WRITE_DATA, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("PARAMS_REAL", PARAMS_REAL, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("PARAMS_IMAGINARY", PARAMS_IMAGINARY, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("PARAM_PHIR", &PARAM_PHIR, ConfigItemType::DOUBLE));
 	configItems.push_back(ConfigItem("PARAM_PHII", &PARAM_PHII, ConfigItemType::DOUBLE));
+	configItems.push_back(ConfigItem("USE_MEAN_FOR_FINAL_PARAMETERS", &USE_MEAN_FOR_FINAL_PARAMETERS, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("USE_NORMALIZE_WF", &USE_NORMALIZE_WF, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("USE_ADJUST_PARAMETERS", &USE_ADJUST_PARAMETERS, ConfigItemType::INT));
 }
 
 void ReadConfig(string filePath)
@@ -614,7 +618,6 @@ void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<dou
 
 void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, bool intermediateStep = false)
 {
-	int stepMultiplicationFactor = 10;
 	//vector<vector<double> > singlelocalOperators; // for all O_k
 	vector<double> singlelocalEnergyR; // for all E^R
 	//vector<double> singlelocalEnergyI; // for all E^I
@@ -622,7 +625,7 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 	//vector<vector<double> > singlelocalOperatorlocalEnergyR; // for all O_k E^R
 	//vector<vector<double> > singlelocalOperatorlocalEnergyI; // for all O_k E^I
 
-	MC_NSTEPS *= (sys->GetStep() % WRITE_EVERY_NTH_STEP_TO_FILE == 0 ? stepMultiplicationFactor : 1);
+	MC_NSTEPS *= (sys->GetStep() % WRITE_EVERY_NTH_STEP_TO_FILE == 0 ? MC_NSTEP_MULTIPLICATION_FACTOR_FOR_WRITE_DATA : 1);
 	mc_nsteps = (double) MC_NSTEPS;
 	ClearVector(localOperators);
 	localEnergyR = 0;
@@ -714,7 +717,7 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 		cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
 	}
 
-	MC_NSTEPS /= (sys->GetStep() % WRITE_EVERY_NTH_STEP_TO_FILE == 0 ? stepMultiplicationFactor : 1);
+	MC_NSTEPS /= (sys->GetStep() % WRITE_EVERY_NTH_STEP_TO_FILE == 0 ? MC_NSTEP_MULTIPLICATION_FACTOR_FOR_WRITE_DATA : 1);
 }
 
 void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, bool intermediateStep = false)
@@ -1558,15 +1561,8 @@ int mainMPI(int argc, char** argv)
 	}
 	else if (SYSTEM_TYPE == "BulkSplines")
 	{
-		sys = new BulkSplines(configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BulkOnlySplines")
-	{
-		sys = new BulkOnlySplines(configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BulkOnlySplinesOriginal")
-	{
-		sys = new BulkOnlySplinesOriginal(configDirectory);
+		//sys = new BulkSplines(configDirectory);
+		sys = new BulkSplinesPhi(configDirectory);
 	}
 	else if (SYSTEM_TYPE == "BulkQT")
 	{
@@ -1715,7 +1711,7 @@ int mainMPI(int argc, char** argv)
 			if (sys->USE_NORMALIZATION_AND_PHASE)
 			{
 				CalculateNextParameters(R, uR, uI, &phiR, &phiI);
-				if (processRank == rootRank && USE_NORMALIZE_WF == true)
+				if (processRank == rootRank && USE_NORMALIZE_WF == 1)
 				{
 					NormalizeWavefunction(sys->GetWf(), &phiR);
 				}
@@ -1724,11 +1720,11 @@ int mainMPI(int argc, char** argv)
 			{
 				CalculateNextParameters(R, uR, uI);
 			}
-			if (processRank == rootRank && USE_ADJUST_PARAMETERS == true)
+			if (processRank == rootRank && USE_ADJUST_PARAMETERS == 1)
 			{
 				AdjustParameters(uR, uI, &phiR, &phiI);
 			}
-			if (USE_PARAMETER_ACCEPTANCE_CHECK)
+			if (USE_PARAMETER_ACCEPTANCE_CHECK == 1)
 			{
 				if (processRank == rootRank)
 				{
@@ -1840,7 +1836,7 @@ int mainMPI(int argc, char** argv)
 
 	nAcceptances = 0;
 	nTrials = 0;
-	if (USE_MEAN_FOR_FINAL_PARAMETERS)
+	if (USE_MEAN_FOR_FINAL_PARAMETERS == 1)
 	{
 		if (processRank == rootRank)
 		{
@@ -1960,10 +1956,8 @@ int main(int argc, char **argv)
 	}
 	else if (argc == 1) //INFO: started without specifying config-file. used for local execution
 	{
-		//SYSTEM_TYPE = "BulkOnlySplines";
-		//SYSTEM_TYPE = "BulkOnlySplinesOriginal";
-		SYSTEM_TYPE = "BulkQT";
-		//SYSTEM_TYPE = "BulkSplines";
+		//SYSTEM_TYPE = "BulkQT";
+		SYSTEM_TYPE = "BulkSplines";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/drop_3.config";
@@ -1975,15 +1969,6 @@ int main(int argc, char **argv)
 		else if (SYSTEM_TYPE == "BulkSplines")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkSplines.config";
-		}
-		else if (SYSTEM_TYPE == "BulkOnlySplines")
-		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkGauss.config";
-		}
-		else if (SYSTEM_TYPE == "BulkOnlySplinesOriginal")
-		{
-			//configFilePath = "/home/gartner/Sources/TDVMC/config/BulkOnlySplinesOriginal.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/test64.config";
 		}
 		else if (SYSTEM_TYPE == "BulkQT")
 		{
