@@ -72,12 +72,13 @@ double VectorDisplacement(vector<double>& ri, vector<double>& rj, vector<double>
 
 double GetCoordinateNIC(double r)
 {
-	return r - LBOX * round(r / LBOX);
+	int k;
+	k = (int) r * LBOX_R + ((r >= 0.0) ? 0.5 : -0.5);
+	return r - k * LBOX;
 }
 
 void GetVectorNIC(vector<double>& r, vector<double>& rNIC)
 {
-	rNIC.resize(r.size());
 	for (unsigned int i = 0; i < r.size(); i++)
 	{
 		rNIC[i] = GetCoordinateNIC(r[i]);
@@ -87,7 +88,6 @@ void GetVectorNIC(vector<double>& r, vector<double>& rNIC)
 void VectorDiffNIC(vector<double>& ri, vector<double>& rj, vector<double>& result)
 {
 	double delta;
-	result.resize(ri.size());
 	for (unsigned int i = 0; i < ri.size(); i++)
 	{
 		delta = ri[i] - rj[i];

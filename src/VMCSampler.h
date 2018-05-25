@@ -63,7 +63,7 @@ double GetWf()
 		{
 			for (int j = 0; j < i; j++)
 			{
-				vector<double> vecrij;
+				vector<double> vecrij(DIM);
 				double rij, interval, bin, res, res2, res3;
 				rij = VectorDisplacementNIC(R[i], R[j], vecrij);
 
@@ -182,7 +182,7 @@ double GetEnergy()
 			{
 				if (i != n)
 				{
-					vector<double> vecrni;
+					vector<double> vecrni(DIM);
 					double rni, interval, bin, res, res2;
 					rni = VectorDisplacementNIC(R[n], R[i], vecrni);
 					vector<double> erni_delta = (vecrni / rni) / nodePointSpacing;

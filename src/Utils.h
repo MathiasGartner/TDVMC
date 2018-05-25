@@ -2,6 +2,7 @@
 
 #include "Constants.h"
 
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <json/json.h>

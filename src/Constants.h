@@ -14,3 +14,4 @@ extern int DIM;     	         	//number of dimensions
 extern int N_PARAM;	        	  	//number of parameters of trial function
 
 extern double LBOX;				    //length of box
+extern double LBOX_R;				//reciprocal length of box

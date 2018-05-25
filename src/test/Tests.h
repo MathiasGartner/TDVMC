@@ -51,6 +51,7 @@ void TestVectorDisplacement(double i1, double i2, double i3, double j1, double j
 void TestVectorDisplacements()
 {
 	LBOX = 4;
+	LBOX_R = 1.0 / LBOX;
 	DIM = 3;
 	TestVectorDisplacement(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 	TestVectorDisplacement(0, 0, 0, 1, 0, 0, 1, -1, 0, 0);

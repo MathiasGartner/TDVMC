@@ -66,6 +66,7 @@ double TOTALTIME;
 int IMAGINARY_TIME;
 int ODE_SOLVER_TYPE;
 double LBOX;
+double LBOX_R;
 vector<double> PARAMS_REAL;
 vector<double> PARAMS_IMAGINARY;
 double PARAM_PHIR;
@@ -392,6 +393,7 @@ void Init()
 		srand(processRank + 1);
 	}
 	LBOX = pow((N / RHO), 1.0 / DIM); //box with dimensions [-L/2, L/2]
+	LBOX_R = 1.0 / LBOX;
 	nAcceptances = 0;
 	nTrials = 0;
 
@@ -1905,6 +1907,7 @@ void startVMCSampler()
 	VMCSampler::generator = mt19937_64(processRank + 1);
 
 	LBOX = 4;
+	LBOX_R = 1.0 / LBOX;
 	N = 64;
 	DIM = 3;
 	N_PARAM = 100;
