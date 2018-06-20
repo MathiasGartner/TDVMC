@@ -12,8 +12,6 @@ using namespace std;
 class HeDrop: public IPhysicalSystem
 {
 private:
-	string configDirectory;
-
 	int numberOfSplines;
 	int numberOfShortSplines;
 	int numberOfLargeSplines;
@@ -50,6 +48,10 @@ private:
 	int numOfkValues;
 	double densityProfileMaxDistance;
 	int numOfDensityProfileValues;
+	vector<double> densityProfileBins;
+	double densityProfileBinInterval;
+	int densityProfileBin;
+	double densityProfileNodePointSpacing;
 
 	double exponentNew;
 	double mcMillanSumNew;
@@ -83,7 +85,7 @@ private:
 
 //Implementation of IPhysicalSystem
 public:
-	HeDrop(string configDirectory);
+	HeDrop(vector<double>& params, string configDirectory);
 
 	void InitSystem();
 

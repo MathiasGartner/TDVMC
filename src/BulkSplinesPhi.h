@@ -13,7 +13,7 @@ class BulkSplinesPhi: public BulkSplines
 {
 
 public:
-	BulkSplinesPhi(string configDirectory);
+	BulkSplinesPhi(vector<double>& params, string configDirectory);
 
 	void CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI) override;
 

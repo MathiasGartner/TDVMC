@@ -1,9 +1,8 @@
 #include "BulkQT.h"
 
-BulkQT::BulkQT(string configDirectory) : IPhysicalSystem()
+BulkQT::BulkQT(vector<double>& params, string configDirectory) :
+		IPhysicalSystem(params, configDirectory)
 {
-	this->configDirectory = configDirectory;
-
 	this->USE_NORMALIZATION_AND_PHASE = false;
 	this->USE_NIC = true;
 	this->USE_MOVE_COM_TO_ZERO = false;
@@ -31,12 +30,7 @@ void BulkQT::InitSystem()
 	double tmp1 = 2.0 * nodePointSpacing2 + 2 * nodePointSpacing * rijSplit + rijSplit2;
 	double tmp2 = rijSplit2 - nodePointSpacing2;
 	double tmp3 = 2.0 * nodePointSpacing2 - 2 * nodePointSpacing * rijSplit + rijSplit2;
-	bcFactors.push_back({
-		1.0,
-		tmp2 / tmp1,
-		tmp3 / tmp1,
-		rijSplit4 / tmp1
-	});
+	bcFactors.push_back( { 1.0, tmp2 / tmp1, tmp3 / tmp1, rijSplit4 / tmp1 });
 	numberOfSpecialParameters = bcFactors.size();
 	numberOfStandardParameters = N_PARAM - numberOfSpecialParameters;
 
@@ -126,7 +120,7 @@ void BulkQT::InitSystem()
 
 vector<double> BulkQT::GetCenterOfMass(vector<vector<double> >& R)
 {
-	vector<double> com = {0.0, 0.0, 0.0};
+	vector<double> com = { 0.0, 0.0, 0.0 };
 	return com;
 }
 
@@ -190,11 +184,11 @@ void BulkQT::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 	localEnergyR = 0;
 	localEnergyI = 0;
 	ClearVector(localOperators);
-    ClearVector(localOperatorsMatrix);
-    ClearVector(localOperatorlocalEnergyR);
-    ClearVector(localOperatorlocalEnergyI);
-    ClearVector(otherExpectationValues);
-    ClearVector(grBins);
+	ClearVector(localOperatorsMatrix);
+	ClearVector(localOperatorlocalEnergyR);
+	ClearVector(localOperatorlocalEnergyI);
+	ClearVector(otherExpectationValues);
+	ClearVector(grBins);
 
 	for (int n = 0; n < N; n++)
 	{
@@ -296,8 +290,8 @@ void BulkQT::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 		kineticSumI1 += VectorNorm2(vecKineticSumI1);
 	}
 
-	kineticR = - (kineticSumR1 - kineticSumI1 + kineticSumR2);
-	kineticI = - (kineticSumR1I1 + kineticSumI2);
+	kineticR = -(kineticSumR1 - kineticSumI1 + kineticSumR2);
+	kineticI = -(kineticSumR1I1 + kineticSumI2);
 
 	double kineticTailCorrection = GetTailCorrectionKinetic(uR[N_PARAM - 1]);
 	double potentialTailCorrection = GetTailCorrectionPotential();
@@ -340,7 +334,7 @@ void BulkQT::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 
 void BulkQT::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
-    ClearVector(additionalSystemProperties);
+	ClearVector(additionalSystemProperties);
 	CalculateExpectationValues(R, uR, uI, phiR, phiI);
 	for (int i = 0; i < numOfOtherExpectationValues; i++)
 	{
@@ -370,7 +364,7 @@ void BulkQT::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vec
 	}
 	for (int k = 0; k < numOfkValues; k++)
 	{
-		sk[k] = (sumSCos[k] * sumSCos[k] + sumSSin[k] * sumSSin[k]) / ((double)(N * kValues[k].size()));
+		sk[k] = (sumSCos[k] * sumSCos[k] + sumSSin[k] * sumSSin[k]) / ((double) (N * kValues[k].size()));
 		additionalSystemProperties[numOfOtherExpectationValues + k] = sk[k];
 	}
 }
@@ -408,7 +402,8 @@ void BulkQT::CalculateWavefunction(vector<vector<double> >& R, vector<double>& u
 					tmp = -1.0 / 6.0 * (-1.0 + 3.0 * res - 3.0 * res2 + res3);
 					splineSums[bin] += tmp;
 
-					tmp = 1.0 / 6.0 * (4.0 - 6.0 * res2 + 3.0 * res3);;
+					tmp = 1.0 / 6.0 * (4.0 - 6.0 * res2 + 3.0 * res3);
+					;
 					splineSums[bin + 1] += tmp;
 
 					tmp = 1.0 / 6.0 * (1.0 + 3.0 * res + 3.0 * res2 - 3.0 * res3);

@@ -1,6 +1,7 @@
 #include "BulkQTPhi.h"
 
-BulkQTPhi::BulkQTPhi(string configDirectory) : BulkQT(configDirectory)
+BulkQTPhi::BulkQTPhi(vector<double>& params, string configDirectory) :
+		BulkQT(params, configDirectory)
 {
 	this->USE_NORMALIZATION_AND_PHASE = true;
 }

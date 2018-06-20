@@ -43,6 +43,7 @@ IPhysicalSystem* sys;
 
 vector<ConfigItem> configItems;
 
+string CONFIG_VERSION;
 string SYSTEM_TYPE;
 string OUTPUT_DIRECTORY;		//from config file
 string configDirectory;
@@ -78,7 +79,9 @@ int MC_NSTEP_MULTIPLICATION_FACTOR_FOR_WRITE_DATA;
 int USE_MEAN_FOR_FINAL_PARAMETERS;
 int USE_NORMALIZE_WF;
 int USE_ADJUST_PARAMETERS;
+vector<double> SYSTEM_PARAMS;
 
+string requiredConfigVersion = "0.11";
 int numOfProcesses = 1;
 int rootRank = 0;
 int processRank = 0;
@@ -98,6 +101,7 @@ vector<double> localOperatorlocalEnergyI; // for <O_k E^I>
 vector<double> otherExpectationValues; // eg. for potential and kinetic energy
 vector<double> additionalSystemProperties; // for properties at the end of the simulation
 
+bool doNotAcceptStep = false;
 vector<vector<double> > uRList;
 vector<vector<double> > uIList;
 vector<double> phiRList;
@@ -114,6 +118,7 @@ vector<vector<double> > AllParametersI;
 vector<vector<double> > AllAdditionalSystemProperties;
 
 vector<vector<vector<double> > > mcSamples;
+vector<double> wfValues2;
 
 mt19937_64 generator;
 //default_random_engine generator;
@@ -244,6 +249,7 @@ void WriteRandomGeneratorStatesToFile(string fileNamePrefix)
 
 void RegisterAllConfigItems()
 {
+	configItems.push_back(ConfigItem("CONFIG_VERSION", &CONFIG_VERSION, ConfigItemType::STRING));
 	configItems.push_back(ConfigItem("SYSTEM_TYPE", &SYSTEM_TYPE, ConfigItemType::STRING));
 	configItems.push_back(ConfigItem("OUTPUT_DIRECTORY", &OUTPUT_DIRECTORY, ConfigItemType::STRING));
 	configItems.push_back(ConfigItem("N", &N, ConfigItemType::INT));
@@ -267,13 +273,14 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("PARAMETER_ACCEPTANCE_CHECK_TYPE", &PARAMETER_ACCEPTANCE_CHECK_TYPE, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("WRITE_EVERY_NTH_STEP_TO_FILE", &WRITE_EVERY_NTH_STEP_TO_FILE, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("MC_NSTEP_MULTIPLICATION_FACTOR_FOR_WRITE_DATA", &MC_NSTEP_MULTIPLICATION_FACTOR_FOR_WRITE_DATA, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("USE_MEAN_FOR_FINAL_PARAMETERS", &USE_MEAN_FOR_FINAL_PARAMETERS, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("USE_NORMALIZE_WF", &USE_NORMALIZE_WF, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("USE_ADJUST_PARAMETERS", &USE_ADJUST_PARAMETERS, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("SYSTEM_PARAMS", SYSTEM_PARAMS, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("PARAMS_REAL", PARAMS_REAL, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("PARAMS_IMAGINARY", PARAMS_IMAGINARY, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("PARAM_PHIR", &PARAM_PHIR, ConfigItemType::DOUBLE));
 	configItems.push_back(ConfigItem("PARAM_PHII", &PARAM_PHII, ConfigItemType::DOUBLE));
-	configItems.push_back(ConfigItem("USE_MEAN_FOR_FINAL_PARAMETERS", &USE_MEAN_FOR_FINAL_PARAMETERS, ConfigItemType::INT));
-	configItems.push_back(ConfigItem("USE_NORMALIZE_WF", &USE_NORMALIZE_WF, ConfigItemType::INT));
-	configItems.push_back(ConfigItem("USE_ADJUST_PARAMETERS", &USE_ADJUST_PARAMETERS, ConfigItemType::INT));
 }
 
 void ReadConfig(string filePath)
@@ -402,6 +409,7 @@ void Init()
 	mc_nadditionalsteps = (double) MC_NADDITIONALSTEPS;
 
 	mcSamples.resize(MC_NSTEPS);
+	wfValues2.resize(MC_NSTEPS);
 }
 
 void PostSystemInit()
@@ -665,6 +673,7 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 		if (i < mc_nsteps_original)
 		{
 			mcSamples[i] = R;
+			wfValues2[i] = sys->GetWf() * sys->GetWf();
 		}
 
 		//INFO: consumes too much memory
@@ -787,6 +796,8 @@ void UpdateExpectationValuesForGivenSamples(vector<vector<vector<double> > >& sa
 {
 	int count = samples.size();
 	double dblCount = (double) count;
+	double weight = 1.0;
+	double weightSum = 0.0;
 
 	ClearVector(localOperators);
 	localEnergyR = 0;
@@ -804,14 +815,16 @@ void UpdateExpectationValuesForGivenSamples(vector<vector<vector<double> > >& sa
 		sys->CalculateWavefunction(samples[i], uR, uI, phiR, phiI);
 		sys->CalculateExpectationValues(samples[i], uR, uI, phiR, phiI);
 
+		weight = sys->GetWf() * sys->GetWf() / wfValues2[i];
+		weightSum += weight;
 		//INFO: calculate contribution to average value
-		localOperators += sys->GetLocalOperators() / dblCount;
-		localEnergyR += sys->GetLocalEnergyR() / dblCount;
-		localEnergyI += sys->GetLocalEnergyI() / dblCount;
-		localOperatorsMatrix += sys->GetLocalOperatorsMatrix() / dblCount;
-		localOperatorlocalEnergyR += sys->GetLocalOperatorlocalEnergyR() / dblCount;
-		localOperatorlocalEnergyI += sys->GetLocalOperatorlocalEnergyI() / dblCount;
-		otherExpectationValues += sys->GetOtherExpectationValues() / dblCount;
+		localOperators += sys->GetLocalOperators() / dblCount * weight;
+		localEnergyR += sys->GetLocalEnergyR() / dblCount * weight;
+		localEnergyI += sys->GetLocalEnergyI() / dblCount * weight;
+		localOperatorsMatrix += sys->GetLocalOperatorsMatrix() / dblCount * weight;
+		localOperatorlocalEnergyR += sys->GetLocalOperatorlocalEnergyR() / dblCount * weight;
+		localOperatorlocalEnergyI += sys->GetLocalOperatorlocalEnergyI() / dblCount * weight;
+		otherExpectationValues += sys->GetOtherExpectationValues() / dblCount * weight;
 
 		if ((10 * i) % count == 0)
 		{
@@ -822,6 +835,16 @@ void UpdateExpectationValuesForGivenSamples(vector<vector<vector<double> > >& sa
 			}
 		}
 	}
+
+	double inverseWeightMean = dblCount / weightSum;
+	localOperators *= inverseWeightMean;
+	localEnergyR *= inverseWeightMean;
+	localEnergyI *= inverseWeightMean;
+	localOperatorsMatrix *= inverseWeightMean;
+	localOperatorlocalEnergyR *= inverseWeightMean;
+	localOperatorlocalEnergyI *= inverseWeightMean;
+	otherExpectationValues *= inverseWeightMean;
+
 	if (processRank == rootRank)
 	{
 		cout << endl;
@@ -974,6 +997,7 @@ void PerformCholeskyDecomposition(vector<vector<double> >& matrix)
 				if (!logged)
 				{
 					Log("!!!!! NOT POSITIVE SEMI DEFINITE !!!! @ i=" + to_string(i) + ", j=" + to_string(j), ERROR);
+					doNotAcceptStep = true;
 					logged = true;
 				}
 			}
@@ -1448,7 +1472,12 @@ void AlignCoordinates(vector<vector<double> >& R)
 bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	bool accept = true;
-	if (PARAMETER_ACCEPTANCE_CHECK_TYPE == 0)
+	if(doNotAcceptStep)
+	{
+		doNotAcceptStep = false;
+		return false;
+	}
+	else if (PARAMETER_ACCEPTANCE_CHECK_TYPE == 0)
 	{
 		return true;
 	}
@@ -1537,6 +1566,11 @@ int mainMPI(int argc, char** argv)
 		if (FileExist(configFilePath))
 		{
 			ReadConfig(configFilePath);
+			if (requiredConfigVersion != CONFIG_VERSION)
+			{
+				Log("Config file is out of date.\nrequired: \"" + requiredConfigVersion + "\"\nfound: \"" + CONFIG_VERSION + "\"", ERROR);
+				return 1;
+			}
 			CreateOutputDirectory();
 			//PrintConfig();
 		}
@@ -1555,25 +1589,25 @@ int mainMPI(int argc, char** argv)
 
 	if (SYSTEM_TYPE == "HeDrop")
 	{
-		sys = new HeDrop(configDirectory);
+		sys = new HeDrop(SYSTEM_PARAMS, configDirectory);
 	}
 	else if (SYSTEM_TYPE == "HeBulk")
 	{
-		sys = new HeBulk(configDirectory);
+		sys = new HeBulk(SYSTEM_PARAMS, configDirectory);
 	}
 	else if (SYSTEM_TYPE == "BulkSplines")
 	{
-		//sys = new BulkSplines(configDirectory);
-		sys = new BulkSplinesPhi(configDirectory);
+		//sys = new BulkSplines(SYSTEM_PARAMS, configDirectory);
+		sys = new BulkSplinesPhi(SYSTEM_PARAMS, configDirectory);
 	}
 	else if (SYSTEM_TYPE == "BulkQT")
 	{
-		//sys = new BulkQT(configDirectory);
-		sys = new BulkQTPhi(configDirectory);
+		//sys = new BulkQT(SYSTEM_PARAMS, configDirectory);
+		sys = new BulkQTPhi(SYSTEM_PARAMS, configDirectory);
 	}
 	else if (SYSTEM_TYPE == "GaussianWavepacket")
 	{
-		sys = new GaussianWavepacket(configDirectory);
+		sys = new GaussianWavepacket(SYSTEM_PARAMS, configDirectory);
 	}
 	else
 	{
@@ -1681,7 +1715,17 @@ int mainMPI(int argc, char** argv)
 			nrOfAcceptParameterTrials++;
 			MC_NSTEPS *= nrOfAcceptParameterTrials;
 			AlignCoordinates(R);
+
+			//if (step % 10 == 1)
+			//{
+			//	ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
+			//}
+			//else
+			//{
+			//	ParallelUpdateExpectationValuesForGivenSamples(mcSamples, uR, uI, phiR, phiI);
+			//}
 			ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
+
 			if (processRank == rootRank)
 			{
 				if (step % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
@@ -1961,9 +2005,10 @@ int main(int argc, char **argv)
 	{
 		//SYSTEM_TYPE = "BulkQT";
 		SYSTEM_TYPE = "BulkSplines";
+		//SYSTEM_TYPE = "HeDrop";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/drop_3.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/drop_20.config";
 		}
 		else if (SYSTEM_TYPE == "HeBulk")
 		{

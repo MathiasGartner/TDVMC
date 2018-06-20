@@ -9,14 +9,12 @@
 
 using namespace std;
 
-class BulkSplines : public IPhysicalSystem
+class BulkSplines: public IPhysicalSystem
 {
 private:
-	string configDirectory;
-
-	int	numberOfSplines;
+	int numberOfSplines;
 	vector<double> splineSums; //indices: k (bin); for <O_k>
-	vector<vector<vector<double> >  > splineSumsD; //indices: k (bin), n (particle), a (coordinate)
+	vector<vector<vector<double> > > splineSumsD; //indices: k (bin), n (particle), a (coordinate)
 	vector<vector<double> > splineSumsD2; //indices: k (bin), n (particle)
 
 	double halfLength;
@@ -45,11 +43,13 @@ private:
 
 //Implementation of IPhysicalSystem
 public:
-	BulkSplines(string configDirectory);
+	BulkSplines(vector<double>& params, string configDirectory);
 
 	void InitSystem();
 
 	vector<double> GetCenterOfMass(vector<vector<double> >& R);
+
+	virtual double GetExternalPotential(vector<double>& r);
 
 	void CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
 

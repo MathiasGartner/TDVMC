@@ -12,11 +12,10 @@ using namespace std;
 class GaussianWavepacket: public IPhysicalSystem
 {
 private:
-	string configDirectory;
 
 //Implementation of IPhysicalSystem
 public:
-	GaussianWavepacket(string configDirectory);
+	GaussianWavepacket(vector<double>& params, string configDirectory);
 
 	void InitSystem();
 

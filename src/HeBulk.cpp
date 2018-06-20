@@ -1,9 +1,8 @@
 #include "HeBulk.h"
 
-HeBulk::HeBulk(string configDirectory) : IPhysicalSystem()
+HeBulk::HeBulk(vector<double>& params, string configDirectory) :
+		IPhysicalSystem(params, configDirectory)
 {
-	this->configDirectory = configDirectory;
-
 	this->USE_NORMALIZATION_AND_PHASE = false;
 	this->USE_NIC = true;
 	this->USE_MOVE_COM_TO_ZERO = false;
@@ -126,7 +125,7 @@ void HeBulk::InitSystem()
 
 vector<double> HeBulk::GetCenterOfMass(vector<vector<double> >& R)
 {
-	vector<double> com = {0.0, 0.0, 0.0};
+	vector<double> com = { 0.0, 0.0, 0.0 };
 	return com;
 }
 
@@ -153,13 +152,13 @@ void HeBulk::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 	//Aziz potential
 	double e = 10.948;
 	double rm = 2.963;
-    double a = 184431.01;
-    double alpha = 10.43329537;
-    double beta = -2.27965105;
-    double d = 1.4826;
-    double c6 = 1.36745214;
-    double c8 = 0.42123807;
-    double c10 = 0.17473318;
+	double a = 184431.01;
+	double alpha = 10.43329537;
+	double beta = -2.27965105;
+	double d = 1.4826;
+	double c6 = 1.36745214;
+	double c8 = 0.42123807;
+	double c10 = 0.17473318;
 
 	double kineticR = 0;
 	double kineticI = 0;
@@ -182,11 +181,11 @@ void HeBulk::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 	localEnergyR = 0;
 	localEnergyI = 0;
 	ClearVector(localOperators);
-    ClearVector(localOperatorsMatrix);
-    ClearVector(localOperatorlocalEnergyR);
-    ClearVector(localOperatorlocalEnergyI);
-    ClearVector(otherExpectationValues);
-    ClearVector(grBins);
+	ClearVector(localOperatorsMatrix);
+	ClearVector(localOperatorlocalEnergyR);
+	ClearVector(localOperatorlocalEnergyI);
+	ClearVector(otherExpectationValues);
+	ClearVector(grBins);
 
 	for (int n = 0; n < N; n++)
 	{
@@ -374,7 +373,7 @@ void HeBulk::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 
 void HeBulk::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
-    ClearVector(additionalSystemProperties);
+	ClearVector(additionalSystemProperties);
 	CalculateExpectationValues(R, uR, uI, phiR, phiI);
 	for (int i = 0; i < numOfOtherExpectationValues; i++)
 	{
@@ -404,7 +403,7 @@ void HeBulk::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vec
 	}
 	for (int k = 0; k < numOfkValues; k++)
 	{
-		sk[k] = (sumSCos[k] * sumSCos[k] + sumSSin[k] * sumSSin[k]) / ((double)(N * kValues[k].size()));
+		sk[k] = (sumSCos[k] * sumSCos[k] + sumSSin[k] * sumSSin[k]) / ((double) (N * kValues[k].size()));
 		additionalSystemProperties[numOfOtherExpectationValues + k] = sk[k];
 	}
 }

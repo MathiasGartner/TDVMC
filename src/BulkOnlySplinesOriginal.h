@@ -12,11 +12,9 @@ using namespace std;
 class BulkOnlySplinesOriginal: public IPhysicalSystem
 {
 private:
-	string configDirectory;
-
-	int	numberOfSplines;
+	int numberOfSplines;
 	vector<double> splineSums; //indices: k (bin); for <O_k>
-	vector<vector<vector<double> >  > splineSumsD; //indices: k (bin), n (particle), a (coordinate)
+	vector<vector<vector<double> > > splineSumsD; //indices: k (bin), n (particle), a (coordinate)
 	vector<vector<double> > splineSumsD2; //indices: k (bin), n (particle)
 
 	double halfLength;
@@ -45,7 +43,7 @@ private:
 
 //Implementation of IPhysicalSystem
 public:
-	BulkOnlySplinesOriginal(string configDirectory);
+	BulkOnlySplinesOriginal(vector<double>& params, string configDirectory);
 
 	void InitSystem();
 

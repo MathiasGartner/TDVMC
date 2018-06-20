@@ -1,9 +1,8 @@
 #include "BulkSplines.h"
 
-BulkSplines::BulkSplines(string configDirectory) : IPhysicalSystem()
+BulkSplines::BulkSplines(vector<double>& params, string configDirectory) :
+		IPhysicalSystem(params, configDirectory)
 {
-	this->configDirectory = configDirectory;
-
 	this->USE_NORMALIZATION_AND_PHASE = false;
 	this->USE_NIC = true;
 	this->USE_MOVE_COM_TO_ZERO = false;
@@ -16,6 +15,7 @@ void BulkSplines::InitSystem()
 	numOfkValues = 300;
 	numOfOtherExpectationValues = 3 + grBinCount;
 	numOfAdditionalSystemProperties = numOfOtherExpectationValues + numOfkValues;
+	//numOfAdditionalSystemProperties = numOfOtherExpectationValues + numOfkValues + numberOfSplines + numberOfSplines * N * DIM + numberOfSplines * N; //expectationValues + s(k) + splines + splinesD + splinesD2
 
 	numberOfSplines = N_PARAM + 2;
 	halfLength = LBOX / 2.0;
@@ -24,12 +24,7 @@ void BulkSplines::InitSystem()
 	nodePointSpacing2 = nodePointSpacing * nodePointSpacing;
 
 	//cut off
-	bcFactors.push_back({
-		1.0,
-		-1.0 / 2.0,
-		1.0,
-		0.0
-	});
+	bcFactors.push_back( { 1.0, -1.0 / 2.0, 1.0, 0.0 });
 	numberOfSpecialParameters = bcFactors.size();
 	numberOfStandardParameters = N_PARAM - numberOfSpecialParameters;
 
@@ -110,8 +105,13 @@ void BulkSplines::InitSystem()
 
 vector<double> BulkSplines::GetCenterOfMass(vector<vector<double> >& R)
 {
-	vector<double> com = {0.0, 0.0, 0.0};
+	vector<double> com = { 0.0, 0.0, 0.0 };
 	return com;
+}
+
+double BulkSplines::GetExternalPotential(vector<double>& r)
+{
+	return 0;
 }
 
 void BulkSplines::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
@@ -131,10 +131,17 @@ void BulkSplines::CalculateExpectationValues(vector<vector<double> >& R, vector<
 
 	//Gauss potential
 	//double a = this->time > 1e-04 ? 0.15 : 0.1;
-	double a = 0.1 + this->time;
+	//double a = 0.1 + this->time;
 	//double b = 50.0;
+	double a = params[0];
+	double b = params[1];
+	if (params.size() > 2 && this->time > params[2])
+	{
+		a = params[3];
+		b = params[4];
+	}
 	//double a = 0.1;
-	double b = 100.0;
+	//double b = 100.0;
 
 	double kineticR = 0;
 	double kineticI = 0;
@@ -155,16 +162,16 @@ void BulkSplines::CalculateExpectationValues(vector<vector<double> >& R, vector<
 	localEnergyR = 0;
 	localEnergyI = 0;
 	ClearVector(localOperators);
-    ClearVector(localOperatorsMatrix);
-    ClearVector(localOperatorlocalEnergyR);
-    ClearVector(localOperatorlocalEnergyI);
-    ClearVector(otherExpectationValues);
-    ClearVector(grBins);
+	ClearVector(localOperatorsMatrix);
+	ClearVector(localOperatorlocalEnergyR);
+	ClearVector(localOperatorlocalEnergyI);
+	ClearVector(otherExpectationValues);
+	ClearVector(grBins);
 
 	for (int n = 0; n < N; n++)
 	{
 		//external potential energy
-		potentialExtern += 0;
+		potentialExtern += GetExternalPotential(R[n]);
 
 		for (int i = 0; i < N; i++)
 		{
@@ -252,8 +259,8 @@ void BulkSplines::CalculateExpectationValues(vector<vector<double> >& R, vector<
 		kineticSumI1 += VectorNorm2(vecKineticSumI1);
 	}
 
-	kineticR = - (kineticSumR1 - kineticSumI1 + kineticSumR2);
-	kineticI = - (kineticSumR1I1 + kineticSumI2);
+	kineticR = -(kineticSumR1 - kineticSumI1 + kineticSumR2);
+	kineticI = -(kineticSumR1I1 + kineticSumI2);
 
 	localEnergyR = kineticR + potentialIntern + potentialExtern;
 	localEnergyI = kineticI;
@@ -273,7 +280,7 @@ void BulkSplines::CalculateExpectationValues(vector<vector<double> >& R, vector<
 	}
 	for (int i = 0; i < numberOfSpecialParameters; i++)
 	{
-		localOperators[N_PARAM - (numberOfSpecialParameters - i)] = (bcFactors[i][0] * splineSums[numberOfSplines - 3] + bcFactors[i][1] * splineSums[numberOfSplines - 2] + bcFactors[i][2] * splineSums[numberOfSplines - 1] +bcFactors[i][3]);
+		localOperators[N_PARAM - (numberOfSpecialParameters - i)] = (bcFactors[i][0] * splineSums[numberOfSplines - 3] + bcFactors[i][1] * splineSums[numberOfSplines - 2] + bcFactors[i][2] * splineSums[numberOfSplines - 1] + bcFactors[i][3]);
 	}
 	for (int k = 0; k < N_PARAM; k++)
 	{
@@ -296,11 +303,14 @@ void BulkSplines::CalculateExpectationValues(vector<vector<double> >& R, vector<
 
 void BulkSplines::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
-    ClearVector(additionalSystemProperties);
+	//int index = 0;
+
+	ClearVector(additionalSystemProperties);
 	CalculateExpectationValues(R, uR, uI, phiR, phiI);
 	for (int i = 0; i < numOfOtherExpectationValues; i++)
 	{
 		additionalSystemProperties[i] = otherExpectationValues[i];
+		//index++;
 	}
 
 	vector<double> vecrij(DIM);
@@ -326,9 +336,37 @@ void BulkSplines::CalculateAdditionalSystemProperties(vector<vector<double> >& R
 	}
 	for (int k = 0; k < numOfkValues; k++)
 	{
-		sk[k] = (sumSCos[k] * sumSCos[k] + sumSSin[k] * sumSSin[k]) / ((double)(N * kValues[k].size()));
+		sk[k] = (sumSCos[k] * sumSCos[k] + sumSSin[k] * sumSSin[k]) / ((double) (N * kValues[k].size()));
 		additionalSystemProperties[numOfOtherExpectationValues + k] = sk[k];
+		//index++;
 	}
+
+	//for (int i = 0; i < numberOfSplines; i++)
+	//{
+	//	additionalSystemProperties[index] = splineSums[i];
+	//	index++;
+	//}
+	//
+	//for (int k = 0; k < numberOfSplines; k++)
+	//{
+	//	for (int n = 0; n < N; n++)
+	//	{
+	//		for (int a = 0; a < DIM; a++)
+	//		{
+	//			additionalSystemProperties[index] = splineSumsD[k][n][a];
+	//			index++;
+	//		}
+	//	}
+	//}
+	//
+	//for (int k = 0; k < numberOfSplines; k++)
+	//{
+	//	for (int n = 0; n < N; n++)
+	//	{
+	//		additionalSystemProperties[index] = splineSumsD2[k][n];
+	//		index++;
+	//	}
+	//}
 }
 
 void BulkSplines::CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
@@ -361,7 +399,8 @@ void BulkSplines::CalculateWavefunction(vector<vector<double> >& R, vector<doubl
 				tmp = -1.0 / 6.0 * (-1.0 + 3.0 * res - 3.0 * res2 + res3);
 				splineSums[bin] += tmp;
 
-				tmp = 1.0 / 6.0 * (4.0 - 6.0 * res2 + 3.0 * res3);;
+				tmp = 1.0 / 6.0 * (4.0 - 6.0 * res2 + 3.0 * res3);
+
 				splineSums[bin + 1] += tmp;
 
 				tmp = 1.0 / 6.0 * (1.0 + 3.0 * res + 3.0 * res2 - 3.0 * res3);

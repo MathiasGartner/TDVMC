@@ -1,10 +1,8 @@
 #include "BulkOnlySplines.h"
 
-BulkOnlySplines::BulkOnlySplines(string configDirectory) :
-		IPhysicalSystem()
+BulkOnlySplines::BulkOnlySplines(vector<double>& params, string configDirectory) :
+		IPhysicalSystem(params, configDirectory)
 {
-	this->configDirectory = configDirectory;
-
 	this->USE_NORMALIZATION_AND_PHASE = true;
 	this->USE_NIC = true;
 	this->USE_MOVE_COM_TO_ZERO = false;
@@ -287,91 +285,90 @@ void BulkOnlySplines::CalculateExpectationValues(vector<vector<double> >& R, vec
 		//cout << kineticSumR2 << endl;
 	}
 
+	/*
+	 vector<vector<vector<double> > > allEvec;
+	 vector<vector<double> > allRni;
+	 vector<vector<vector<double> > > allSplineSums;
+	 allRni.resize(N);
+	 allEvec.resize(N);
+	 for (int i = 0; i < N; i++)
+	 {
+	 allRni[i].resize(N);
+	 allEvec[i].resize(N);
+	 }
+	 for (int n = 0; n < N; n++)
+	 {
+	 for (int i = 0; i < N; i++)
+	 {
+	 if (i == n)
+	 {
+	 rni = 0;
+	 evecrni = {0, 0, 0};
+	 }
+	 else
+	 {
+	 rni = VectorDisplacementNIC(R[n], R[i], vecrni);
+	 evecrni = vecrni / rni;
+	 }
+	 allRni[n][i] = rni;
+	 allEvec[n][i] = evecrni;
+	 }
+	 }
+	 allSplineSums.resize(numberOfSplines);
+	 for (auto &s : allSplineSums)
+	 {
+	 s.resize(N);
+	 for (auto &p : s)
+	 {
+	 p.resize(N);
+	 }
+	 }
+	 for (int n = 0; n < N; n++)
+	 {
+	 for (int i = 0; i < N; i++)
+	 {
+	 if (allRni[n][i] < maxDistance)
+	 {
+	 interval = allRni[n][i] / nodePointSpacing;
+	 bin = int(interval);
+	 res = interval - bin;
+	 res2 = res * res;
 
-/*
-	vector<vector<vector<double> > > allEvec;
-	vector<vector<double> > allRni;
-	vector<vector<vector<double> > > allSplineSums;
-	allRni.resize(N);
-	allEvec.resize(N);
-	for (int i = 0; i < N; i++)
-	{
-		allRni[i].resize(N);
-		allEvec[i].resize(N);
-	}
-	for (int n = 0; n < N; n++)
-	{
-		for (int i = 0; i < N; i++)
-		{
-			if (i == n)
-			{
-				rni = 0;
-				evecrni = {0, 0, 0};
-			}
-			else
-			{
-				rni = VectorDisplacementNIC(R[n], R[i], vecrni);
-				evecrni = vecrni / rni;
-			}
-			allRni[n][i] = rni;
-			allEvec[n][i] = evecrni;
-		}
-	}
-	allSplineSums.resize(numberOfSplines);
-	for (auto &s : allSplineSums)
-	{
-		s.resize(N);
-		for (auto &p : s)
-		{
-			p.resize(N);
-		}
-	}
-	for (int n = 0; n < N; n++)
-	{
-		for (int i = 0; i < N; i++)
-		{
-			if (allRni[n][i] < maxDistance)
-			{
-				interval = allRni[n][i] / nodePointSpacing;
-				bin = int(interval);
-				res = interval - bin;
-				res2 = res * res;
+	 tmp[0] = -1.0 / 2.0 * (1.0 - 2.0 * res + res2);
+	 tmp[1] = 1.0 / 6.0 * (-12.0 * res + 9.0 * res2);
+	 tmp[2] = 1.0 / 6.0 * (3.0 + 6.0 * res - 9.0 * res2);
+	 tmp[3] = 1.0 / 2.0 * res2;
 
-				tmp[0] = -1.0 / 2.0 * (1.0 - 2.0 * res + res2);
-				tmp[1] = 1.0 / 6.0 * (-12.0 * res + 9.0 * res2);
-				tmp[2] = 1.0 / 6.0 * (3.0 + 6.0 * res - 9.0 * res2);
-				tmp[3] = 1.0 / 2.0 * res2;
+	 for (int b = 0; b < 4; b++)
+	 {
+	 allSplineSums[bin + b][n][i] = tmp[b] / nodePointSpacing;
+	 }
+	 }
+	 }
+	 }
+	 double newSum = 0;
+	 for (int k = 0; k < N_PARAM; k++)
+	 {
+	 for (int p = 0; p < N_PARAM; p++)
+	 {
+	 for (int n = 0; n < N; n++)
+	 {
+	 for (int i = 0; i < N; i++)
+	 {
+	 for (int j = 0; j < N; j++)
+	 {
+	 if (i != n && j != n)
+	 {
+	 newSum += uR[k] * uR[p] * allSplineSums[k][n][i] * allSplineSums[p][n][j] * VectorDotProduct(allEvec[n][i], allEvec[n][j]);
+	 }
+	 }
+	 }
+	 }
+	 }
+	 }
 
-				for (int b = 0; b < 4; b++)
-				{
-					allSplineSums[bin + b][n][i] = tmp[b] / nodePointSpacing;
-				}
-			}
-		}
-	}
-	double newSum = 0;
-	for (int k = 0; k < N_PARAM; k++)
-	{
-		for (int p = 0; p < N_PARAM; p++)
-		{
-			for (int n = 0; n < N; n++)
-			{
-				for (int i = 0; i < N; i++)
-				{
-					for (int j = 0; j < N; j++)
-					{
-						if (i != n && j != n)
-						{
-							newSum += uR[k] * uR[p] * allSplineSums[k][n][i] * allSplineSums[p][n][j] * VectorDotProduct(allEvec[n][i], allEvec[n][j]);
-						}
-					}
-				}
-			}
-		}
-	}
-
-	cout << "!!!!!!!!" << newSum << ", " << kineticSumR1 << endl;
-	*/
+	 cout << "!!!!!!!!" << newSum << ", " << kineticSumR1 << endl;
+	 */
 
 	vector<vector<double> > localKineticEnergiesD1;
 	vector<double> localKineticEnergiesD2;
@@ -395,7 +392,8 @@ void BulkOnlySplines::CalculateExpectationValues(vector<vector<double> >& R, vec
 		localKineticEnergiesD1.push_back(sumD1);
 		localKineticEnergiesD2.push_back(sumD2);
 	}
-	sumD1 =	{0, 0, 0};
+	sumD1 =
+	{	0, 0, 0};
 	sumD2 = 0;
 	for (int p = 0; p < N; p++)
 	{
@@ -415,9 +413,6 @@ void BulkOnlySplines::CalculateExpectationValues(vector<vector<double> >& R, vec
 	vector<double> d1sums = OuterSum(localKineticEnergiesD1);
 	allER1new.push_back(VectorNorm2(d1sums));
 	allER2new.push_back(Sum(localKineticEnergiesD2));
-
-
-
 
 	kineticR = -(kineticSumR1 - kineticSumI1 + kineticSumR2);
 	kineticI = -(kineticSumR1I1 + kineticSumI2);

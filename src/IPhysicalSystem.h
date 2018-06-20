@@ -7,6 +7,10 @@ using namespace std;
 class IPhysicalSystem
 {
 protected:
+
+	vector<double> params;
+	string configDirectory;
+
 	double time;
 	int step;
 	double wf;
@@ -30,8 +34,11 @@ public:
 	bool USE_NIC; //INFO: nearest image convention
 	bool USE_MOVE_COM_TO_ZERO; //INFO: move center of mass to zero
 
-	IPhysicalSystem()
+	IPhysicalSystem(vector<double>& params, string configDirectory)
 	{
+		this->params = params;
+		this->configDirectory = configDirectory;
+
 		this->time = 0;
 		this->step = 0;
 		this->wf = 0;

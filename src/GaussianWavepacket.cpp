@@ -2,11 +2,9 @@
 
 using namespace std;
 
-GaussianWavepacket::GaussianWavepacket(string configDirectory) :
-		IPhysicalSystem()
+GaussianWavepacket::GaussianWavepacket(vector<double>& params, string configDirectory) :
+		IPhysicalSystem(params, configDirectory)
 {
-	this->configDirectory = configDirectory;
-
 	this->USE_NORMALIZATION_AND_PHASE = true;
 	this->USE_NIC = false;
 	this->USE_MOVE_COM_TO_ZERO = false;

@@ -1,6 +1,7 @@
 #include "BulkSplinesPhi.h"
 
-BulkSplinesPhi::BulkSplinesPhi(string configDirectory) : BulkSplines(configDirectory)
+BulkSplinesPhi::BulkSplinesPhi(vector<double>& params, string configDirectory) :
+		BulkSplines(params, configDirectory)
 {
 	this->USE_NORMALIZATION_AND_PHASE = true;
 }

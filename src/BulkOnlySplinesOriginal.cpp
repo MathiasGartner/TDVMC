@@ -1,9 +1,7 @@
 #include "BulkOnlySplinesOriginal.h"
 
-BulkOnlySplinesOriginal::BulkOnlySplinesOriginal(string configDirectory) : IPhysicalSystem()
+BulkOnlySplinesOriginal::BulkOnlySplinesOriginal(vector<double>& params, string configDirectory) : IPhysicalSystem(params, configDirectory)
 {
-	this->configDirectory = configDirectory;
-
 	this->USE_NORMALIZATION_AND_PHASE = false;
 	this->USE_NIC = true;
 	this->USE_MOVE_COM_TO_ZERO = false;

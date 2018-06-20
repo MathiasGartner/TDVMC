@@ -2,11 +2,9 @@
 
 using namespace std;
 
-HeDrop::HeDrop(string configDirectory) :
-		IPhysicalSystem()
+HeDrop::HeDrop(vector<double>& params, string configDirectory) :
+		IPhysicalSystem(params, configDirectory)
 {
-	this->configDirectory = configDirectory;
-
 	this->USE_NORMALIZATION_AND_PHASE = true;
 	this->USE_NIC = false;
 	this->USE_MOVE_COM_TO_ZERO = true;
@@ -18,8 +16,8 @@ void HeDrop::InitSystem()
 	grBinStartIndex = 3;
 	numOfkValues = 84;
 	numOfDensityProfileValues = 200;
-	numOfOtherExpectationValues = 3 + grBinCount;
-	numOfAdditionalSystemProperties = numOfOtherExpectationValues + numOfkValues + numOfDensityProfileValues + 1; //+1: <r^2>
+	numOfOtherExpectationValues = 3 + grBinCount + numOfDensityProfileValues;
+	numOfAdditionalSystemProperties = numOfOtherExpectationValues + numOfkValues + 1; //+1: <r^2>
 
 	//rijSplit = 1.75;
 	rijSplit = 2.4;
@@ -187,6 +185,10 @@ void HeDrop::InitSystem()
 		}
 	}
 
+	densityProfileMaxDistance = grMaxDistance;
+	densityProfileNodePointSpacing = grNodePointSpacing;
+	densityProfileBins.resize(numOfDensityProfileValues);
+
 	//cout << "nodePointSpacingShort=" << nodePointSpacingShort << ", nodePointSpacingLarge=" << nodePointSpacingLarge << ", rijSplit=" << rijSplit << ", rijSplineSplit=" << rijSplineSplit << ", rijTail=" << rijTail << endl;
 }
 
@@ -270,10 +272,13 @@ void HeDrop::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 	ClearVector(localOperatorlocalEnergyI);
 	ClearVector(otherExpectationValues);
 	ClearVector(grBins);
+	ClearVector(densityProfileBins);
+	vector<double> com = GetCenterOfMass(R);
 
-	//if (this->time > 5e-5)
+	if (this->time > 1e-6)
 	{
-		rm += 0.12;
+		e = 21.0;
+		rm = 2.35;
 	}
 	for (int n = 0; n < N; n++)
 	{
@@ -400,6 +405,19 @@ void HeDrop::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 				grBins[grBin] += 1.0 / grBinVolumes[grBin];
 			}
 		}
+
+		//density profile
+		double r;
+		vector<double> diff = R[n] - com;
+		r = VectorNorm(diff);
+		if (r < densityProfileMaxDistance)
+		{
+			densityProfileBinInterval = r / densityProfileNodePointSpacing;
+			densityProfileBin = floor(densityProfileBinInterval);
+			densityProfileBins[densityProfileBin] += 1.0 / grBinVolumes[densityProfileBin];
+		}
+
+		//kinetic energy
 		for (int a = 0; a < DIM; a++)
 		{
 			vecKineticSumR1[a] = 0.0;
@@ -551,6 +569,10 @@ void HeDrop::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 	{
 		otherExpectationValues[i + grBinStartIndex] = grBins[i];
 	}
+	for (int i = 0; i < numOfDensityProfileValues; i++)
+	{
+		otherExpectationValues[i + grBinStartIndex + grBinCount] = densityProfileBins[i];
+	}
 }
 
 void HeDrop::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
@@ -589,35 +611,15 @@ void HeDrop::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vec
 		additionalSystemProperties[numOfOtherExpectationValues + k] = sk[k];
 	}
 
-	vector<double> densityProfileBins;
-	double densityProfileBinInterval;
-	int densityProfileBin;
-	double densityProfileNodePointSpacing;
 	double r;
 	double r2Sum = 0.0;
 	vector<double> com;
 	com = GetCenterOfMass(R);
-	//com = {0, 0, 0}; //INFO: for a moving dot
-	densityProfileMaxDistance = grMaxDistance;
-	densityProfileNodePointSpacing = grNodePointSpacing;
-	densityProfileBins.resize(numOfDensityProfileValues);
-	ClearVector(densityProfileBins);
 	for (int i = 0; i < N; i++)
 	{
 		vector<double> diff = R[i] - com;
 		r = VectorNorm(diff);
 		r2Sum += r * r;
-		if (r < densityProfileMaxDistance)
-		{
-			densityProfileBinInterval = r / densityProfileNodePointSpacing;
-			densityProfileBin = floor(densityProfileBinInterval);
-			//densityProfileBins[densityProfileBin] += 1.0 / (double)pow(densityProfileBin + 1, 2);
-			densityProfileBins[densityProfileBin] += 1.0 / grBinVolumes[densityProfileBin];
-		}
-	}
-	for (int d = 0; d < numOfDensityProfileValues; d++)
-	{
-		additionalSystemProperties[numOfOtherExpectationValues + numOfkValues + d] = densityProfileBins[d];
 	}
 	additionalSystemProperties[numOfAdditionalSystemProperties - 1] = r2Sum / (double) N;
 }
