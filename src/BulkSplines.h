@@ -33,13 +33,15 @@ private:
 	vector<vector<vector<double> > > kValues;
 	int numOfkValues;
 
-	double exponentNew;
 	vector<double> splineSumsNew; //indices: k (bin); for <O_k>
 	vector<double> sumOldPerBin;
 	vector<double> sumNewPerBin;
 	int changedParticleIndex;
 
 	vector<vector<double> > bcFactors; //factors according to the boundary conditions
+
+protected:
+	double exponentNew;
 
 //Implementation of IPhysicalSystem
 public:
