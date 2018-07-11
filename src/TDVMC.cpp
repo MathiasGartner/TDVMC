@@ -2,6 +2,7 @@
 
 #include "BulkSplines.h"
 #include "BulkSplinesPhi.h"
+#include "BulkSplinesScaled.h"
 #include "BulkQT.h"
 #include "BulkQTPhi.h"
 #include "ConfigItem.h"
@@ -11,6 +12,7 @@
 #include "HeDrop.h"
 #include "MathOperators.h"
 #include "MPIMethods.h"
+#include "SimulationStepData.h"
 #include "Timer.h"
 #include "Utils.h"
 #include "VMCSampler.h"
@@ -119,6 +121,10 @@ vector<vector<double> > AllAdditionalSystemProperties;
 
 vector<vector<vector<double> > > mcSamples;
 vector<double> wfValues2;
+
+vector<double> times;
+vector<double> previousStepWeights = { 0.982014, 0.952574, 0.880797, 0.731059, 0.5, 0.268941, 0.119203, 0.0474259, 0.0179862, 0.00669285 };
+vector<SimulationStepData> previousStepData;
 
 mt19937_64 generator;
 //default_random_engine generator;
@@ -928,6 +934,32 @@ void BuildSystemOfEquationsForParametersNoPhi(vector<vector<double> >& matrix, v
 	}
 }
 
+void BuildSystemOfEquationsForParametersIncludePhiWithTimeRotation(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
+{
+	double rotation = 1.499 * M_PI; // 3/2 Pi -> real time; Pi -> imaginary time
+	double cosRotation = cos(rotation);
+	double sinRotation = sin(rotation);
+
+	energiesReal.resize(N_PARAM);
+	energiesImag.resize(N_PARAM);
+	matrix.resize(N_PARAM);
+	for (auto &i : matrix)
+	{
+		i.resize(N_PARAM);
+	}
+
+	for (int i = 0; i < N_PARAM; i++)
+	{
+		energiesReal[i] = cosRotation * (localOperatorlocalEnergyR[i] - localEnergyR * localOperators[i]) - sinRotation * (localOperatorlocalEnergyI[i]);
+		energiesImag[i] = sinRotation * (localOperatorlocalEnergyR[i] - localEnergyR * localOperators[i]) + cosRotation * (localOperatorlocalEnergyI[i]);
+		for (int j = 0; j <= i; j++)
+		{
+			matrix[i][j] = localOperatorsMatrix[i][j] - localOperators[i] * localOperators[j];
+			matrix[j][i] = matrix[i][j];
+		}
+	}
+}
+
 void BuildSystemOfEquationsForParametersIncludePhi(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
 {
 	energiesReal.resize(N_PARAM);
@@ -960,7 +992,11 @@ void BuildSystemOfEquationsForParametersIncludePhi(vector<vector<double> >& matr
 
 void BuildSystemOfEquationsForParameters(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
 {
-	if (sys->USE_NORMALIZATION_AND_PHASE)
+	if (IMAGINARY_TIME == -1)
+	{
+		BuildSystemOfEquationsForParametersIncludePhiWithTimeRotation(matrix, energiesReal, energiesImag);
+	}
+	else if (sys->USE_NORMALIZATION_AND_PHASE)
 	{
 		BuildSystemOfEquationsForParametersIncludePhi(matrix, energiesReal, energiesImag);
 	}
@@ -1046,7 +1082,15 @@ void SolveForParametersDot(vector<vector<double> >& matrix, vector<double>& ener
 		*resultPhiReal -= localOperators[i] * resultReal[i];
 		*resultPhiImag -= localOperators[i] * resultImag[i];
 	}
-	if (IMAGINARY_TIME == 0)
+	if (IMAGINARY_TIME == -1)
+	{
+		double rotation = 1.499 * M_PI; // 3/2 Pi -> real time; Pi -> imaginary time
+		double cosRotation = cos(rotation);
+		double sinRotation = sin(rotation);
+		*resultPhiImag -= cosRotation * localEnergyR;
+		*resultPhiReal -= sinRotation * localEnergyR;
+	}
+	else if (IMAGINARY_TIME == 0)
 	{
 		*resultPhiImag -= localEnergyR;
 	}
@@ -1283,6 +1327,14 @@ void CalculateNextParametersRK4ReuseSamples(vector<vector<double> >& R, vector<d
 	if (processRank == rootRank)
 	{
 		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
+
+		if (sys->GetStep() % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
+		{
+			WriteDataToFile(matrix, "eq_matrix" + to_string(sys->GetStep()), "matrix");
+			WriteDataToFile(energiesReal, "eq_rhs_uR_" + to_string(sys->GetStep()), "energiesReal");
+			WriteDataToFile(energiesImag, "eq_rhs_uI_" + to_string(sys->GetStep()), "energiesImag");
+		}
+
 		PerformCholeskyDecomposition(matrix);
 		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR[0], uDotI[0], &(phiDotR[0]), &(phiDotI[0]));
 		for (int i = 0; i < N_PARAM; i++)
@@ -1292,6 +1344,12 @@ void CalculateNextParametersRK4ReuseSamples(vector<vector<double> >& R, vector<d
 		}
 		tmpPhiR = *phiR + phiDotR[0] * TIMESTEP / 2.0;
 		tmpPhiI = *phiI + phiDotI[0] * TIMESTEP / 2.0;
+
+		if (sys->GetStep() % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
+		{
+			WriteDataToFile(uDotR[0], "eq_result_uRDot" + to_string(sys->GetStep()), to_string(phiDotR[0]));
+			WriteDataToFile(uDotI[0], "eq_result_uIDot" + to_string(sys->GetStep()), to_string(phiDotI[0]));
+		}
 	}
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
 	ParallelUpdateExpectationValuesForGivenSamples(mcSamples, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
@@ -1472,7 +1530,7 @@ void AlignCoordinates(vector<vector<double> >& R)
 bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	bool accept = true;
-	if(doNotAcceptStep)
+	if (doNotAcceptStep)
 	{
 		doNotAcceptStep = false;
 		return false;
@@ -1600,6 +1658,10 @@ int mainMPI(int argc, char** argv)
 		//sys = new BulkSplines(SYSTEM_PARAMS, configDirectory);
 		sys = new BulkSplinesPhi(SYSTEM_PARAMS, configDirectory);
 	}
+	else if (SYSTEM_TYPE == "BulkSplinesScaled")
+	{
+		sys = new BulkSplinesScaled(SYSTEM_PARAMS, configDirectory);
+	}
 	else if (SYSTEM_TYPE == "BulkQT")
 	{
 		//sys = new BulkQT(SYSTEM_PARAMS, configDirectory);
@@ -1630,6 +1692,8 @@ int mainMPI(int argc, char** argv)
 	vector<double> uI(N_PARAM);
 	double phiR;
 	double phiI;
+	PARAMS_REAL.resize(N_PARAM, 0.0);
+	PARAMS_IMAGINARY.resize(N_PARAM, 0.0);
 
 	for (unsigned int i = 0; i < R.size(); i++)
 	{
@@ -1653,7 +1717,7 @@ int mainMPI(int argc, char** argv)
 		//PrintData(uR);
 		//PrintData(uI);
 
-		if (processRank == rootRank)// && USE_ADJUST_PARAMETERS == true)
+		if (processRank == rootRank)		// && USE_ADJUST_PARAMETERS == true)
 		{
 			//AdjustParameters(uR, uI, &phiR, &phiI);
 		}
@@ -1679,6 +1743,7 @@ int mainMPI(int argc, char** argv)
 		step++;
 		sys->SetTime(currentTime);
 		sys->SetStep(step);
+		times.push_back(currentTime);
 
 		BroadcastNewParameters(uR, uI, &phiR, &phiI);
 		if (processRank == rootRank)
@@ -1740,11 +1805,9 @@ int mainMPI(int argc, char** argv)
 				}
 				cout << "t=" << currentTime << endl;
 				//cout << "localEnergyR=" << localEnergyR << " (" << otherExpectationValues[0] << " + " << otherExpectationValues[1] << ")" << endl;
-				cout << "localEnergyR/N=" << localEnergyR / (double) N << " (" <<
-						otherExpectationValues[0] / (double) N << " + " <<
-						otherExpectationValues[1] / (double) N << " + " <<
-						//otherExpectationValues[2] / (double) N << " + " <<
-						//otherExpectationValues[3] / (double) N << ")" <<
+				cout << "localEnergyR/N=" << localEnergyR / (double) N << " (" << otherExpectationValues[0] / (double) N << " + " << otherExpectationValues[1] / (double) N << " + " <<
+				//otherExpectationValues[2] / (double) N << " + " <<
+				//otherExpectationValues[3] / (double) N << ")" <<
 						endl;
 				//cout << "localEnergyR/N=" << localEnergyR / (double)N << endl;
 				AllLocalEnergyR.push_back(localEnergyR);
@@ -1860,10 +1923,12 @@ int mainMPI(int argc, char** argv)
 		WriteDataToFile(AllParametersR, "AllParametersR", "uR");
 		WriteDataToFile(AllParametersI, "AllParametersI", "uI");
 
-		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR100", "ER", 100);
-		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues100", "kinetic, potential, wf, g(r)", 100);
-		WriteDataToFile(AllParametersR, "AllParametersR100", "uR", 100);
-		WriteDataToFile(AllParametersI, "AllParametersI100", "uI", 100);
+		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR_every100th", "ER", 100);
+		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues_every100th", "kinetic, potential, wf, g(r)", 100);
+		WriteDataToFile(AllParametersR, "AllParametersR_every100th", "uR", 100);
+		WriteDataToFile(AllParametersI, "AllParametersI_every100th", "uI", 100);
+
+		WriteDataToFile(times, "times", "t");
 	}
 	if (processRank == rootRank)
 	{
@@ -1976,7 +2041,7 @@ void startVMCSampler()
 			VMCSampler::DoMetropolisStep();
 		}
 		double e = VMCSampler::GetEnergy();
-		energies.push_back({e, -VMCSampler::energy1 / (double)N, -VMCSampler::energy2 / (double)N, -VMCSampler::energy2_1 / (double)N, -VMCSampler::energy2_2 / (double)N});
+		energies.push_back( { e, -VMCSampler::energy1 / (double) N, -VMCSampler::energy2 / (double) N, -VMCSampler::energy2_1 / (double) N, -VMCSampler::energy2_2 / (double) N });
 		cout << JoinVector(energies.back()) << endl;
 	}
 
@@ -2004,7 +2069,8 @@ int main(int argc, char **argv)
 	else if (argc == 1) //INFO: started without specifying config-file. used for local execution
 	{
 		//SYSTEM_TYPE = "BulkQT";
-		SYSTEM_TYPE = "BulkSplines";
+		//SYSTEM_TYPE = "BulkSplines";
+		SYSTEM_TYPE = "BulkSplinesScaled";
 		//SYSTEM_TYPE = "HeDrop";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
@@ -2017,6 +2083,10 @@ int main(int argc, char **argv)
 		else if (SYSTEM_TYPE == "BulkSplines")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkSplines.config";
+		}
+		else if (SYSTEM_TYPE == "BulkSplinesScaled")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkSplinesScaled.config";
 		}
 		else if (SYSTEM_TYPE == "BulkQT")
 		{
