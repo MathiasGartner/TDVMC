@@ -186,7 +186,7 @@ map<int, int> GatherHistogram(int data)
 	return histogram;
 }
 
-void GetCPUAllocation()
+void GetCPUAllocation(bool printOnlyMultipleAllocations)
 {
 	bool print = false;
 	int id = get_cpu_id();
@@ -196,7 +196,15 @@ void GetCPUAllocation()
 	{
 		if (h.second > 1)
 		{
-			print = true;
+			if (printOnlyMultipleAllocations)
+			{
+				cout << h.first << ":" << h.second << endl;
+			}
+			else
+			{
+				print = true;
+				break;
+			}
 		}
 	}
 	if (print)

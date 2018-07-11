@@ -385,7 +385,7 @@ void TestMPI(int argc, char *argv[])
 		cout << endl << "=====================";
 		cout << endl << "=====================" << endl << endl;
 	}
-	MPIMethods::GetCPUAllocation();
+	MPIMethods::GetCPUAllocation(true);
 	if (processRank == rootRank)
 	{
 		cout << endl << "==========TestMPIData()==========";

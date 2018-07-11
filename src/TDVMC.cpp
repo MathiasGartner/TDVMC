@@ -1601,6 +1601,10 @@ bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double
 
 int mainMPI(int argc, char** argv)
 {
+	//////////////////////////
+	/// Init MPI processes ///
+	//////////////////////////
+
 	char processName[80];
 	int processNameLength;
 
@@ -1613,8 +1617,12 @@ int mainMPI(int argc, char** argv)
 	MPIMethods::processRank = processRank;
 	MPIMethods::rootRank = rootRank;
 
-	//Log("running on cpu " + to_string(get_cpu_id()));
-	MPIMethods::GetCPUAllocation();
+	MPIMethods::GetCPUAllocation(true);
+
+
+	////////////////////////////////////////
+	/// Read and Broadcast configuration ///
+	////////////////////////////////////////
 
 	RegisterAllConfigItems();
 	if (processRank == rootRank)
@@ -1644,6 +1652,11 @@ int mainMPI(int argc, char** argv)
 	//cout << "configDirectory=\"" << configDirectory << "\"" << endl;
 	BroadcastConfig();
 	//PrintConfig();
+
+
+	//////////////////////////////////
+	/// Initialize Physical System ///
+	//////////////////////////////////
 
 	if (SYSTEM_TYPE == "HeDrop")
 	{
@@ -1679,6 +1692,12 @@ int mainMPI(int argc, char** argv)
 		}
 		return 1;
 	}
+
+
+	/////////////////////////////
+	/// other Initializations ///
+	/////////////////////////////
+
 	Init();
 	if (processRank == rootRank)
 	{
@@ -1703,7 +1722,7 @@ int mainMPI(int argc, char** argv)
 	InitCoordinateConfiguration(R);
 	if (processRank == rootRank)
 	{
-		WriteParticleInputFile(OUT_DIR + "particleconfiguration.csv", R);
+		WriteParticleInputFile("particleconfiguration.csv", R);
 	}
 	if (processRank == rootRank)
 	{
@@ -1728,6 +1747,11 @@ int mainMPI(int argc, char** argv)
 
 	sys->InitSystem();
 	PostSystemInit();
+
+
+	////////////////////////
+	/// start simulation ///
+	////////////////////////
 
 	int step = 0;
 	int acceptNewParams;
@@ -1774,6 +1798,10 @@ int mainMPI(int argc, char** argv)
 		//PrintParameters(uR);
 		//PrintParameters(uI);
 		//cout << "phiR=" << phiR << ", phiI=" << phiI << endl;
+
+		////////////////////////////////////////
+		/// try to calculate next parameters ///
+		////////////////////////////////////////
 
 		while (acceptNewParams != 1 && nrOfAcceptParameterTrials < 4)
 		{
@@ -1866,13 +1894,20 @@ int mainMPI(int argc, char** argv)
 			}
 		}
 
+		///////////////////////////////
+		/// parameters are accepted ///
+		/// write data to file      ///
+		///////////////////////////////
+
 		if (processRank == rootRank)
 		{
+			// Write current parameters
 			if (step % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
 			{
 				WriteDataToFile(uR, "parametersR" + to_string(step), "parameterR, phiR=" + to_string(phiR) + ", wf=" + to_string(sys->GetWf()));
 				WriteDataToFile(uI, "parametersI" + to_string(step), "parameterI, phiI=" + to_string(phiI));
 			}
+			// Write every nth expectationvalue calculated until now
 			if (step % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
 			{
 				WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER", WRITE_EVERY_NTH_STEP_TO_FILE);
@@ -1882,8 +1917,9 @@ int mainMPI(int argc, char** argv)
 			}
 		}
 
-		//INFO: check if simulation should be cancelled
+		// check if simulation should be cancelled or set back to a previous timestep
 		int cancel = 0;
+		int setBackNSteps = 0;
 		if (processRank == rootRank)
 		{
 			if (FileExist("./stop"))
@@ -1891,7 +1927,7 @@ int mainMPI(int argc, char** argv)
 				Log("Detected stop-file!", WARNING);
 				cancel = 1;
 			}
-			if (!isfinite(localEnergyR))
+			else if (!isfinite(localEnergyR) || isnan(localEnergyR))
 			{
 				Log("Energy not finite", ERROR);
 				cancel = 2;
@@ -1905,16 +1941,18 @@ int mainMPI(int argc, char** argv)
 		if (cancel != 0)
 		{
 			TOTALTIME = currentTime;
+			break; //break for (currentTime = 0; currentTime <= TOTALTIME; currentTime += TIMESTEP)
 		}
 	}
 
-	if (processRank == rootRank)
-	{
-		PrintData(uR);
-		PrintData(uI);
-	}
+	//if (processRank == rootRank)
+	//{
+	//	PrintData(uR);
+	//	PrintData(uI);
+	//}
 	//cout << "phiR=" << phiR << ", phiI=" << phiI << endl;
 
+	// Write data of whole simulation to files
 	if (processRank == rootRank)
 	{
 		Log("Write last files ...");
@@ -1928,15 +1966,17 @@ int mainMPI(int argc, char** argv)
 		WriteDataToFile(AllParametersR, "AllParametersR_every100th", "uR", 100);
 		WriteDataToFile(AllParametersI, "AllParametersI_every100th", "uI", 100);
 
-		WriteDataToFile(times, "times", "t");
+		WriteDataToFile(times, "AA_times", "t");
 	}
+
+	// Write random number gnerator states to file
 	if (processRank == rootRank)
 	{
 		int tmp = 0;
 		tmp = system(("mkdir " + OUT_DIR + "random").c_str());
 		cout << tmp << endl;
 	}
-	MPIMethods::Barrier();
+	MPIMethods::Barrier(); // wait for main process to create directory
 	WriteRandomGeneratorStatesToFile("random/state");
 	if (processRank == rootRank)
 	{
@@ -1944,6 +1984,11 @@ int mainMPI(int argc, char** argv)
 		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
 		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
 	}
+
+
+	////////////////////////////////////////////////////
+	/// additional calculations at end of simulation ///
+	////////////////////////////////////////////////////
 
 	nAcceptances = 0;
 	nTrials = 0;
@@ -1972,6 +2017,8 @@ int mainMPI(int argc, char** argv)
 		WriteDataToFile(AllAdditionalSystemProperties, "AllAdditionalSystemProperties", "g(r), ...");
 	}
 
+
+	// Write config file for successive simulations
 	AlignCoordinates(R);
 	if (processRank == rootRank)
 	{
@@ -1997,15 +2044,15 @@ int mainMPI(int argc, char** argv)
 		}
 	}
 
-	Log("free memory ...");
+	//Log("free memory ...");
 	//TODO: how to properly delete the IPhysicalSystem pointer?
 	//delete sys;
 
-	Log("finalize ...");
+	//Log("finalize ...");
 	MPIMethods::Barrier();
 	MPI_Finalize();
 
-	Log("done");
+	//Log("done");
 
 	return 0;
 }
