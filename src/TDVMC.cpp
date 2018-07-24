@@ -37,7 +37,8 @@
 #include <unistd.h>
 #include <vector>
 
-#include <json/json.h>
+#include "../resources/json/json-forwards.h"
+#include "../resources/json/json.h"
 
 using namespace std;
 
@@ -114,6 +115,7 @@ vector<double> phiRListDiffs;
 vector<double> phiIListDiffs;
 
 vector<double> AllLocalEnergyR;
+vector<vector<double> > AllLocalOperators;
 vector<vector<double> > AllOtherExpectationValues;
 vector<vector<double> > AllParametersR;
 vector<vector<double> > AllParametersI;
@@ -1753,12 +1755,18 @@ int mainMPI(int argc, char** argv)
 	/// start simulation ///
 	////////////////////////
 
+	Timer t;
 	int step = 0;
 	int acceptNewParams;
 	int nrOfAcceptParameterTrials;
+	int maxNrOfAcceptParameterTrials = 4;
 
 	for (currentTime = 0; currentTime <= TOTALTIME; currentTime += TIMESTEP)
 	{
+		if (processRank == rootRank)
+		{
+			t.start();
+		}
 		acceptNewParams = 0;
 		nrOfAcceptParameterTrials = 0;
 		MC_NSTEPS = mc_nsteps_original;
@@ -1803,7 +1811,7 @@ int mainMPI(int argc, char** argv)
 		/// try to calculate next parameters ///
 		////////////////////////////////////////
 
-		while (acceptNewParams != 1 && nrOfAcceptParameterTrials < 4)
+		while (acceptNewParams != 1 && nrOfAcceptParameterTrials < maxNrOfAcceptParameterTrials)
 		{
 			nrOfAcceptParameterTrials++;
 			MC_NSTEPS *= nrOfAcceptParameterTrials;
@@ -1839,6 +1847,7 @@ int mainMPI(int argc, char** argv)
 						endl;
 				//cout << "localEnergyR/N=" << localEnergyR / (double)N << endl;
 				AllLocalEnergyR.push_back(localEnergyR);
+				AllLocalOperators.push_back(localOperators);
 				AllOtherExpectationValues.push_back(otherExpectationValues);
 				AllParametersR.push_back(uR);
 				AllParametersR[AllParametersR.size() - 1].push_back(phiR);
@@ -1877,6 +1886,7 @@ int mainMPI(int argc, char** argv)
 					if (processRank == rootRank)
 					{
 						AllLocalEnergyR.pop_back();
+						AllLocalOperators.pop_back();
 						AllOtherExpectationValues.pop_back();
 						AllParametersR.pop_back();
 						AllParametersI.pop_back();
@@ -1893,6 +1903,7 @@ int mainMPI(int argc, char** argv)
 				acceptNewParams = 1;
 			}
 		}
+
 
 		///////////////////////////////
 		/// parameters are accepted ///
@@ -1911,6 +1922,7 @@ int mainMPI(int argc, char** argv)
 			if (step % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
 			{
 				WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER", WRITE_EVERY_NTH_STEP_TO_FILE);
+				WriteDataToFile(AllLocalOperators, "AllLocalOperators", "<O_k>", WRITE_EVERY_NTH_STEP_TO_FILE);
 				WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", "kinetic, potential, wf, g(r)", WRITE_EVERY_NTH_STEP_TO_FILE);
 				WriteDataToFile(AllParametersR, "AllParametersR", "uR", WRITE_EVERY_NTH_STEP_TO_FILE);
 				WriteDataToFile(AllParametersI, "AllParametersI", "uI", WRITE_EVERY_NTH_STEP_TO_FILE);
@@ -1927,7 +1939,7 @@ int mainMPI(int argc, char** argv)
 				Log("Detected stop-file!", WARNING);
 				cancel = 1;
 			}
-			else if (!isfinite(localEnergyR) || isnan(localEnergyR))
+			else if (!isfinite(localEnergyR) || std::isnan(localEnergyR))
 			{
 				Log("Energy not finite", ERROR);
 				cancel = 2;
@@ -1943,6 +1955,12 @@ int mainMPI(int argc, char** argv)
 			TOTALTIME = currentTime;
 			break; //break for (currentTime = 0; currentTime <= TOTALTIME; currentTime += TIMESTEP)
 		}
+
+		if (processRank == rootRank)
+		{
+			t.stop();
+			Log("duration for full timestep: " + to_string(t.duration()) + " ms");
+		}
 	}
 
 	//if (processRank == rootRank)
@@ -1957,11 +1975,13 @@ int mainMPI(int argc, char** argv)
 	{
 		Log("Write last files ...");
 		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER");
+		WriteDataToFile(AllLocalOperators, "AllLocalOperators", "<O_k>");
 		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", "kinetic, potential, wf, g(r)");
 		WriteDataToFile(AllParametersR, "AllParametersR", "uR");
 		WriteDataToFile(AllParametersI, "AllParametersI", "uI");
 
 		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR_every100th", "ER", 100);
+		WriteDataToFile(AllLocalOperators, "AllLocalOperators_every100th", "ER", 100);
 		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues_every100th", "kinetic, potential, wf, g(r)", 100);
 		WriteDataToFile(AllParametersR, "AllParametersR_every100th", "uR", 100);
 		WriteDataToFile(AllParametersI, "AllParametersI_every100th", "uI", 100);

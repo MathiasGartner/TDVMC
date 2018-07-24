@@ -5,7 +5,8 @@
 #include <string>
 #include <vector>
 
-#include <json/json.h>
+#include "../resources/json/json-forwards.h"
+#include "../resources/json/json.h"
 
 using namespace std;
 

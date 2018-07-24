@@ -1,4 +1,10 @@
+Debug/TDVMC
 Debug/src/*.d
 Debug/src/*.o
+Debug/resources/*.d
+Debug/resources/*.o
+Release/TDVMC
 Release/src/*.d
 Release/src/*.o
+Release/resources/*.d
+Release/resources/*.o

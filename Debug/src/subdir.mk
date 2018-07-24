@@ -10,11 +10,13 @@ CPP_SRCS += \
 ../src/BulkQTPhi.cpp \
 ../src/BulkSplines.cpp \
 ../src/BulkSplinesPhi.cpp \
+../src/BulkSplinesScaled.cpp \
 ../src/ConfigItem.cpp \
 ../src/GaussianWavepacket.cpp \
 ../src/HeBulk.cpp \
 ../src/HeDrop.cpp \
 ../src/MathOperators.cpp \
+../src/SimulationStepData.cpp \
 ../src/TDVMC.cpp \
 ../src/Utils.cpp 
 
@@ -25,11 +27,13 @@ OBJS += \
 ./src/BulkQTPhi.o \
 ./src/BulkSplines.o \
 ./src/BulkSplinesPhi.o \
+./src/BulkSplinesScaled.o \
 ./src/ConfigItem.o \
 ./src/GaussianWavepacket.o \
 ./src/HeBulk.o \
 ./src/HeDrop.o \
 ./src/MathOperators.o \
+./src/SimulationStepData.o \
 ./src/TDVMC.o \
 ./src/Utils.o 
 
@@ -40,11 +44,13 @@ CPP_DEPS += \
 ./src/BulkQTPhi.d \
 ./src/BulkSplines.d \
 ./src/BulkSplinesPhi.d \
+./src/BulkSplinesScaled.d \
 ./src/ConfigItem.d \
 ./src/GaussianWavepacket.d \
 ./src/HeBulk.d \
 ./src/HeDrop.d \
 ./src/MathOperators.d \
+./src/SimulationStepData.d \
 ./src/TDVMC.d \
 ./src/Utils.d 
 
@@ -53,7 +59,7 @@ CPP_DEPS += \
 src/%.o: ../src/%.cpp
 	@echo 'Building file: $<'
 	@echo 'Invoking: GCC C++ Compiler'
-	mpic++ -std=c++0x -I/usr/include/jsoncpp -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@)" -o "$@" "$<"
+	mpic++ -std=c++0x -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 

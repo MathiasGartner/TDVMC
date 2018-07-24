@@ -5,10 +5,12 @@
 #include <cmath>
 #include <cstring>
 #include <fstream>
-#include <json/json.h>
 #include <random>
 #include <string>
 #include <sstream>
+
+#include "../resources/json/json.h"
+#include "../resources/json/json-forwards.h"
 
 using namespace std;
 

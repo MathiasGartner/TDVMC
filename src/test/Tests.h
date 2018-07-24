@@ -64,6 +64,7 @@ void TestVectorDisplacements()
 	TestVectorDisplacement(4, 4, 4, 10.1, 0, 0, sqrt(1.9*1.9), 1.9, 0, 0);
 	TestVectorDisplacement(4, 4, 4, 9.9, 0, 0, sqrt(1.9*1.9), -1.9, 0, 0);
 	TestVectorDisplacement(0.1, 0, 0, 3.9, 0, 0, sqrt(0.2*0.2), 0.2, 0, 0);
+	TestVectorDisplacement(0, 0, 0, 3.9, 3.9, 3.9, sqrt(0.1*0.1*3), 0.1, 0.1, 0.1);
 	cout << endl;
 }
 

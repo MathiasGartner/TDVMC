@@ -191,7 +191,7 @@ void BulkSplinesScaled::CalculateExpectationValues(vector<vector<double> >& R, v
 					potentialIntern += b * exp(-(rnia * rnia) / 2.0);
 
 					double rniAbsorption = rni - 1.3;
-					double absorptionFactor = 1.0;
+					double absorptionFactor = 0.0;
 					if (rniAbsorption > 0)
 					{
 						potentialInternComplex += absorptionFactor * rniAbsorption * rniAbsorption;
