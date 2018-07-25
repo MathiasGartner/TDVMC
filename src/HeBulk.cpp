@@ -6,6 +6,32 @@ HeBulk::HeBulk(vector<double>& params, string configDirectory) :
 	this->USE_NORMALIZATION_AND_PHASE = false;
 	this->USE_NIC = true;
 	this->USE_MOVE_COM_TO_ZERO = false;
+
+	numberOfSplines = 0;
+	mcMillanSum = 0;
+	rijSplit = 0;
+	halfLength = 0;
+	maxDistance = 0;
+	nodePointSpacing = 0;
+	nodePointSpacing2 = 0;
+
+	grBinCount = 0;
+	grBinStartIndex = 0;
+	grMaxDistance = 0;
+	grNodePointSpacing = 0;
+	numOfkValues = 0;
+
+	exponentNew = 0;
+	mcMillanSumNew = 0;
+
+	factorFirstSpline1 = 0;
+	factorFirstSpline2 = 0;
+	factorSecondSpline1 = 0;
+	factorSecondSpline2 = 0;
+	factorLastSpline = 0;
+	factorSecondLastSpline = 0;
+	factorLastSplinePhi = 0;
+	factorSecondLastSplinePhi = 0;
 }
 
 void HeBulk::InitSystem()
@@ -107,7 +133,7 @@ void HeBulk::InitSystem()
 		grBinVolumes[i] = grBinVolumes[i] - grBinVolumes[i - 1];
 	}
 
-	kValues = ReadFromFile(this->configDirectory + "kVectors.json", 0);
+	kValues = ReadKValuesFromJsonFile(this->configDirectory + "kVectors.json");
 	for (int k = 0; k < numOfkValues; k++)
 	{
 		for (unsigned int kn = 0; kn < kValues[k].size(); kn++)

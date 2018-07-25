@@ -27,6 +27,9 @@ public:
 
 	ConfigItemType type;
 
+private:
+	ConfigItem(string name, ConfigItemType type);
+
 public:
 	ConfigItem(string name, string* variable, ConfigItemType type);
 	ConfigItem(string name, int* variable, ConfigItemType type);

@@ -80,6 +80,6 @@ void WriteDataToFile(vector<double>& data, string filename, string header, int e
 void WriteDataToFile(vector<vector<double> >& data, string filename, string header, int everyNth = 1, bool writeHeader = true);
 void WriteDataToFile(vector<vector<vector<double> > >& data, string filename, string header);
 
-vector<vector<vector<double> > > ReadFromFile(string filePath, int headerlines);
+vector<vector<vector<double> > > ReadKValuesFromJsonFile(string filePath);
 
 int get_cpu_id();

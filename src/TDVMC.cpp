@@ -294,14 +294,25 @@ void RegisterAllConfigItems()
 void ReadConfig(string filePath)
 {
 	//cout << "file exists: " << FileExist(filePath) << "." << endl;
-	Json::Value configData;
-	Json::Reader configReader;
-	ifstream configFile(filePath, ifstream::binary);
-	configReader.parse(configFile, configData, false);
 
-	for (auto ci : configItems)
+	string errors;
+	bool successful;
+	Json::Value configData;
+	Json::CharReaderBuilder builder;
+	ifstream configFile(filePath, ifstream::binary);
+
+	successful = Json::parseFromStream(builder, configFile, &configData, &errors);
+
+	if (successful)
 	{
-		ci.setValue(configData[ci.name]);
+		for (auto ci : configItems)
+		{
+			ci.setValue(configData[ci.name]);
+		}
+	}
+	else
+	{
+		Log("could not read config file", ERROR);
 	}
 }
 

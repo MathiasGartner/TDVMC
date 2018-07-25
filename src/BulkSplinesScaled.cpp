@@ -6,6 +6,24 @@ BulkSplinesScaled::BulkSplinesScaled(vector<double>& params, string configDirect
 	this->USE_NORMALIZATION_AND_PHASE = true;
 	this->USE_NIC = true;
 	this->USE_MOVE_COM_TO_ZERO = false;
+
+	numberOfSplines = 0;
+
+	halfLength = 0;
+	maxDistance = 0;
+	nodePointSpacing = 0;
+	nodePointSpacing2 = 0;
+	numberOfSpecialParameters = 0;
+	numberOfStandardParameters = 0;
+
+	grBinCount = 0;
+	grBinStartIndex = 0;
+	grMaxDistance = 0;
+	grNodePointSpacing = 0;
+	numOfkValues = 0;
+
+	exponentNew = 0;
+	changedParticleIndex = 0;
 }
 
 void BulkSplinesScaled::InitSystem()
@@ -92,7 +110,7 @@ void BulkSplinesScaled::InitSystem()
 		grBinVolumes[i] = grBinVolumes[i] - grBinVolumes[i - 1];
 	}
 
-	kValues = ReadFromFile(this->configDirectory + "kVectors.json", 0);
+	kValues = ReadKValuesFromJsonFile(this->configDirectory + "kVectors.json");
 	for (int k = 0; k < numOfkValues; k++)
 	{
 		for (unsigned int kn = 0; kn < kValues[k].size(); kn++)

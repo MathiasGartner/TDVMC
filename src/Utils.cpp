@@ -434,27 +434,31 @@ void WriteDataToFile(vector<vector<vector<double> > >& data, string filename, st
 	file.close();
 }
 
-vector<vector<vector<double> > > ReadFromFile(string filePath, int headerlines)
+vector<vector<vector<double> > > ReadKValuesFromJsonFile(string filePath)
 {
 	vector<vector<vector<double> > > data;
-
+	string errors;
+	bool successful;
 	Json::Value configData;
-	Json::Reader configReader;
+	Json::CharReaderBuilder builder;
 	ifstream configFile(filePath, ifstream::binary);
-	configReader.parse(configFile, configData, false);
 
-	auto allKValues = configData["data"];
-	for (unsigned int i = 0; i < allKValues.size(); i++)
+	successful = Json::parseFromStream(builder, configFile, &configData, &errors);
+	if (successful)
 	{
-		data.push_back(vector<vector<double> >());
-		auto allEqualNormVectors = allKValues[i];
-		for (unsigned int j = 0; j < allEqualNormVectors.size(); j++)
+		auto allKValues = configData["data"];
+		for (unsigned int i = 0; i < allKValues.size(); i++)
 		{
-			data[i].push_back(vector<double>());
-			auto kValues = allEqualNormVectors[j];
-			for (unsigned int l = 0; l < kValues.size(); l++)
+			data.push_back(vector<vector<double> >());
+			auto allEqualNormVectors = allKValues[i];
+			for (unsigned int j = 0; j < allEqualNormVectors.size(); j++)
 			{
-				data[i][j].push_back(kValues[l].asDouble());
+				data[i].push_back(vector<double>());
+				auto kValues = allEqualNormVectors[j];
+				for (unsigned int l = 0; l < kValues.size(); l++)
+				{
+					data[i][j].push_back(kValues[l].asDouble());
+				}
 			}
 		}
 	}

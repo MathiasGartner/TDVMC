@@ -8,6 +8,59 @@ HeDrop::HeDrop(vector<double>& params, string configDirectory) :
 	this->USE_NORMALIZATION_AND_PHASE = true;
 	this->USE_NIC = false;
 	this->USE_MOVE_COM_TO_ZERO = true;
+
+	numberOfSplines = 0;
+	numberOfShortSplines = 0;
+	numberOfLargeSplines = 0;
+	mcMillanSum = 0;
+	constSum = 0;
+	//logSum = 0;
+	linearSum = 0;
+	rijSplit = 0;
+	rijSplineSplit = 0;
+	nodePointSpacingShort = 0;
+	nodePointSpacingShort2 = 0;
+	nodePointSpacingLarge = 0;
+	nodePointSpacingLarge2 = 0;
+	rijTail = 0;
+
+	grBinCount = 0;
+	grBinStartIndex = 0;
+	grMaxDistance = 0;
+	grNodePointSpacing = 0;
+	numOfkValues = 0;
+	densityProfileMaxDistance = 0;
+	numOfDensityProfileValues = 0;
+	densityProfileBinInterval = 0;
+	densityProfileBin = 0;
+	densityProfileNodePointSpacing = 0;
+
+	exponentNew = 0;
+	mcMillanSumNew = 0;
+	constSumNew = 0;
+	//logSumNew = 0;
+	linearSumNew = 0;
+
+	factorFirstSpline1 = 0;
+	factorFirstSpline2 = 0;
+	factorSecondSpline1 = 0;
+	factorSecondSpline2 = 0;
+	factorSecondLastSpline = 0;
+	factorSecondLastSplineConst = 0;
+	//factorSecondLastSplineLog = 0;
+	factorSecondLastSplineLinear = 0;
+	factorLastSpline = 0;
+	factorLastSplineConst = 0;
+	//factorLastSplineLog = 0;
+	factorLastSplineLinear = 0;
+	factorSecondLastShort = 0;
+	factorSecondLastLarge = 0;
+	factorLastShort = 0;
+	factorLastLarge = 0;
+	factorFirstShort = 0;
+	factorFirstLarge = 0;
+	factorSecondShort = 0;
+	factorSecondLarge = 0;
 }
 
 void HeDrop::InitSystem()
@@ -173,7 +226,7 @@ void HeDrop::InitSystem()
 		grBinVolumes[i] = grBinVolumes[i] - grBinVolumes[i - 1];
 	}
 
-	kValues = ReadFromFile(this->configDirectory + "kVectors.json", 0);
+	kValues = ReadKValuesFromJsonFile(this->configDirectory + "kVectors.json");
 	for (int k = 0; k < numOfkValues; k++)
 	{
 		for (unsigned int kn = 0; kn < kValues[k].size(); kn++)

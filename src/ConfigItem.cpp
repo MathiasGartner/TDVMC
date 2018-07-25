@@ -1,31 +1,33 @@
 #include "ConfigItem.h"
 
-ConfigItem::ConfigItem(string name, string* variable, ConfigItemType type)
+ConfigItem::ConfigItem(string name,  ConfigItemType type)
 {
 	this->name = name;
+	this->variableString = 0;
+	this->variableInt = 0;
+	this->variableDouble = 0;
+	this->variableArrDouble = 0;
+	this->type = type;
+}
+
+ConfigItem::ConfigItem(string name, string* variable, ConfigItemType type) : ConfigItem(name, type)
+{
 	this->variableString = variable;
-	this->type = type;
 }
 
-ConfigItem::ConfigItem(string name, int* variable, ConfigItemType type)
+ConfigItem::ConfigItem(string name, int* variable, ConfigItemType type) : ConfigItem(name, type)
 {
-	this->name = name;
 	this->variableInt = variable;
-	this->type = type;
 }
 
-ConfigItem::ConfigItem(string name, double* variable, ConfigItemType type)
+ConfigItem::ConfigItem(string name, double* variable, ConfigItemType type) : ConfigItem(name, type)
 {
-	this->name = name;
 	this->variableDouble = variable;
-	this->type = type;
 }
 
-ConfigItem::ConfigItem(string name, vector<double>& variable, ConfigItemType type)
+ConfigItem::ConfigItem(string name, vector<double>& variable, ConfigItemType type) : ConfigItem(name, type)
 {
-	this->name = name;
 	this->variableArrDouble = &variable;
-	this->type = type;
 }
 
 void ConfigItem::setValue(Json::Value value)
