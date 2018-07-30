@@ -75,6 +75,36 @@ vector<double> ReduceToMinMaxMean(double data)
 	return result;
 }
 
+bool IsAnyTrue(bool value)
+{
+	int ownValue = value ? 1 : 0;
+	int reducedValue;
+	MPI_Allreduce(&ownValue, &reducedValue, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+	return reducedValue > 0;
+}
+
+bool IsAnyFalse(bool value)
+{
+	int ownValue = value ? 1 : 0;
+	int reducedValue;
+	MPI_Allreduce(&ownValue, &reducedValue, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+	return reducedValue < 1;
+}
+
+vector<bool> CollectValues(bool value)
+{
+	vector<bool> values(numOfProcesses);
+	int ownValue = value ? 1 : 0;
+	int* gatheredValues = new int[numOfProcesses];;
+	MPI_Gather(&ownValue, 1, MPI_INT, gatheredValues, 1, MPI_INT, rootRank, MPI_COMM_WORLD);
+	for (int i = 0; i < numOfProcesses; i++)
+	{
+		values[i] = gatheredValues[i] == 1;
+	}
+	delete[] gatheredValues;
+	return values;
+}
+
 void ReduceToAverage(double* data)
 {
 	double ownValues;
@@ -86,6 +116,22 @@ void ReduceToAverage(double* data)
 	{
 		*data = reducedValues / (double) numOfProcesses;
 	}
+}
+
+double ReduceToAverage(int* data)
+{
+	double average = 0;
+	int ownValues;
+	int reducedValues;
+
+	ownValues = *data;
+	MPI_Reduce(&ownValues, &reducedValues, 1, MPI_INT, MPI_SUM, rootRank, MPI_COMM_WORLD);
+	if (processRank == rootRank)
+	{
+		average = reducedValues / (double) numOfProcesses;
+		*data = average;
+	}
+	return average;
 }
 
 void ReduceToAverage(double* data, int count)

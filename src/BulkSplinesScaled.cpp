@@ -159,7 +159,7 @@ void BulkSplinesScaled::CalculateExpectationValues(vector<vector<double> >& R, v
 	//double b = 50.0;
 	double a = params[0];
 	double b = params[1];
-	if (params.size() > 2 && this->time > params[2])
+	if (params.size() > 2 && this->time >= params[2])
 	{
 		a = params[3];
 		b = params[4];

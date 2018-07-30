@@ -163,11 +163,24 @@ void Log(string message, MessageType messageType)
 	}
 }
 
-void PrintData(vector<double> data)
+void PrintData(vector<double>& data)
 {
 	for (unsigned int i = 0; i < data.size(); i++)
 	{
 		cout << data[i] << ", ";
+	}
+	cout << endl;
+}
+
+void PrintData(vector<bool>& data)
+{
+	for (unsigned int i = 0; i < data.size(); i++)
+	{
+		cout << (data[i] ? '#' : '_');
+		if (i % 100 == 99)
+		{
+			cout << endl;
+		}
 	}
 	cout << endl;
 }
@@ -643,6 +656,67 @@ void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<dou
 		nAcceptances++;
 	}
 	nTrials++;
+}
+
+bool NeedToUpdateSamples(vector<vector<vector<double> > >& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+	bool updateNeeded = true;
+	double weight = 1.0;
+	double weightDiff = 0.0;
+	int count = samples.size();
+	int randomSample = randomInt(count - 1);
+	sys->CalculateWavefunction(samples[randomSample], uR, uI, phiR, phiI);
+	double newWf2 = sys->GetWf() * sys->GetWf();
+	weight = newWf2 / wfValues2[randomSample];
+	weightDiff = abs(1.0 - weight);
+	updateNeeded = weightDiff > 0.9;
+	return updateNeeded;
+}
+
+void UpdateAllSamples(vector<vector<vector<double> > >& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+	int count = samples.size();
+	for (int i = 0; i < count; i++)
+	{
+		sys->CalculateWavefunction(samples[i], uR, uI, phiR, phiI);
+		for (int n = 0; n < MC_NTHERMSTEPS; n++)
+		{
+			DoMetropolisStep(samples[i], uR, uI, phiR, phiI);
+		}
+		wfValues2[i] = sys->GetWf() * sys->GetWf();
+	}
+}
+
+void UpdateSamples(vector<vector<vector<double> > >& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+	int nrOfUpdatedSamples = 0;
+	int count = samples.size();
+	double weight = 1.0;
+	double weightDiff = 0.0;
+
+	for (int i = 0; i < count; i++)
+	{
+		sys->CalculateWavefunction(samples[i], uR, uI, phiR, phiI);
+		double newWf2 = sys->GetWf() * sys->GetWf();
+		weight = newWf2 / wfValues2[i];
+		weightDiff = abs(1.0 - weight);
+
+		if (weightDiff > 0.1)
+		{
+			nrOfUpdatedSamples++;
+			for (int n = 0; n < MC_NTHERMSTEPS; n++)
+			{
+				DoMetropolisStep(samples[i], uR, uI, phiR, phiI);
+			}
+			wfValues2[i] = sys->GetWf() * sys->GetWf();
+		}
+	}
+	//Log("nrOfUpdatedSamples: " + to_string(nrOfUpdatedSamples) + "(" + to_string((double)nrOfUpdatedSamples / count * 100.0) + "%)");
+	double avgNrOfUpdatedSamples = MPIMethods::ReduceToAverage(&nrOfUpdatedSamples);
+	if (processRank == rootRank)
+	{
+		Log("nrOfUpdatedSamples: " + to_string(avgNrOfUpdatedSamples) + "(" + to_string(avgNrOfUpdatedSamples / count * 100.0) + "%)");
+	}
 }
 
 void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, bool intermediateStep = false)
@@ -1632,7 +1706,6 @@ int mainMPI(int argc, char** argv)
 
 	MPIMethods::GetCPUAllocation(true);
 
-
 	////////////////////////////////////////
 	/// Read and Broadcast configuration ///
 	////////////////////////////////////////
@@ -1665,7 +1738,6 @@ int mainMPI(int argc, char** argv)
 	//cout << "configDirectory=\"" << configDirectory << "\"" << endl;
 	BroadcastConfig();
 	//PrintConfig();
-
 
 	//////////////////////////////////
 	/// Initialize Physical System ///
@@ -1705,7 +1777,6 @@ int mainMPI(int argc, char** argv)
 		}
 		return 1;
 	}
-
 
 	/////////////////////////////
 	/// other Initializations ///
@@ -1760,7 +1831,6 @@ int mainMPI(int argc, char** argv)
 
 	sys->InitSystem();
 	PostSystemInit();
-
 
 	////////////////////////
 	/// start simulation ///
@@ -1828,15 +1898,56 @@ int mainMPI(int argc, char** argv)
 			MC_NSTEPS *= nrOfAcceptParameterTrials;
 			AlignCoordinates(R);
 
-			//if (step % 10 == 1)
+			if (step < 2)
+			{
+				ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
+			}
+			else
+			{
+				bool update = NeedToUpdateSamples(mcSamples, uR, uI, phiR, phiI);
+				vector<bool> allUpdateValues = MPIMethods::CollectValues(update);
+				if (processRank == rootRank)
+				{
+					PrintData(allUpdateValues);
+				}
+				if (MPIMethods::IsAnyFalse(update))
+				{
+					if (update)
+					{
+						UpdateAllSamples(mcSamples, uR, uI, phiR, phiI);
+					}
+					ParallelUpdateExpectationValuesForGivenSamples(mcSamples, uR, uI, phiR, phiI);
+				}
+				else
+				{
+					ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
+				}
+				//if (MPIMethods::IsAnyTrue(update))
+				//{
+				//	ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
+				//}
+				//else
+				//{
+				//	if (processRank == rootRank)
+				//	{
+				//		Log("reuse samples!", WARNING);
+				//	}
+				//	ParallelUpdateExpectationValuesForGivenSamples(mcSamples, uR, uI, phiR, phiI);
+				//}
+			}
+			//if (step < 2)
 			//{
 			//	ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
 			//}
 			//else
 			//{
+			//	//if (step % 2 == 1)
+			//	{
+			//		UpdateSamples(mcSamples, uR, uI, phiR, phiI);
+			//	}
 			//	ParallelUpdateExpectationValuesForGivenSamples(mcSamples, uR, uI, phiR, phiI);
 			//}
-			ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
+			//ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
 
 			if (processRank == rootRank)
 			{
@@ -1871,6 +1982,8 @@ int mainMPI(int argc, char** argv)
 				if (processRank == rootRank && USE_NORMALIZE_WF == 1)
 				{
 					NormalizeWavefunction(sys->GetWf(), &phiR);
+					//or better use
+					//NormalizeWavefunction(otherExpectationValues[2], &phiR);
 				}
 			}
 			else
@@ -1915,7 +2028,6 @@ int mainMPI(int argc, char** argv)
 			}
 		}
 
-
 		///////////////////////////////
 		/// parameters are accepted ///
 		/// write data to file      ///
@@ -1942,7 +2054,7 @@ int mainMPI(int argc, char** argv)
 
 		// check if simulation should be cancelled or set back to a previous timestep
 		int cancel = 0;
-		int setBackNSteps = 0;
+		//int setBackNSteps = 0;
 		if (processRank == rootRank)
 		{
 			if (FileExist("./stop"))
@@ -2016,7 +2128,6 @@ int mainMPI(int argc, char** argv)
 		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
 	}
 
-
 	////////////////////////////////////////////////////
 	/// additional calculations at end of simulation ///
 	////////////////////////////////////////////////////
@@ -2047,7 +2158,6 @@ int mainMPI(int argc, char** argv)
 		WriteDataToFile(additionalSystemProperties, "AdditionalSystemProperties", "g(r), ...");
 		WriteDataToFile(AllAdditionalSystemProperties, "AllAdditionalSystemProperties", "g(r), ...");
 	}
-
 
 	// Write config file for successive simulations
 	AlignCoordinates(R);
@@ -2147,6 +2257,7 @@ int main(int argc, char **argv)
 	else if (argc == 1) //INFO: started without specifying config-file. used for local execution
 	{
 		//SYSTEM_TYPE = "BulkQT";
+		//SYSTEM_TYPE = "BulkSplines";
 		//SYSTEM_TYPE = "BulkSplines";
 		SYSTEM_TYPE = "BulkSplinesScaled";
 		//SYSTEM_TYPE = "HeDrop";

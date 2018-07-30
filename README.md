@@ -1,9 +1,12 @@
 # TDVMC
 TDVMC - Time Dependent Variational Monte Carlo
 
+#resources
+use json parser from https://github.com/open-source-parsers/jsoncpp
+
 #Makefile for zusie server
 CXX      := mpicxx
-CXXFLAGS :=  -Ofast -std=c++11
+CXXFLAGS := -Ofast -std=c++11
 LDFLAGS  := -lmpi
 BUILD    := ./build
 OBJ_DIR  := $(BUILD)/objects
