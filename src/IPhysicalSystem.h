@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ICorrelatedSamplingData.h"
+
 #include <vector>
 
 using namespace std;
@@ -80,19 +82,28 @@ public:
 	int GetNumOfOtherExpectationValues() { return numOfOtherExpectationValues; }
 	int GetNumOfAdditionalSystemProperties() { return numOfAdditionalSystemProperties; }
 
+
 	virtual void InitSystem() = 0;
 
 	virtual vector<double> GetCenterOfMass(vector<vector<double> >& R) = 0;
 
+	virtual void CalculateOtherLocalOperators(vector<vector<double> >& R) = 0;
+
 	virtual void CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI) = 0;
+
+	virtual void CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI) = 0;
 
 	virtual void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI) = 0;
 
 	virtual void CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI) = 0;
+
+	virtual void CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI) = 0;
 
 	virtual void CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition) = 0;
 
 	virtual double CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition) = 0;
 
 	virtual void AcceptMove() = 0;
+
+	virtual void FillCorrelatedSamplingData(ICorrelatedSamplingData* data) = 0;
 };

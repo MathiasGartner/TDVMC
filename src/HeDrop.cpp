@@ -262,6 +262,11 @@ vector<double> HeDrop::GetCenterOfMass(vector<vector<double> >& R)
 	return com;
 }
 
+void HeDrop::CalculateOtherLocalOperators(vector<vector<double> >& R)
+{
+
+}
+
 void HeDrop::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	vector<double> vecrni(DIM);
@@ -628,6 +633,11 @@ void HeDrop::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 	}
 }
 
+void HeDrop::CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+
+}
+
 void HeDrop::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	ClearVector(additionalSystemProperties);
@@ -762,6 +772,11 @@ void HeDrop::CalculateWavefunction(vector<vector<double> >& R, vector<double>& u
 
 	//cout << "sum=" << sum << "\t\tsumTmp=" << sumTmp << "\t\twf=" << value << endl;
 	//cout << "sum=" << sum << "\t\twf=" << wf << "\t\tlogSum=" << logSum << "\t\tlinearSum=" << linearSum << "\t\tphiR=" << phiR << endl;
+}
+
+void HeDrop::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+
 }
 
 void HeDrop::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
@@ -920,4 +935,8 @@ void HeDrop::AcceptMove()
 	constSum = constSumNew;
 	//logSum = logSumNew;
 	linearSum = linearSumNew;
+}
+
+void HeDrop::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
+{
 }

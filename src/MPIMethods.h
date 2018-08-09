@@ -70,7 +70,8 @@ vector<double> ReduceToMinMaxMean(double data)
 	MPI_Reduce(&own, &sum, 1, MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
 	if (processRank == rootRank)
 	{
-		result = { min, max, sum / (double)numOfProcesses };
+		result =
+		{	min, max, sum / (double)numOfProcesses};
 	}
 	return result;
 }
@@ -95,7 +96,8 @@ vector<bool> CollectValues(bool value)
 {
 	vector<bool> values(numOfProcesses);
 	int ownValue = value ? 1 : 0;
-	int* gatheredValues = new int[numOfProcesses];;
+	int* gatheredValues = new int[numOfProcesses];
+	;
 	MPI_Gather(&ownValue, 1, MPI_INT, gatheredValues, 1, MPI_INT, rootRank, MPI_COMM_WORLD);
 	for (int i = 0; i < numOfProcesses; i++)
 	{

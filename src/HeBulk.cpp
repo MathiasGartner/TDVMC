@@ -155,6 +155,11 @@ vector<double> HeBulk::GetCenterOfMass(vector<vector<double> >& R)
 	return com;
 }
 
+void HeBulk::CalculateOtherLocalOperators(vector<vector<double> >& R)
+{
+
+}
+
 void HeBulk::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	vector<double> vecrni(DIM);
@@ -397,6 +402,11 @@ void HeBulk::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 	}
 }
 
+void HeBulk::CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+
+}
+
 void HeBulk::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	ClearVector(additionalSystemProperties);
@@ -489,6 +499,11 @@ void HeBulk::CalculateWavefunction(vector<vector<double> >& R, vector<double>& u
 	exponent = sum;
 
 	//cout << "sum=" << sum << "\t\tsumTmp=" << sumTmp << "\t\twf=" << value << endl;
+}
+
+void HeBulk::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+
 }
 
 void HeBulk::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
@@ -594,4 +609,8 @@ void HeBulk::AcceptMove()
 	{
 		splineSums[i] = splineSumsNew[i];
 	}
+}
+
+void HeBulk::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
+{
 }

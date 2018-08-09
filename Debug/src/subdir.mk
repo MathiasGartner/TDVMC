@@ -4,6 +4,7 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
+../src/BosonsBulk.cpp \
 ../src/BulkOnlySplines.cpp \
 ../src/BulkOnlySplinesOriginal.cpp \
 ../src/BulkQT.cpp \
@@ -11,6 +12,7 @@ CPP_SRCS += \
 ../src/BulkSplines.cpp \
 ../src/BulkSplinesPhi.cpp \
 ../src/BulkSplinesScaled.cpp \
+../src/CSDataBulkSplines.cpp \
 ../src/ConfigItem.cpp \
 ../src/GaussianWavepacket.cpp \
 ../src/HeBulk.cpp \
@@ -21,6 +23,7 @@ CPP_SRCS += \
 ../src/Utils.cpp 
 
 OBJS += \
+./src/BosonsBulk.o \
 ./src/BulkOnlySplines.o \
 ./src/BulkOnlySplinesOriginal.o \
 ./src/BulkQT.o \
@@ -28,6 +31,7 @@ OBJS += \
 ./src/BulkSplines.o \
 ./src/BulkSplinesPhi.o \
 ./src/BulkSplinesScaled.o \
+./src/CSDataBulkSplines.o \
 ./src/ConfigItem.o \
 ./src/GaussianWavepacket.o \
 ./src/HeBulk.o \
@@ -38,6 +42,7 @@ OBJS += \
 ./src/Utils.o 
 
 CPP_DEPS += \
+./src/BosonsBulk.d \
 ./src/BulkOnlySplines.d \
 ./src/BulkOnlySplinesOriginal.d \
 ./src/BulkQT.d \
@@ -45,6 +50,7 @@ CPP_DEPS += \
 ./src/BulkSplines.d \
 ./src/BulkSplinesPhi.d \
 ./src/BulkSplinesScaled.d \
+./src/CSDataBulkSplines.d \
 ./src/ConfigItem.d \
 ./src/GaussianWavepacket.d \
 ./src/HeBulk.d \

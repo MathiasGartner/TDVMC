@@ -1,9 +1,9 @@
-#include "BulkOnlySplinesOriginal.h"
+#include "BosonsBulk.h"
 
-BulkOnlySplinesOriginal::BulkOnlySplinesOriginal(vector<double>& params, string configDirectory) :
+BosonsBulk::BosonsBulk(vector<double>& params, string configDirectory) :
 		IPhysicalSystem(params, configDirectory)
 {
-	this->USE_NORMALIZATION_AND_PHASE = false;
+	this->USE_NORMALIZATION_AND_PHASE = true;
 	this->USE_NIC = true;
 	this->USE_MOVE_COM_TO_ZERO = false;
 
@@ -16,6 +16,7 @@ BulkOnlySplinesOriginal::BulkOnlySplinesOriginal(vector<double>& params, string 
 	numberOfSpecialParameters = 0;
 	numberOfStandardParameters = 0;
 
+	numOfOtherLocalOperators = 0;
 	grBinCount = 0;
 	grBinStartIndex = 0;
 	grMaxDistance = 0;
@@ -26,13 +27,16 @@ BulkOnlySplinesOriginal::BulkOnlySplinesOriginal(vector<double>& params, string 
 	changedParticleIndex = 0;
 }
 
-void BulkOnlySplinesOriginal::InitSystem()
+void BosonsBulk::InitSystem()
 {
+	numOfOtherLocalOperators = 4; //INFO: potentialIntern, potentialInternComplex, potentialExtern, potentialExternComplex
+	otherLocalOperators.resize(numOfOtherLocalOperators);
 	grBinCount = 100;
 	grBinStartIndex = 3;
 	numOfkValues = 300;
 	numOfOtherExpectationValues = 3 + grBinCount;
 	numOfAdditionalSystemProperties = numOfOtherExpectationValues + numOfkValues;
+	//numOfAdditionalSystemProperties = numOfOtherExpectationValues + numOfkValues + numberOfSplines + numberOfSplines * N * DIM + numberOfSplines * N; //expectationValues + s(k) + splines + splinesD + splinesD2
 
 	numberOfSplines = N_PARAM + 2;
 	halfLength = LBOX / 2.0;
@@ -41,7 +45,7 @@ void BulkOnlySplinesOriginal::InitSystem()
 	nodePointSpacing2 = nodePointSpacing * nodePointSpacing;
 
 	//cut off
-	bcFactors.push_back( { 1.0, 1.0, 1.0, 0.0 });
+	bcFactors.push_back( { 1.0, -1.0 / 2.0, 1.0, 0.0 });
 	numberOfSpecialParameters = bcFactors.size();
 	numberOfStandardParameters = N_PARAM - numberOfSpecialParameters;
 
@@ -61,6 +65,11 @@ void BulkOnlySplinesOriginal::InitSystem()
 	for (auto &k : splineSumsD2)
 	{
 		k.resize(N);
+	}
+	scalingFactors.resize(numberOfSplines);
+	for (int i = 0; i < numberOfSplines; i++)
+	{
+		scalingFactors[i] = 1.0 / ((i + 1) * (i + 1));
 	}
 
 	localEnergyR = 0;
@@ -120,67 +129,103 @@ void BulkOnlySplinesOriginal::InitSystem()
 	cout << "nodePointSpacing=" << nodePointSpacing << endl;
 }
 
-vector<double> BulkOnlySplinesOriginal::GetCenterOfMass(vector<vector<double> >& R)
+void BosonsBulk::RefreshLocalOperators()
 {
-	vector<double> com = { 0.0, 0.0, 0.0 };
-	return com;
+	for (int i = 0; i < numberOfStandardParameters; i++)
+	{
+		this->localOperators[i] = splineSums[i];
+	}
+	for (int i = 0; i < numberOfSpecialParameters; i++)
+	{
+		this->localOperators[N_PARAM - (numberOfSpecialParameters - i)] = (bcFactors[i][0] * splineSums[numberOfSplines - 3] + bcFactors[i][1] * splineSums[numberOfSplines - 2] + bcFactors[i][2] * splineSums[numberOfSplines - 1] + bcFactors[i][3]);
+	}
 }
 
-void BulkOnlySplinesOriginal::CalculateOtherLocalOperators(vector<vector<double> >& R)
+void BosonsBulk::CalculateLocalOperators(vector<vector<double> >& R)
 {
+	double interval;
+	int bin;
+	double res;
+	double res2;
+	double res3;
+	double rni;
+	vector<double> vecrni(DIM);
+	double tmp;
 
+	ClearVector(splineSums);
+
+	for (int n = 0; n < N; n++)
+	{
+		for (int i = 0; i < n; i++)
+		{
+			rni = VectorDisplacementNIC(R[n], R[i], vecrni);
+			if (rni < maxDistance)
+			{
+				interval = rni / nodePointSpacing;
+				bin = int(interval); //INFO: same as floor(interval) for positive values of "interval" but a little bit faster
+				res = interval - bin;
+				res2 = res * res;
+				res3 = res2 * res;
+
+				tmp = -1.0 / 6.0 * (-1.0 + 3.0 * res - 3.0 * res2 + res3);
+				splineSums[bin] += tmp;
+
+				tmp = 1.0 / 6.0 * (4.0 - 6.0 * res2 + 3.0 * res3);
+
+				splineSums[bin + 1] += tmp;
+
+				tmp = 1.0 / 6.0 * (1.0 + 3.0 * res + 3.0 * res2 - 3.0 * res3);
+				splineSums[bin + 2] += tmp;
+
+				tmp = 1.0 / 6.0 * res3;
+				splineSums[bin + 3] += tmp;
+			}
+		}
+	}
+	for (int i = 0; i < numberOfSplines; i++)
+	{
+		splineSums[i] *= scalingFactors[i];
+	}
+	RefreshLocalOperators();
 }
 
-void BulkOnlySplinesOriginal::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void BosonsBulk::CalculateOtherLocalOperators(vector<vector<double> >& R)
 {
 	vector<double> vecrni(DIM);
 	vector<double> evecrni(DIM);
 	vector<double> tmp(4);
-	double temp;
 	double rni;
 	double interval;
 	int bin;
 	double res;
 	double res2;
 
-	double potentialExtern = 0;
-	double potentialIntern = 0;
-
-	//Gauss potential
-	//double a = this->time > 1e-04 ? 0.15 : 0.1;
-	//double b = 50.0;
-	double a = 0.1;
-	double b = 100.0;
-
-	double kineticR = 0;
-	double kineticI = 0;
-	vector<double> vecKineticSumR1(DIM);
-	vector<double> vecKineticSumI1(DIM);
-	double kineticSumR1 = 0;
-	double kineticSumI1 = 0;
-	double kineticSumR1I1 = 0;
-	double kineticSumR2 = 0;
-	double kineticSumI2 = 0;
-
 	double grBinInterval;
 	int grBin;
 
+	double potentialExtern = 0;
+	double potentialExternComplex = 0;
+	double potentialIntern = 0;
+	double potentialInternComplex = 0;
+
+	//Gauss potential
+	double a = params[0];
+	double b = params[1];
+	if (params.size() > 2 && this->time >= params[2])
+	{
+		a = params[3];
+		b = params[4];
+	}
+
 	ClearVector(splineSumsD);
 	ClearVector(splineSumsD2);
-
-	localEnergyR = 0;
-	localEnergyI = 0;
-	ClearVector(localOperators);
-	ClearVector(localOperatorsMatrix);
-	ClearVector(localOperatorlocalEnergyR);
-	ClearVector(localOperatorlocalEnergyI);
-	ClearVector(otherExpectationValues);
 	ClearVector(grBins);
+	ClearVector(otherLocalOperators);
 
 	for (int n = 0; n < N; n++)
 	{
 		//external potential energy
-		potentialExtern += 0;
+		potentialExtern += GetExternalPotential(R[n]);
 
 		for (int i = 0; i < N; i++)
 		{
@@ -192,6 +237,13 @@ void BulkOnlySplinesOriginal::CalculateExpectationValues(vector<vector<double> >
 				{
 					double rnia = rni / a;
 					potentialIntern += b * exp(-(rnia * rnia) / 2.0);
+
+					double rniAbsorption = rni - 1.3;
+					double absorptionFactor = 0.0;
+					if (rniAbsorption > 0)
+					{
+						potentialInternComplex += absorptionFactor * rniAbsorption * rniAbsorption;
+					}
 				}
 
 				//kinetic energy
@@ -234,37 +286,82 @@ void BulkOnlySplinesOriginal::CalculateExpectationValues(vector<vector<double> >
 				grBins[grBin] += 1.0 / grBinVolumes[grBin];
 			}
 		}
+
+		for (int f = 0; f < numberOfSplines; f++)
+		{
+			splineSumsD[f][n] *= scalingFactors[f];
+			splineSumsD2[f][n] *= scalingFactors[f];
+		}
+	}
+	otherLocalOperators[0] = potentialIntern;
+	otherLocalOperators[1] = potentialInternComplex;
+	otherLocalOperators[2] = potentialExtern;
+	otherLocalOperators[3] = potentialExternComplex;
+}
+
+vector<double> BosonsBulk::GetCenterOfMass(vector<vector<double> >& R)
+{
+	vector<double> com = { 0.0, 0.0, 0.0 };
+	return com;
+}
+
+double BosonsBulk::GetExternalPotential(vector<double>& r)
+{
+	return 0;
+}
+
+void BosonsBulk::CalculateExpectationValues(vector<double>& O, vector<vector<vector<double> > >& sD, vector<vector<double> >& sD2, vector<double>& otherO, vector<double>& gr, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+	double temp;
+
+	double kineticR = 0;
+	double kineticI = 0;
+	vector<double> vecKineticSumR1(DIM);
+	vector<double> vecKineticSumI1(DIM);
+	double kineticSumR1 = 0;
+	double kineticSumI1 = 0;
+	double kineticSumR1I1 = 0;
+	double kineticSumR2 = 0;
+	double kineticSumI2 = 0;
+
+	localEnergyR = 0;
+	localEnergyI = 0;
+
+	ClearVector(localOperatorsMatrix);
+	ClearVector(localOperatorlocalEnergyR);
+	ClearVector(localOperatorlocalEnergyI);
+	ClearVector(otherExpectationValues);
+
+	for (int n = 0; n < N; n++)
+	{
 		for (int a = 0; a < DIM; a++)
 		{
 			vecKineticSumR1[a] = 0.0;
-			//vecKineticSumI1[a] = 0.0;
+			vecKineticSumI1[a] = 0.0;
 		}
 
 		for (int k = 0; k < numberOfStandardParameters; k++)
 		{
 			for (int a = 0; a < DIM; a++)
 			{
-				vecKineticSumR1[a] += uR[k] * splineSumsD[k][n][a];
-				//vecKineticSumI1[a] += uI[k] * splineSumsD[k][n][a];
+				vecKineticSumR1[a] += uR[k] * sD[k][n][a];
+				vecKineticSumI1[a] += uI[k] * sD[k][n][a];
 			}
-			kineticSumR2 += uR[k] * splineSumsD2[k][n];
-			//kineticSumI2 += uI[k] * splineSumsD2[k][n];
+			kineticSumR2 += uR[k] * sD2[k][n];
+			kineticSumI2 += uI[k] * sD2[k][n];
 		}
-		for (int a = 0; a < DIM; a++)
+		for (int i = 0; i < numberOfSpecialParameters; i++)
 		{
-			temp = (bcFactors[0][0] * splineSumsD[numberOfSplines - 3][n][a] + bcFactors[0][1] * splineSumsD[numberOfSplines - 2][n][a] + bcFactors[0][2] * splineSumsD[numberOfSplines - 1][n][a]);
-			vecKineticSumR1[a] += uR[N_PARAM - 1] * temp;
-			//vecKineticSumI1[a] += uI[N_PARAM - 1] * temp;
-			//temp = (bcFactors[1][0] * splineSumsD[numberOfSplines - 3][n][a] + bcFactors[1][1] * splineSumsD[numberOfSplines - 2][n][a] + bcFactors[1][2] * splineSumsD[numberOfSplines - 1][n][a]);
-			//vecKineticSumR1[a] += uR[N_PARAM - 1] * temp;
-			//vecKineticSumI1[a] += uI[N_PARAM - 1] * temp;
+			for (int a = 0; a < DIM; a++)
+			{
+				temp = (bcFactors[i][0] * sD[numberOfSplines - 3][n][a] + bcFactors[i][1] * sD[numberOfSplines - 2][n][a] + bcFactors[i][2] * sD[numberOfSplines - 1][n][a]);
+				vecKineticSumR1[a] += uR[N_PARAM - (numberOfSpecialParameters - i)] * temp;
+				vecKineticSumI1[a] += uI[N_PARAM - 1] * temp;
+			}
+			temp = (bcFactors[i][0] * sD2[numberOfSplines - 3][n] + bcFactors[i][1] * sD2[numberOfSplines - 2][n] + bcFactors[i][2] * sD2[numberOfSplines - 1][n]);
+			kineticSumR2 += uR[N_PARAM - (numberOfSpecialParameters - i)] * temp;
+			kineticSumI2 += uI[N_PARAM - 1] * temp;
 		}
-		temp = (bcFactors[0][0] * splineSumsD2[numberOfSplines - 3][n] + bcFactors[0][1] * splineSumsD2[numberOfSplines - 2][n] + bcFactors[0][2] * splineSumsD2[numberOfSplines - 1][n]);
-		kineticSumR2 += uR[N_PARAM - 1] * temp;
-		//kineticSumI2 += uI[N_PARAM - 1] * temp;
-		//temp = (bcFactors[1][0] * splineSumsD2[numberOfSplines - 3][n] + bcFactors[1][1] * splineSumsD2[numberOfSplines - 2][n] + bcFactors[1][2] * splineSumsD2[numberOfSplines - 1][n]);
-		//kineticSumR2 += uR[N_PARAM - 1] * temp;
-		//kineticSumI2 += uI[N_PARAM - 1] * temp;
 
 		kineticSumR1I1 += 2.0 * VectorDotProduct(vecKineticSumR1, vecKineticSumI1);
 		kineticSumR1 += VectorNorm2(vecKineticSumR1);
@@ -274,8 +371,8 @@ void BulkOnlySplinesOriginal::CalculateExpectationValues(vector<vector<double> >
 	kineticR = -(kineticSumR1 - kineticSumI1 + kineticSumR2);
 	kineticI = -(kineticSumR1I1 + kineticSumI2);
 
-	localEnergyR = kineticR + potentialIntern + potentialExtern;
-	localEnergyI = kineticI;
+	localEnergyR = kineticR + otherO[0] + otherO[2];
+	localEnergyI = kineticI + otherO[1];
 
 	//cout << "potentialExtern=" << potentialExtern << endl;
 	//cout << "potentialIntern=" << potentialIntern << endl;
@@ -286,43 +383,49 @@ void BulkOnlySplinesOriginal::CalculateExpectationValues(vector<vector<double> >
 	//cout << "kineticSumR1I1=" << kineticSumR1I1 << endl;
 	//cout << "kineticR=" << kineticR << endl;
 
-	for (int i = 0; i < numberOfStandardParameters; i++)
-	{
-		localOperators[i] = splineSums[i];
-	}
-	localOperators[N_PARAM - 1] = (bcFactors[0][0] * splineSums[numberOfSplines - 3] + bcFactors[0][1] * splineSums[numberOfSplines - 2] + bcFactors[0][2] * splineSums[numberOfSplines - 1] + bcFactors[0][3]);
-	//localOperators[N_PARAM - 1] = (bcFactors[1][0] * splineSums[numberOfSplines - 3] + bcFactors[1][1] * splineSums[numberOfSplines - 2] + bcFactors[1][2] * splineSums[numberOfSplines - 1] +bcFactors[1][3]);
+	localOperators = O; //INFO: for providing the localOperators to TDVMC.cpp via IPhysicalSystem.GetLocalOperators()
 	for (int k = 0; k < N_PARAM; k++)
 	{
 		for (int j = 0; j < N_PARAM; j++)
 		{
-			localOperatorsMatrix[k][j] = localOperators[k] * localOperators[j];
+			localOperatorsMatrix[k][j] = O[k] * O[j];
 		}
-		localOperatorlocalEnergyR[k] = localOperators[k] * localEnergyR;
-		localOperatorlocalEnergyI[k] = localOperators[k] * localEnergyI;
+		localOperatorlocalEnergyR[k] = O[k] * localEnergyR;
+		localOperatorlocalEnergyI[k] = O[k] * localEnergyI;
 	}
 
 	otherExpectationValues[0] = kineticR;
-	otherExpectationValues[1] = potentialIntern;
+	otherExpectationValues[1] = otherO[0];
 	otherExpectationValues[2] = wf;
 	for (int i = 0; i < grBinCount; i++)
 	{
-		otherExpectationValues[i + grBinStartIndex] = grBins[i];
+		otherExpectationValues[i + grBinStartIndex] = gr[i];
 	}
 }
 
-void BulkOnlySplinesOriginal::CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void BosonsBulk::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
-
+	RefreshLocalOperators();
+	CalculateOtherLocalOperators(R);
+	CalculateExpectationValues(this->localOperators, this->splineSumsD, this->splineSumsD2, this->otherLocalOperators, this->grBins, uR, uI, phiR, phiI);
 }
 
-void BulkOnlySplinesOriginal::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void BosonsBulk::CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
+	CSDataBulkSplines* s = dynamic_cast<CSDataBulkSplines*>(sample);
+	CalculateExpectationValues(s->localOperators, s->splineSumsD, s->splineSumsD2, s->otherLocalOperators, s->grBins, uR, uI, phiR, phiI);
+}
+
+void BosonsBulk::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+	//int index = 0;
+
 	ClearVector(additionalSystemProperties);
 	CalculateExpectationValues(R, uR, uI, phiR, phiI);
 	for (int i = 0; i < numOfOtherExpectationValues; i++)
 	{
 		additionalSystemProperties[i] = otherExpectationValues[i];
+		//index++;
 	}
 
 	vector<double> vecrij(DIM);
@@ -350,68 +453,63 @@ void BulkOnlySplinesOriginal::CalculateAdditionalSystemProperties(vector<vector<
 	{
 		sk[k] = (sumSCos[k] * sumSCos[k] + sumSSin[k] * sumSSin[k]) / ((double) (N * kValues[k].size()));
 		additionalSystemProperties[numOfOtherExpectationValues + k] = sk[k];
+		//index++;
 	}
+
+	//for (int i = 0; i < numberOfSplines; i++)
+	//{
+	//	additionalSystemProperties[index] = splineSums[i];
+	//	index++;
+	//}
+	//
+	//for (int k = 0; k < numberOfSplines; k++)
+	//{
+	//	for (int n = 0; n < N; n++)
+	//	{
+	//		for (int a = 0; a < DIM; a++)
+	//		{
+	//			additionalSystemProperties[index] = splineSumsD[k][n][a];
+	//			index++;
+	//		}
+	//	}
+	//}
+	//
+	//for (int k = 0; k < numberOfSplines; k++)
+	//{
+	//	for (int n = 0; n < N; n++)
+	//	{
+	//		additionalSystemProperties[index] = splineSumsD2[k][n];
+	//		index++;
+	//	}
+	//}
 }
 
-void BulkOnlySplinesOriginal::CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void BosonsBulk::CalculateWavefunction(vector<double>& O, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	double sum = 0;
-	double interval;
-	int bin;
-	double res;
-	double res2;
-	double res3;
-	double rni;
-	vector<double> vecrni(DIM);
-	double tmp;
 
-	ClearVector(splineSums);
-
-	for (int n = 0; n < N; n++)
+	for (int i = 0; i < N_PARAM; i++)
 	{
-		for (int i = 0; i < n; i++)
-		{
-			rni = VectorDisplacementNIC(R[n], R[i], vecrni);
-			if (rni < maxDistance)
-			{
-				interval = rni / nodePointSpacing;
-				bin = int(interval); //INFO: same as floor(interval) for positive values of "interval" but a little bit faster
-				res = interval - bin;
-				res2 = res * res;
-				res3 = res2 * res;
-
-				tmp = -1.0 / 6.0 * (-1.0 + 3.0 * res - 3.0 * res2 + res3);
-				splineSums[bin] += tmp;
-
-				tmp = 1.0 / 6.0 * (4.0 - 6.0 * res2 + 3.0 * res3);
-				;
-				splineSums[bin + 1] += tmp;
-
-				tmp = 1.0 / 6.0 * (1.0 + 3.0 * res + 3.0 * res2 - 3.0 * res3);
-				splineSums[bin + 2] += tmp;
-
-				tmp = 1.0 / 6.0 * res3;
-				splineSums[bin + 3] += tmp;
-			}
-		}
+		sum += uR[i] * O[i];
 	}
-	for (int i = 0; i < numberOfStandardParameters; i++)
-	{
-		sum += uR[i] * splineSums[i];
-	}
-	sum += uR[N_PARAM - 1] * (bcFactors[0][0] * splineSums[numberOfSplines - 3] + bcFactors[0][1] * splineSums[numberOfSplines - 2] + bcFactors[0][2] * splineSums[numberOfSplines - 1] + bcFactors[0][3]);
-	//sum += uR[N_PARAM - 1] * (bcFactors[1][0] * splineSums[numberOfSplines - 3] + bcFactors[1][1] * splineSums[numberOfSplines - 2] + bcFactors[1][2] * splineSums[numberOfSplines - 1] + bcFactors[1][3]);
 
-	wf = exp(sum);
 	exponent = sum;
+	wf = exp(exponent + phiR);
 }
 
-void BulkOnlySplinesOriginal::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void BosonsBulk::CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
-
+	CalculateLocalOperators(R);
+	CalculateWavefunction(this->localOperators, uR, uI, phiR, phiI);
 }
 
-void BulkOnlySplinesOriginal::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
+void BosonsBulk::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+	CSDataBulkSplines* s = dynamic_cast<CSDataBulkSplines*>(sample);
+	CalculateWavefunction(s->localOperators, uR, uI, phiR, phiI);
+}
+
+void BosonsBulk::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
 	double sum = 0;
 	double interval;
@@ -461,6 +559,11 @@ void BulkOnlySplinesOriginal::CalculateWFChange(vector<vector<double> >& R, vect
 
 	for (int i = 0; i < numberOfSplines; i++)
 	{
+		sumOldPerBin[i] *= scalingFactors[i];
+		sumNewPerBin[i] *= scalingFactors[i];
+	}
+	for (int i = 0; i < numberOfSplines; i++)
+	{
 		splineSumsNew[i] = max(0.0, splineSums[i] - sumOldPerBin[i] + sumNewPerBin[i]);
 	}
 
@@ -468,14 +571,16 @@ void BulkOnlySplinesOriginal::CalculateWFChange(vector<vector<double> >& R, vect
 	{
 		sum += uR[i] * splineSumsNew[i];
 	}
-	sum += uR[N_PARAM - 1] * (bcFactors[0][0] * splineSumsNew[numberOfSplines - 3] + bcFactors[0][1] * splineSumsNew[numberOfSplines - 2] + bcFactors[0][2] * splineSumsNew[numberOfSplines - 1] + bcFactors[0][3]);
-	//sum += uR[N_PARAM - 1] * (bcFactors[1][0] * splineSumsNew[numberOfSplines - 3] + bcFactors[1][1] * splineSumsNew[numberOfSplines - 2] + bcFactors[1][2] * splineSumsNew[numberOfSplines - 1] + bcFactors[1][3]);
+	for (int i = 0; i < numberOfSpecialParameters; i++)
+	{
+		sum += uR[N_PARAM - (numberOfSpecialParameters - i)] * (bcFactors[i][0] * splineSumsNew[numberOfSplines - 3] + bcFactors[i][1] * splineSumsNew[numberOfSplines - 2] + bcFactors[i][2] * splineSumsNew[numberOfSplines - 1] + bcFactors[i][3]);
+	}
 
-	wfNew = exp(sum);
 	exponentNew = sum;
+	wfNew = exp(exponentNew + phiR);
 }
 
-double BulkOnlySplinesOriginal::CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
+double BosonsBulk::CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
 	CalculateWFChange(R, uR, uI, phiR, phiI, changedParticleIndex, oldPosition);
 	double wfQuotient = exp(2.0 * (exponentNew - exponent));
@@ -485,13 +590,18 @@ double BulkOnlySplinesOriginal::CalculateWFQuotient(vector<vector<double> >& R, 
 	return wfQuotient;
 }
 
-void BulkOnlySplinesOriginal::AcceptMove()
+void BosonsBulk::AcceptMove()
 {
 	wf = wfNew;
 	exponent = exponentNew;
 	splineSums = splineSumsNew;
 }
 
-void BulkOnlySplinesOriginal::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
+void BosonsBulk::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
 {
+	CSDataBulkSplines* d = dynamic_cast<CSDataBulkSplines*>(data);
+	d->splineSumsD = this->splineSumsD;
+	d->splineSumsD2 = this->splineSumsD2;
+	d->otherLocalOperators = this->otherLocalOperators;
+	d->grBins = this->grBins;
 }

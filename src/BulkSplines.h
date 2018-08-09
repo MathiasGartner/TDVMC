@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Constants.h"
+#include "ICorrelatedSamplingData.h"
 #include "IPhysicalSystem.h"
 #include "MathOperators.h"
 #include "Utils.h"
@@ -43,6 +44,9 @@ private:
 protected:
 	double exponentNew;
 
+private:
+	double GetExternalPotential(vector<double>& r);
+
 //Implementation of IPhysicalSystem
 public:
 	BulkSplines(vector<double>& params, string configDirectory);
@@ -51,17 +55,23 @@ public:
 
 	vector<double> GetCenterOfMass(vector<vector<double> >& R);
 
-	virtual double GetExternalPotential(vector<double>& r);
+	void CalculateOtherLocalOperators(vector<vector<double> >& R);
 
 	void CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
+
+	void CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
 
 	void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
 
 	void CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
+
+	void CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
 
 	void CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition);
 
 	double CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition);
 
 	void AcceptMove();
+
+	void FillCorrelatedSamplingData(ICorrelatedSamplingData* data);
 };

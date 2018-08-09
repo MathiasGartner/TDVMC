@@ -154,6 +154,11 @@ vector<double> BulkOnlySplines::GetCenterOfMass(vector<vector<double> >& R)
 	return com;
 }
 
+void BulkOnlySplines::CalculateOtherLocalOperators(vector<vector<double> >& R)
+{
+
+}
+
 void BulkOnlySplines::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	vector<double> vecrni(DIM);
@@ -474,6 +479,11 @@ void BulkOnlySplines::CalculateExpectationValues(vector<vector<double> >& R, vec
 	//cout << kineticR << endl;
 }
 
+void BulkOnlySplines::CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+
+}
+
 void BulkOnlySplines::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	ClearVector(additionalSystemProperties);
@@ -567,6 +577,11 @@ void BulkOnlySplines::CalculateWavefunction(vector<vector<double> >& R, vector<d
 
 	wf = exp(sum + phiR);
 	exponent = sum;
+}
+
+void BulkOnlySplines::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+
 }
 
 void BulkOnlySplines::CalculateWFChange2(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
@@ -732,4 +747,9 @@ void BulkOnlySplines::AcceptMove()
 	//		sumPerBinPerParticle[this->changedParticleIndex - 1][i] = sumNewPerBinForChangedParticle[i];
 	//	}
 	//}
+}
+
+void BulkOnlySplines::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
+{
+
 }

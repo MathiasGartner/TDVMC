@@ -164,6 +164,11 @@ double BulkQT::GetTailCorrectionPotential()
 	return value;
 }
 
+void BulkQT::CalculateOtherLocalOperators(vector<vector<double> >& R)
+{
+
+}
+
 void BulkQT::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	vector<double> vecrni(DIM);
@@ -353,6 +358,11 @@ void BulkQT::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 	}
 }
 
+void BulkQT::CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+
+}
+
 void BulkQT::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	ClearVector(additionalSystemProperties);
@@ -448,6 +458,11 @@ void BulkQT::CalculateWavefunction(vector<vector<double> >& R, vector<double>& u
 
 	wf = exp(sum);
 	exponent = sum;
+}
+
+void BulkQT::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+
 }
 
 void BulkQT::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
@@ -546,4 +561,8 @@ void BulkQT::AcceptMove()
 	exponent = exponentNew;
 	quadraticSum = quadraticSumNew;
 	splineSums = splineSumsNew;
+}
+
+void BulkQT::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
+{
 }

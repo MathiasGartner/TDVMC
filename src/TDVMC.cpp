@@ -1,5 +1,6 @@
 #include "mpi.h"
 
+#include "BosonsBulk.h"
 #include "BulkSplines.h"
 #include "BulkSplinesPhi.h"
 #include "BulkSplinesScaled.h"
@@ -7,10 +8,11 @@
 #include "BulkQTPhi.h"
 #include "ConfigItem.h"
 #include "Constants.h"
-#include "CorrelatedSamplingData.h"
 #include "GaussianWavepacket.h"
 #include "HeBulk.h"
 #include "HeDrop.h"
+#include "ICorrelatedSamplingData.h"
+#include "IPhysicalSystem.h"
 #include "MathOperators.h"
 #include "MPIMethods.h"
 #include "SimulationStepData.h"
@@ -122,11 +124,7 @@ vector<vector<double> > AllParametersR;
 vector<vector<double> > AllParametersI;
 vector<vector<double> > AllAdditionalSystemProperties;
 
-vector<vector<vector<double> > > mcSamples;
-vector<double> wfValues2;
-vector<double> exponentValues;
-
-vector<CorrelatedSamplingData> correlatedSamplingData;
+vector<ICorrelatedSamplingData*> correlatedSamplingData;
 
 vector<double> times;
 vector<double> previousStepWeights = { 0.982014, 0.952574, 0.880797, 0.731059, 0.5, 0.268941, 0.119203, 0.0474259, 0.0179862, 0.00669285 };
@@ -444,9 +442,12 @@ void Init()
 	mc_nsteps_original = MC_NSTEPS;
 	mc_nadditionalsteps = (double) MC_NADDITIONALSTEPS;
 
-	mcSamples.resize(MC_NSTEPS);
-	wfValues2.resize(MC_NSTEPS);
-	exponentValues.resize(MC_NSTEPS);
+	correlatedSamplingData.resize(MC_NSTEPS);
+	//TODO: Let the IPhysicalSystem sys create the objects needed for storing the correlated sampling data
+	for (int i = 0; i < MC_NSTEPS; i++)
+	{
+		correlatedSamplingData[i] = new CSDataBulkSplines();
+	}
 }
 
 void PostSystemInit()
@@ -464,10 +465,12 @@ void PostSystemInit()
 	AllAdditionalSystemProperties.resize(0);
 }
 
+
 void WriteParticlesToFile(vector<vector<double> >& R, string ending)
 {
 	WriteDataToFile(R, "position" + ending, "x, y, z");
 }
+
 
 bool LoadLastPositionsFromFile(string filename, vector<vector<double> >& R)
 {
@@ -504,6 +507,7 @@ bool LoadLastPositionsFromFile(string filename, vector<vector<double> >& R)
 	file.close();
 	return successful;
 }
+
 
 void InitCoordinateConfiguration(vector<vector<double> >& R)
 {
@@ -592,6 +596,7 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 	}
 }
 
+
 void MoveCoordinatesToFirstCell(vector<vector<double> >& R)
 {
 	for (int i = 0; i < N; i++)
@@ -602,6 +607,7 @@ void MoveCoordinatesToFirstCell(vector<vector<double> >& R)
 		}
 	}
 }
+
 
 void MoveCenterOfMassToZero(vector<vector<double> >& R)
 {
@@ -615,6 +621,7 @@ void MoveCenterOfMassToZero(vector<vector<double> >& R)
 		}
 	}
 }
+
 
 void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
@@ -663,23 +670,25 @@ void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<dou
 	nTrials++;
 }
 
-bool NeedToUpdateSamples(vector<vector<vector<double> > >& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+
+bool NeedToUpdateSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	bool updateNeeded = true;
-	double weight = 1.0;
-	double weightDiff = 0.0;
-	int count = samples.size();
-	int randomSample = randomInt(count - 1);
-	sys->CalculateWavefunction(samples[randomSample], uR, uI, phiR, phiI);
-	//double newWf2 = sys->GetWf() * sys->GetWf();
-	//weight = newWf2 / wfValues2[randomSample];
-	weight = exp(2.0 * sys->GetExponent() - 2.0 * exponentValues[randomSample]);
-	weightDiff = abs(1.0 - weight);
-	updateNeeded = weightDiff > 0.99;
+	//double weight = 1.0;
+	//double weightDiff = 0.0;
+	//int count = samples.size();
+	//int randomSample = randomInt(count - 1);
+	//sys->CalculateWavefunction(samples[randomSample], uR, uI, phiR, phiI);
+	////double newWf2 = sys->GetWf() * sys->GetWf();
+	////weight = newWf2 / wfValues2[randomSample];
+	//weight = exp(2.0 * sys->GetExponent() - 2.0 * correlatedSamplingData[randomSample].exponent);
+	//weightDiff = abs(1.0 - weight);
+	//updateNeeded = weightDiff > 0.99;
 	return updateNeeded;
 }
 
-void UpdateSamplesRandom(vector<vector<vector<double> > >& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+
+void UpdateSamplesRandom(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	double percent = 0.2;
 	int count = samples.size();
@@ -688,64 +697,74 @@ void UpdateSamplesRandom(vector<vector<vector<double> > >& samples, vector<doubl
 	for (int i = 0; i < nrOfUpdates; i++)
 	{
 		int randomSample = randomInt(count - 1);
-		sys->CalculateWavefunction(samples[randomSample], uR, uI, phiR, phiI);
+		sys->CalculateWavefunction(samples[randomSample]->R, uR, uI, phiR, phiI);
 		for (int n = 0; n < MC_NTHERMSTEPS; n++)
 		{
-			DoMetropolisStep(samples[randomSample], uR, uI, phiR, phiI);
+			DoMetropolisStep(samples[randomSample]->R, uR, uI, phiR, phiI);
 		}
-		wfValues2[randomSample] = sys->GetWf() * sys->GetWf();
-		exponentValues[randomSample] = sys->GetExponent();
+		//TODO: don't update expectation values - CalculateOtherLocalOperators would be sufficient
+		sys->CalculateExpectationValues(samples[randomSample]->R, uR, uI, phiR, phiI);
+
+		samples[randomSample]->wf = sys->GetWf();
+		samples[randomSample]->wf2 = samples[randomSample]->wf * samples[randomSample]->wf;
+		samples[randomSample]->exponent = sys->GetExponent();
+		samples[randomSample]->exponent2 = samples[randomSample]->exponent * samples[randomSample]->exponent;
+		samples[randomSample]->localOperators = sys->GetLocalOperators();
+		sys->FillCorrelatedSamplingData(samples[randomSample]);
 	}
 }
 
-void UpdateAllSamples(vector<vector<vector<double> > >& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+
+void UpdateAllSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
-	int count = samples.size();
-	for (int i = 0; i < count; i++)
-	{
-		sys->CalculateWavefunction(samples[i], uR, uI, phiR, phiI);
-		for (int n = 0; n < MC_NTHERMSTEPS; n++)
-		{
-			DoMetropolisStep(samples[i], uR, uI, phiR, phiI);
-		}
-		wfValues2[i] = sys->GetWf() * sys->GetWf();
-		exponentValues[i] = sys->GetExponent();
-	}
+	//int count = samples.size();
+	//for (int i = 0; i < count; i++)
+	//{
+	//	sys->CalculateWavefunction(samples[i], uR, uI, phiR, phiI);
+	//	for (int n = 0; n < MC_NTHERMSTEPS; n++)
+	//	{
+	//		DoMetropolisStep(samples[i], uR, uI, phiR, phiI);
+	//	}
+	//	wfValues2[i] = sys->GetWf() * sys->GetWf();
+	//	exponentValues[i] = sys->GetExponent();
+	//}
 }
 
-void UpdateSamples(vector<vector<vector<double> > >& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+
+void UpdateSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
-	int nrOfUpdatedSamples = 0;
-	int count = samples.size();
-	double weight = 1.0;
-	double weightDiff = 0.0;
-
-	for (int i = 0; i < count; i++)
-	{
-		sys->CalculateWavefunction(samples[i], uR, uI, phiR, phiI);
-		//double newWf2 = sys->GetWf() * sys->GetWf();
-		//weight = newWf2 / wfValues2[i];
-		weight = exp(2.0 * sys->GetExponent() - 2.0 * exponentValues[i]);
-		weightDiff = abs(1.0 - weight);
-
-		if (weightDiff > 0.1)
-		{
-			nrOfUpdatedSamples++;
-			for (int n = 0; n < MC_NTHERMSTEPS; n++)
-			{
-				DoMetropolisStep(samples[i], uR, uI, phiR, phiI);
-			}
-			wfValues2[i] = sys->GetWf() * sys->GetWf();
-			exponentValues[i] = sys->GetExponent();
-		}
-	}
-	//Log("nrOfUpdatedSamples: " + to_string(nrOfUpdatedSamples) + "(" + to_string((double)nrOfUpdatedSamples / count * 100.0) + "%)");
-	double avgNrOfUpdatedSamples = MPIMethods::ReduceToAverage(&nrOfUpdatedSamples);
-	if (processRank == rootRank)
-	{
-		Log("nrOfUpdatedSamples: " + to_string(avgNrOfUpdatedSamples) + "(" + to_string(avgNrOfUpdatedSamples / count * 100.0) + "%)");
-	}
+	//int nrOfUpdatedSamples = 0;
+	//int count = samples.size();
+	//double weight = 1.0;
+	//double weightDiff = 0.0;
+	//
+	//for (int i = 0; i < count; i++)
+	//{
+	//	sys->CalculateWavefunction(samples[i], uR, uI, phiR, phiI);
+	//	//double newWf2 = sys->GetWf() * sys->GetWf();
+	//	//weight = newWf2 / wfValues2[i];
+	//	weight = exp(2.0 * sys->GetExponent() - 2.0 * correlatedSamplingData[i].exponent);
+	//	weightDiff = abs(1.0 - weight);
+	//
+	//	if (weightDiff > 0.1)
+	//	{
+	//		nrOfUpdatedSamples++;
+	//		for (int n = 0; n < MC_NTHERMSTEPS; n++)
+	//		{
+	//			DoMetropolisStep(samples[i], uR, uI, phiR, phiI);
+	//		}
+	//		wfValues2[i] = sys->GetWf() * sys->GetWf();
+	//		exponentValues[i] = sys->GetExponent();
+	//	}
+	//}
+	////Log("nrOfUpdatedSamples: " + to_string(nrOfUpdatedSamples) + "(" + to_string((double)nrOfUpdatedSamples / count * 100.0) + "%)");
+	//double avgNrOfUpdatedSamples = MPIMethods::ReduceToAverage(&nrOfUpdatedSamples);
+	//if (processRank == rootRank)
+	//{
+	//	Log("nrOfUpdatedSamples: " + to_string(avgNrOfUpdatedSamples) + "(" + to_string(avgNrOfUpdatedSamples / count * 100.0) + "%)");
+	//}
 }
+
 
 void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, bool intermediateStep = false)
 {
@@ -793,9 +812,13 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 
 		if (i < mc_nsteps_original)
 		{
-			mcSamples[i] = R;
-			wfValues2[i] = sys->GetWf() * sys->GetWf();
-			exponentValues[i] = sys->GetExponent();
+			correlatedSamplingData[i]->R = R;
+			correlatedSamplingData[i]->wf = sys->GetWf();
+			correlatedSamplingData[i]->wf2 = correlatedSamplingData[i]->wf * correlatedSamplingData[i]->wf;
+			correlatedSamplingData[i]->exponent = sys->GetExponent();
+			correlatedSamplingData[i]->exponent2 = correlatedSamplingData[i]->exponent * correlatedSamplingData[i]->exponent;
+			correlatedSamplingData[i]->localOperators = sys->GetLocalOperators();
+			sys->FillCorrelatedSamplingData(correlatedSamplingData[i]);
 		}
 
 		//INFO: consumes too much memory
@@ -914,7 +937,8 @@ void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>&
 	//}
 }
 
-void UpdateExpectationValuesForGivenSamples(vector<vector<vector<double> > >& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+
+void UpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	int count = samples.size();
 	double dblCount = (double) count;
@@ -942,7 +966,7 @@ void UpdateExpectationValuesForGivenSamples(vector<vector<vector<double> > >& sa
 		sys->CalculateExpectationValues(samples[i], uR, uI, phiR, phiI);
 
 		//weight = sys->GetWf() * sys->GetWf() / wfValues2[i];
-		weight = exp(2.0 * sys->GetExponent() - 2.0 * exponentValues[i]);
+		weight = exp(2.0 * sys->GetExponent() - 2.0 * samples[i]->exponent);
 		weightSum += weight;
 		//INFO: calculate contribution to average value
 		localOperators += sys->GetLocalOperators() / dblCount * weight;
@@ -986,7 +1010,7 @@ void UpdateExpectationValuesForGivenSamples(vector<vector<vector<double> > >& sa
 	}
 }
 
-void ParallelUpdateExpectationValuesForGivenSamples(vector<vector<vector<double> > >& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void ParallelUpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	//Timer t;
 	//double dblDuration;
@@ -1033,6 +1057,7 @@ void NormalizeParameters(vector<double>& uR, vector<double>& uI, double *phiR, d
 	}
 }
 
+
 void BuildSystemOfEquationsForParametersNoPhi(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
 {
 	energiesReal.resize(N_PARAM);
@@ -1063,6 +1088,7 @@ void BuildSystemOfEquationsForParametersNoPhi(vector<vector<double> >& matrix, v
 	}
 }
 
+
 void BuildSystemOfEquationsForParametersIncludePhiWithTimeRotation(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
 {
 	double rotation = 1.499 * M_PI; // 3/2 Pi -> real time; Pi -> imaginary time
@@ -1088,6 +1114,7 @@ void BuildSystemOfEquationsForParametersIncludePhiWithTimeRotation(vector<vector
 		}
 	}
 }
+
 
 void BuildSystemOfEquationsForParametersIncludePhi(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
 {
@@ -1119,6 +1146,7 @@ void BuildSystemOfEquationsForParametersIncludePhi(vector<vector<double> >& matr
 	}
 }
 
+
 void BuildSystemOfEquationsForParameters(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
 {
 	if (IMAGINARY_TIME == -1)
@@ -1135,6 +1163,7 @@ void BuildSystemOfEquationsForParameters(vector<vector<double> >& matrix, vector
 		BuildSystemOfEquationsForParametersIncludePhi(matrix, energiesReal, energiesImag);
 	}
 }
+
 
 void PerformCholeskyDecomposition(vector<vector<double> >& matrix)
 {
@@ -1169,6 +1198,7 @@ void PerformCholeskyDecomposition(vector<vector<double> >& matrix)
 		}
 	}
 }
+
 
 void SolveForParametersDot(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag, vector<double>& resultReal, vector<double>& resultImag, double *resultPhiReal, double *resultPhiImag)
 {
@@ -1229,6 +1259,7 @@ void SolveForParametersDot(vector<vector<double> >& matrix, vector<double>& ener
 	}
 }
 
+
 void CalculateNextParametersEuler(double dt, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
 	if (processRank == rootRank)
@@ -1262,6 +1293,7 @@ void CalculateNextParametersEuler(double dt, vector<double>& uR, vector<double>&
 		*phiI = *phiI + phiDotI * dt;
 	}
 }
+
 
 void CalculateNextParametersPC(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
@@ -1335,6 +1367,7 @@ void CalculateNextParametersPC(double dt, vector<vector<double> >& R, vector<dou
 	*phiR = tmpPhiR;
 	*phiI = tmpPhiI;
 }
+
 
 void CalculateNextParametersRK4(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
@@ -1426,6 +1459,7 @@ void CalculateNextParametersRK4(double dt, vector<vector<double> >& R, vector<do
 	}
 }
 
+
 void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
 	vector<double> energiesReal; //rhs of the equation that corresponds to uDotR;
@@ -1457,12 +1491,12 @@ void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vecto
 	{
 		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
 
-		if (sys->GetStep() % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
-		{
-			//WriteDataToFile(matrix, "eq_matrix" + to_string(sys->GetStep()), "matrix");
-			//WriteDataToFile(energiesReal, "eq_rhs_uR_" + to_string(sys->GetStep()), "energiesReal");
-			//WriteDataToFile(energiesImag, "eq_rhs_uI_" + to_string(sys->GetStep()), "energiesImag");
-		}
+		//if (sys->GetStep() % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
+		//{
+		//	WriteDataToFile(matrix, "eq_matrix" + to_string(sys->GetStep()), "matrix");
+		//	WriteDataToFile(energiesReal, "eq_rhs_uR_" + to_string(sys->GetStep()), "energiesReal");
+		//	WriteDataToFile(energiesImag, "eq_rhs_uI_" + to_string(sys->GetStep()), "energiesImag");
+		//}
 
 		PerformCholeskyDecomposition(matrix);
 		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR[0], uDotI[0], &(phiDotR[0]), &(phiDotI[0]));
@@ -1474,14 +1508,14 @@ void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vecto
 		tmpPhiR = *phiR + phiDotR[0] * dt / 2.0;
 		tmpPhiI = *phiI + phiDotI[0] * dt / 2.0;
 
-		if (sys->GetStep() % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
-		{
-			//WriteDataToFile(uDotR[0], "eq_result_uRDot" + to_string(sys->GetStep()), to_string(phiDotR[0]));
-			//WriteDataToFile(uDotI[0], "eq_result_uIDot" + to_string(sys->GetStep()), to_string(phiDotI[0]));
-		}
+		//if (sys->GetStep() % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
+		//{
+		//	WriteDataToFile(uDotR[0], "eq_result_uRDot" + to_string(sys->GetStep()), to_string(phiDotR[0]));
+		//	WriteDataToFile(uDotI[0], "eq_result_uIDot" + to_string(sys->GetStep()), to_string(phiDotI[0]));
+		//}
 	}
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-	ParallelUpdateExpectationValuesForGivenSamples(mcSamples, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
+	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
 
 	if (processRank == rootRank)
 	{
@@ -1497,7 +1531,7 @@ void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vecto
 		tmpPhiI = *phiI + phiDotI[1] * dt / 2.0;
 	}
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-	ParallelUpdateExpectationValuesForGivenSamples(mcSamples, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
+	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
 
 	if (processRank == rootRank)
 	{
@@ -1513,7 +1547,7 @@ void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vecto
 		tmpPhiI = *phiI + phiDotI[2] * dt;
 	}
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-	ParallelUpdateExpectationValuesForGivenSamples(mcSamples, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
+	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
 
 	if (processRank == rootRank)
 	{
@@ -1530,10 +1564,12 @@ void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vecto
 	}
 }
 
+
 void CalculateNextParametersImplicitEuler(double dt, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
-
+	//TODO: implement
 }
+
 
 void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
@@ -1573,6 +1609,7 @@ void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<doubl
 	}
 }
 
+
 void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI)
 {
 	double tmpPhiR = 0;
@@ -1580,10 +1617,12 @@ void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<doubl
 	CalculateNextParameters(dt, R, uR, uI, &tmpPhiR, &tmpPhiI);
 }
 
+
 void NormalizeWavefunction(double wf, double *phiR)
 {
 	*phiR = *phiR - log(wf);
 }
+
 
 void AdjustParameters(vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
@@ -1596,6 +1635,7 @@ void AdjustParameters(vector<double>& uR, vector<double>& uI, double *phiR, doub
 	//uR[0] = uR[2];
 	//uR[1] = uR[2];
 }
+
 
 void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
@@ -1641,12 +1681,14 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
 	}
 }
 
+
 void ParallelCalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	CalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
 
 	MPIMethods::ReduceToAverage(additionalSystemProperties);
 }
+
 
 void AlignCoordinates(vector<vector<double> >& R)
 {
@@ -1664,6 +1706,7 @@ void AlignCoordinates(vector<vector<double> >& R)
 }
 
 //TODO: find better criteria when to accept new parameters
+
 bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	bool accept = true;
@@ -1735,6 +1778,7 @@ bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double
 	}
 	return accept;
 }
+
 
 int mainMPI(int argc, char** argv)
 {
@@ -1818,6 +1862,10 @@ int mainMPI(int argc, char** argv)
 	else if (SYSTEM_TYPE == "GaussianWavepacket")
 	{
 		sys = new GaussianWavepacket(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BosonsBulk")
+	{
+		sys = new BosonsBulk(SYSTEM_PARAMS, configDirectory);
 	}
 	else
 	{
@@ -1955,8 +2003,8 @@ int mainMPI(int argc, char** argv)
 			}
 			else
 			{
-				UpdateSamplesRandom(mcSamples, uR, uI, phiR, phiI);
-				ParallelUpdateExpectationValuesForGivenSamples(mcSamples, uR, uI, phiR, phiI);
+				UpdateSamplesRandom(correlatedSamplingData, uR, uI, phiR, phiI);
+				ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR, uI, phiR, phiI);
 
 				//bool update = NeedToUpdateSamples(mcSamples, uR, uI, phiR, phiI);
 				//vector<bool> allUpdateValues = MPIMethods::CollectValues(update);
@@ -1978,7 +2026,6 @@ int mainMPI(int argc, char** argv)
 				//	ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
 				//	dynTimestep = TIMESTEP;
 				//}
-
 
 				//if (MPIMethods::IsAnyTrue(update))
 				//{
@@ -2125,7 +2172,7 @@ int mainMPI(int argc, char** argv)
 				Log("Energy not finite", ERROR);
 				cancel = 2;
 			}
-			else if(nrOfAcceptParameterTrials == maxNrOfAcceptParameterTrials)
+			else if (nrOfAcceptParameterTrials == maxNrOfAcceptParameterTrials)
 			{
 				Log("Parameters not accepted", ERROR);
 				cancel = 3;
@@ -2251,6 +2298,10 @@ int mainMPI(int argc, char** argv)
 	//Log("free memory ...");
 	//TODO: how to properly delete the IPhysicalSystem pointer?
 	//delete sys;
+	for (int i = 0; i < MC_NSTEPS; i++)
+	{
+		delete correlatedSamplingData[i];
+	}
 
 	//Log("finalize ...");
 	MPIMethods::Barrier();
@@ -2301,6 +2352,7 @@ void startVMCSampler()
 	cout << "E=" << JoinVector(energy) << endl;
 }
 
+
 int main(int argc, char **argv)
 {
 	int val = -1;
@@ -2321,8 +2373,8 @@ int main(int argc, char **argv)
 	{
 		//SYSTEM_TYPE = "BulkQT";
 		//SYSTEM_TYPE = "BulkSplines";
-		//SYSTEM_TYPE = "BulkSplines";
-		SYSTEM_TYPE = "BulkSplinesScaled";
+		//SYSTEM_TYPE = "BulkSplinesScaled";
+		SYSTEM_TYPE = "BosonsBulk";
 		//SYSTEM_TYPE = "HeDrop";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
@@ -2348,6 +2400,10 @@ int main(int argc, char **argv)
 		else if (SYSTEM_TYPE == "GaussianWavepacket")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/wavepacket.config";
+		}
+		else if (SYSTEM_TYPE == "BosonsBulk")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonsBulk.config";
 		}
 		if (processRank == rootRank)
 		{

@@ -46,6 +46,11 @@ vector<double> GaussianWavepacket::GetCenterOfMass(vector<vector<double> >& R)
 	return com;
 }
 
+void GaussianWavepacket::CalculateOtherLocalOperators(vector<vector<double> >& R)
+{
+
+}
+
 void GaussianWavepacket::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	double value = 0;
@@ -86,6 +91,11 @@ void GaussianWavepacket::CalculateExpectationValues(vector<vector<double> >& R, 
 	}
 }
 
+void GaussianWavepacket::CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+
+}
+
 void GaussianWavepacket::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 
@@ -100,6 +110,11 @@ void GaussianWavepacket::CalculateWavefunction(vector<vector<double> >& R, vecto
 	//value = exp(u[0]) * exp(u[2] * R[0][0]) * exp(u[4] * pow(R[0][0], 4));
 	value = pow(value, 2);
 	this->wf = value;
+}
+
+void GaussianWavepacket::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+
 }
 
 void GaussianWavepacket::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
@@ -120,4 +135,8 @@ double GaussianWavepacket::CalculateWFQuotient(vector<vector<double> >& R, vecto
 void GaussianWavepacket::AcceptMove()
 {
 	this->wf = this->wfNew;
+}
+
+void GaussianWavepacket::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
+{
 }

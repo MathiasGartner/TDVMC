@@ -137,6 +137,11 @@ double BulkSplinesScaled::GetExternalPotential(vector<double>& r)
 	return 0;
 }
 
+void BulkSplinesScaled::CalculateOtherLocalOperators(vector<vector<double> >& R)
+{
+
+}
+
 void BulkSplinesScaled::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	vector<double> vecrni(DIM);
@@ -338,6 +343,11 @@ void BulkSplinesScaled::CalculateExpectationValues(vector<vector<double> >& R, v
 	}
 }
 
+void BulkSplinesScaled::CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+
+}
+
 void BulkSplinesScaled::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	//int index = 0;
@@ -465,6 +475,11 @@ void BulkSplinesScaled::CalculateWavefunction(vector<vector<double> >& R, vector
 	wf = exp(exponent + phiR);
 }
 
+void BulkSplinesScaled::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+
+}
+
 void BulkSplinesScaled::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
 	double sum = 0;
@@ -551,4 +566,8 @@ void BulkSplinesScaled::AcceptMove()
 	wf = wfNew;
 	exponent = exponentNew;
 	splineSums = splineSumsNew;
+}
+
+void BulkSplinesScaled::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
+{
 }

@@ -1,6 +1,6 @@
 #include "ConfigItem.h"
 
-ConfigItem::ConfigItem(string name,  ConfigItemType type)
+ConfigItem::ConfigItem(string name, ConfigItemType type)
 {
 	this->name = name;
 	this->variableString = 0;
@@ -10,22 +10,26 @@ ConfigItem::ConfigItem(string name,  ConfigItemType type)
 	this->type = type;
 }
 
-ConfigItem::ConfigItem(string name, string* variable, ConfigItemType type) : ConfigItem(name, type)
+ConfigItem::ConfigItem(string name, string* variable, ConfigItemType type) :
+		ConfigItem(name, type)
 {
 	this->variableString = variable;
 }
 
-ConfigItem::ConfigItem(string name, int* variable, ConfigItemType type) : ConfigItem(name, type)
+ConfigItem::ConfigItem(string name, int* variable, ConfigItemType type) :
+		ConfigItem(name, type)
 {
 	this->variableInt = variable;
 }
 
-ConfigItem::ConfigItem(string name, double* variable, ConfigItemType type) : ConfigItem(name, type)
+ConfigItem::ConfigItem(string name, double* variable, ConfigItemType type) :
+		ConfigItem(name, type)
 {
 	this->variableDouble = variable;
 }
 
-ConfigItem::ConfigItem(string name, vector<double>& variable, ConfigItemType type) : ConfigItem(name, type)
+ConfigItem::ConfigItem(string name, vector<double>& variable, ConfigItemType type) :
+		ConfigItem(name, type)
 {
 	this->variableArrDouble = &variable;
 }

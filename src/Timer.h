@@ -17,25 +17,25 @@ public:
 		isRunning = false;
 	}
 
-    void start()
-    {
-    	startTime = chrono::high_resolution_clock::now();
-    	isRunning = true;
-    }
+	void start()
+	{
+		startTime = chrono::high_resolution_clock::now();
+		isRunning = true;
+	}
 
-    void stop()
-    {
-    	endTime = chrono::high_resolution_clock::now();
-    	isRunning = false;
-    }
+	void stop()
+	{
+		endTime = chrono::high_resolution_clock::now();
+		isRunning = false;
+	}
 
-    double duration()
-    {
-        return chrono::duration_cast<chrono::milliseconds>((isRunning ? chrono::high_resolution_clock::now() : endTime) - startTime).count();
-    }
+	double duration()
+	{
+		return chrono::duration_cast<chrono::milliseconds>((isRunning ? chrono::high_resolution_clock::now() : endTime) - startTime).count();
+	}
 
-    double durationSeconds()
-    {
-        return duration() / 1000.0;
-    }
+	double durationSeconds()
+	{
+		return duration() / 1000.0;
+	}
 };

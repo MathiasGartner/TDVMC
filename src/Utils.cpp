@@ -130,7 +130,7 @@ vector<double> OuterSum(vector<vector<double> >& v)
 	for (unsigned int i = 0; i < v[0].size(); i++)
 	{
 		sum = 0;
-		for(unsigned int j = 0; j < v.size(); j++)
+		for (unsigned int j = 0; j < v.size(); j++)
 		{
 			sum += v[j][i];
 		}
@@ -274,7 +274,6 @@ vector<string> split(const string &s, char delim)
 	split(s, delim, elems);
 	return elems;
 }
-
 
 double GetSizeOfVector(vector<double>& v)
 {

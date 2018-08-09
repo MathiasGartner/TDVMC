@@ -62,8 +62,6 @@ vector<double> operator/(vector<double> v, double x)
 	return v;
 }
 
-
-
 vector<vector<double> >& operator+=(vector<vector<double> >& v1, const vector<vector<double> >& v2)
 {
 	for (unsigned int i = 0; i < v1.size(); i++)
