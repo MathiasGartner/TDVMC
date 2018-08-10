@@ -49,6 +49,8 @@ double VectorNorm2(vector<double>& r)
 		sum += r[i] * r[i];
 	}
 	return sum;
+	//TODO: use explicit expression for 3D, 2D or 1D vectors. (a lot faster!!)
+	//return r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
 }
 
 double VectorNorm(vector<double>& r)

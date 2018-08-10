@@ -465,12 +465,10 @@ void PostSystemInit()
 	AllAdditionalSystemProperties.resize(0);
 }
 
-
 void WriteParticlesToFile(vector<vector<double> >& R, string ending)
 {
 	WriteDataToFile(R, "position" + ending, "x, y, z");
 }
-
 
 bool LoadLastPositionsFromFile(string filename, vector<vector<double> >& R)
 {
@@ -507,7 +505,6 @@ bool LoadLastPositionsFromFile(string filename, vector<vector<double> >& R)
 	file.close();
 	return successful;
 }
-
 
 void InitCoordinateConfiguration(vector<vector<double> >& R)
 {
@@ -596,7 +593,6 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 	}
 }
 
-
 void MoveCoordinatesToFirstCell(vector<vector<double> >& R)
 {
 	for (int i = 0; i < N; i++)
@@ -607,7 +603,6 @@ void MoveCoordinatesToFirstCell(vector<vector<double> >& R)
 		}
 	}
 }
-
 
 void MoveCenterOfMassToZero(vector<vector<double> >& R)
 {
@@ -621,7 +616,6 @@ void MoveCenterOfMassToZero(vector<vector<double> >& R)
 		}
 	}
 }
-
 
 void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
@@ -670,6 +664,9 @@ void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<dou
 	nTrials++;
 }
 
+//////////////////////////////////////////
+/// strategies for correlated sampling ///
+//////////////////////////////////////////
 
 bool NeedToUpdateSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
@@ -687,7 +684,6 @@ bool NeedToUpdateSamples(vector<ICorrelatedSamplingData*>& samples, vector<doubl
 	return updateNeeded;
 }
 
-
 void UpdateSamplesRandom(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	double percent = 0.2;
@@ -702,8 +698,7 @@ void UpdateSamplesRandom(vector<ICorrelatedSamplingData*>& samples, vector<doubl
 		{
 			DoMetropolisStep(samples[randomSample]->R, uR, uI, phiR, phiI);
 		}
-		//TODO: don't update expectation values - CalculateOtherLocalOperators would be sufficient
-		sys->CalculateExpectationValues(samples[randomSample]->R, uR, uI, phiR, phiI);
+		sys->CalculateOtherLocalOperators(samples[randomSample]->R);
 
 		samples[randomSample]->wf = sys->GetWf();
 		samples[randomSample]->wf2 = samples[randomSample]->wf * samples[randomSample]->wf;
@@ -713,7 +708,6 @@ void UpdateSamplesRandom(vector<ICorrelatedSamplingData*>& samples, vector<doubl
 		sys->FillCorrelatedSamplingData(samples[randomSample]);
 	}
 }
-
 
 void UpdateAllSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
@@ -729,7 +723,6 @@ void UpdateAllSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>&
 	//	exponentValues[i] = sys->GetExponent();
 	//}
 }
-
 
 void UpdateSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
@@ -765,6 +758,9 @@ void UpdateSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR
 	//}
 }
 
+/////////////////////////////////
+/// update expectation values ///
+/////////////////////////////////
 
 void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, bool intermediateStep = false)
 {
@@ -937,7 +933,6 @@ void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>&
 	//}
 }
 
-
 void UpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	int count = samples.size();
@@ -1037,606 +1032,6 @@ void ParallelUpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingDa
 	MPIMethods::ReduceToAverage(otherExpectationValues);
 }
 
-void NormalizeParameters(vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
-{
-	//double sum = 0;
-	//double factor = 1;
-	//for (int i = 0; i < N_PARAM; i++)
-	//{
-	//	sum += u[i];
-	//}
-	//factor = N_PARAM / (2.0 * sum);
-	//for (int i = 0; i < N_PARAM; i++)
-	//{
-	//	u[i] *= factor;
-	//}
-	double factor = 2.0 / (N * (N - 1.0));
-	for (int i = 0; i < N_PARAM; i++)
-	{
-		uR[i] *= factor;
-	}
-}
-
-
-void BuildSystemOfEquationsForParametersNoPhi(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
-{
-	energiesReal.resize(N_PARAM);
-	energiesImag.resize(N_PARAM);
-	matrix.resize(N_PARAM);
-	for (auto &i : matrix)
-	{
-		i.resize(N_PARAM);
-	}
-
-	for (int i = 0; i < N_PARAM; i++)
-	{
-		if (IMAGINARY_TIME == 0)
-		{
-			energiesReal[i] = localOperatorlocalEnergyI[i];
-			energiesImag[i] = -localOperatorlocalEnergyR[i];
-		}
-		else
-		{
-			energiesReal[i] = -localOperatorlocalEnergyR[i];
-			energiesImag[i] = -localOperatorlocalEnergyI[i];
-		}
-		for (int j = 0; j <= i; j++)
-		{
-			matrix[i][j] = localOperatorsMatrix[i][j];
-			matrix[j][i] = matrix[i][j];
-		}
-	}
-}
-
-
-void BuildSystemOfEquationsForParametersIncludePhiWithTimeRotation(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
-{
-	double rotation = 1.499 * M_PI; // 3/2 Pi -> real time; Pi -> imaginary time
-	double cosRotation = cos(rotation);
-	double sinRotation = sin(rotation);
-
-	energiesReal.resize(N_PARAM);
-	energiesImag.resize(N_PARAM);
-	matrix.resize(N_PARAM);
-	for (auto &i : matrix)
-	{
-		i.resize(N_PARAM);
-	}
-
-	for (int i = 0; i < N_PARAM; i++)
-	{
-		energiesReal[i] = cosRotation * (localOperatorlocalEnergyR[i] - localEnergyR * localOperators[i]) - sinRotation * (localOperatorlocalEnergyI[i]);
-		energiesImag[i] = sinRotation * (localOperatorlocalEnergyR[i] - localEnergyR * localOperators[i]) + cosRotation * (localOperatorlocalEnergyI[i]);
-		for (int j = 0; j <= i; j++)
-		{
-			matrix[i][j] = localOperatorsMatrix[i][j] - localOperators[i] * localOperators[j];
-			matrix[j][i] = matrix[i][j];
-		}
-	}
-}
-
-
-void BuildSystemOfEquationsForParametersIncludePhi(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
-{
-	energiesReal.resize(N_PARAM);
-	energiesImag.resize(N_PARAM);
-	matrix.resize(N_PARAM);
-	for (auto &i : matrix)
-	{
-		i.resize(N_PARAM);
-	}
-
-	for (int i = 0; i < N_PARAM; i++)
-	{
-		if (IMAGINARY_TIME == 0)
-		{
-			energiesReal[i] = localOperatorlocalEnergyI[i];
-			energiesImag[i] = -localOperatorlocalEnergyR[i] + localEnergyR * localOperators[i];
-		}
-		else
-		{
-			energiesReal[i] = -localOperatorlocalEnergyR[i] + localEnergyR * localOperators[i];
-			energiesImag[i] = -localOperatorlocalEnergyI[i];
-		}
-		for (int j = 0; j <= i; j++)
-		{
-			matrix[i][j] = localOperatorsMatrix[i][j] - localOperators[i] * localOperators[j];
-			matrix[j][i] = matrix[i][j];
-		}
-	}
-}
-
-
-void BuildSystemOfEquationsForParameters(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
-{
-	if (IMAGINARY_TIME == -1)
-	{
-		BuildSystemOfEquationsForParametersIncludePhiWithTimeRotation(matrix, energiesReal, energiesImag);
-	}
-	else if (sys->USE_NORMALIZATION_AND_PHASE)
-	{
-		BuildSystemOfEquationsForParametersIncludePhi(matrix, energiesReal, energiesImag);
-	}
-	else
-	{
-		//BuildSystemOfEquationsForParametersNoPhi(matrix, energiesReal, energiesImag);
-		BuildSystemOfEquationsForParametersIncludePhi(matrix, energiesReal, energiesImag);
-	}
-}
-
-
-void PerformCholeskyDecomposition(vector<vector<double> >& matrix)
-{
-	double sum = 0;
-	bool logged = false;
-	for (int i = 0; i < N_PARAM; i++)
-	{
-		for (int j = 0; j <= i; j++)
-		{
-			sum = matrix[i][j];
-			for (int k = 0; k < j; k++)
-			{
-				sum -= matrix[i][k] * matrix[j][k];
-			}
-			if (i > j)
-			{
-				matrix[i][j] = sum / matrix[j][j];
-			}
-			else if (sum > 0)
-			{
-				matrix[i][i] = sqrt(sum);
-			}
-			else
-			{
-				if (!logged)
-				{
-					Log("!!!!! NOT POSITIVE SEMI DEFINITE !!!! @ i=" + to_string(i) + ", j=" + to_string(j), ERROR);
-					doNotAcceptStep = true;
-					logged = true;
-				}
-			}
-		}
-	}
-}
-
-
-void SolveForParametersDot(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag, vector<double>& resultReal, vector<double>& resultImag, double *resultPhiReal, double *resultPhiImag)
-{
-	double sumReal = 0;
-	double sumImag = 0;
-	vector<double> tmpReal;
-	vector<double> tmpImag;
-	tmpReal.resize(N_PARAM);
-	tmpImag.resize(N_PARAM);
-
-	resultReal.resize(N_PARAM);
-	resultImag.resize(N_PARAM);
-	*resultPhiReal = 0;
-	*resultPhiImag = 0;
-
-	for (int i = 0; i < N_PARAM; i++)
-	{
-		sumReal = 0;
-		sumImag = 0;
-		for (int j = 0; j < i; j++)
-		{
-			sumReal += matrix[i][j] * tmpReal[j];
-			sumImag += matrix[i][j] * tmpImag[j];
-		}
-		tmpReal[i] = 1.0 / matrix[i][i] * (energiesReal[i] - sumReal);
-		tmpImag[i] = 1.0 / matrix[i][i] * (energiesImag[i] - sumImag);
-	}
-
-	for (int i = N_PARAM - 1; i >= 0; i--)
-	{
-		sumReal = 0;
-		sumImag = 0;
-		for (int j = N_PARAM - 1; j > i; j--)
-		{
-			sumReal += matrix[j][i] * resultReal[j];
-			sumImag += matrix[j][i] * resultImag[j];
-		}
-		resultReal[i] = 1.0 / matrix[i][i] * (tmpReal[i] - sumReal);
-		resultImag[i] = 1.0 / matrix[i][i] * (tmpImag[i] - sumImag);
-		*resultPhiReal -= localOperators[i] * resultReal[i];
-		*resultPhiImag -= localOperators[i] * resultImag[i];
-	}
-	if (IMAGINARY_TIME == -1)
-	{
-		double rotation = 1.499 * M_PI; // 3/2 Pi -> real time; Pi -> imaginary time
-		double cosRotation = cos(rotation);
-		double sinRotation = sin(rotation);
-		*resultPhiImag -= cosRotation * localEnergyR;
-		*resultPhiReal -= sinRotation * localEnergyR;
-	}
-	else if (IMAGINARY_TIME == 0)
-	{
-		*resultPhiImag -= localEnergyR;
-	}
-	else
-	{
-		*resultPhiReal -= localEnergyR;
-	}
-}
-
-
-void CalculateNextParametersEuler(double dt, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
-{
-	if (processRank == rootRank)
-	{
-		vector<double> energiesReal; //rhs of the equation that corresponds to uDotR;
-		vector<double> energiesImag; //rhs of the equation that corresponds to uDotI;
-		vector<vector<double> > matrix;
-		vector<double> uDotR;
-		vector<double> uDotI;
-		double phiDotR = 0;
-		double phiDotI = 0;
-
-		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
-
-		//WriteDataToFile(matrix, "BBmatrix", "BBmatrix");
-		//WriteDataToFile(energiesReal, "BBenergiesReal", "BBenergiesReal");
-		//WriteDataToFile(energiesImag, "BBenergiesImag", "BBenergiesImag");
-
-		PerformCholeskyDecomposition(matrix);
-		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR, uDotI, &phiDotR, &phiDotI);
-
-		//WriteDataToFile(matrix, "BBcholesky", "BBcholesky");
-		//WriteDataToFile(uDotR, "BBuDotR", "BBuDotR");
-
-		for (int i = 0; i < N_PARAM; i++)
-		{
-			uR[i] = uR[i] + uDotR[i] * dt;
-			uI[i] = uI[i] + uDotI[i] * dt;
-		}
-		*phiR = *phiR + phiDotR * dt;
-		*phiI = *phiI + phiDotI * dt;
-	}
-}
-
-
-void CalculateNextParametersPC(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
-{
-	vector<double> energiesReal; //rhs of the equation that corresponds to uDotR;
-	vector<double> energiesImag; //rhs of the equation that corresponds to uDotI;
-	vector<vector<double> > matrix;
-	vector<double> uDotR;
-	vector<double> uDotI;
-	double phiDotR = 0;
-	double phiDotI = 0;
-
-	int PCsteps = 1;
-	vector<double> tmpUR(N_PARAM);
-	vector<double> tmpUI(N_PARAM);
-	double tmpPhiR = 0;
-	double tmpPhiI = 0;
-	vector<double> nextUDotR;
-	vector<double> nextUDotI;
-	double nextPhiDotR = 0;
-	double nextPhiDotI = 0;
-
-	//TODO: is this initialization needed?
-	for (int i = 0; i < N_PARAM; i++)
-	{
-		tmpUR[i] = 0;
-		tmpUI[i] = 0;
-	}
-
-	if (processRank == rootRank)
-	{
-		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
-		PerformCholeskyDecomposition(matrix);
-		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR, uDotI, &phiDotR, &phiDotI);
-		for (int i = 0; i < N_PARAM; i++)
-		{
-			tmpUR[i] = uR[i] + uDotR[i] * dt;
-			tmpUI[i] = uI[i] + uDotI[i] * dt;
-		}
-		tmpPhiR = *phiR + phiDotR * dt;
-		tmpPhiI = *phiI + phiDotI * dt;
-	}
-	for (int s = 0; s < PCsteps; s++)
-	{
-		//BroadcastNewParameters(uR, uI, phiR, phiI);
-		//BroadcastValues(tmpUR, N_PARAM);
-		//BroadcastValues(tmpUI, N_PARAM);
-		//BroadcastValue(&tmpPhiR);
-		//BroadcastValue(&tmpPhiI);
-		BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-		ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
-		if (processRank == rootRank)
-		{
-			BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
-			PerformCholeskyDecomposition(matrix);
-			SolveForParametersDot(matrix, energiesReal, energiesImag, nextUDotR, nextUDotI, &nextPhiDotR, &nextPhiDotI);
-			for (int i = 0; i < N_PARAM; i++)
-			{
-				tmpUR[i] = uR[i] + (uDotR[i] + nextUDotR[i]) * dt / 2.0;
-				tmpUI[i] = uI[i] + (uDotI[i] + nextUDotI[i]) * dt / 2.0;
-			}
-			tmpPhiR = *phiR + (phiDotR + nextPhiDotR) * dt / 2.0;
-			tmpPhiI = *phiI + (phiDotI + nextPhiDotI) * dt / 2.0;
-		}
-	}
-
-	for (int i = 0; i < N_PARAM; i++)
-	{
-		uR[i] = tmpUR[i];
-		uI[i] = tmpUI[i];
-	}
-	*phiR = tmpPhiR;
-	*phiI = tmpPhiI;
-}
-
-
-void CalculateNextParametersRK4(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
-{
-	vector<double> energiesReal; //rhs of the equation that corresponds to uDotR;
-	vector<double> energiesImag; //rhs of the equation that corresponds to uDotI;
-	vector<vector<double> > matrix;
-
-	vector<double> tmpUR(N_PARAM);
-	vector<double> tmpUI(N_PARAM);
-	double tmpPhiR = 0;
-	double tmpPhiI = 0;
-
-	vector<vector<double> > uDotR;
-	vector<vector<double> > uDotI;
-	vector<double> phiDotR;
-	vector<double> phiDotI;
-
-	//TODO: is this initialization needed?
-	for (int i = 0; i < N_PARAM; i++)
-	{
-		tmpUR[i] = 0;
-		tmpUI[i] = 0;
-	}
-	uDotR.resize(4);
-	uDotI.resize(4);
-	phiDotR.resize(4);
-	phiDotI.resize(4);
-
-	if (processRank == rootRank)
-	{
-		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
-		PerformCholeskyDecomposition(matrix);
-		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR[0], uDotI[0], &(phiDotR[0]), &(phiDotI[0]));
-		for (int i = 0; i < N_PARAM; i++)
-		{
-			tmpUR[i] = uR[i] + uDotR[0][i] * dt / 2.0;
-			tmpUI[i] = uI[i] + uDotI[0][i] * dt / 2.0;
-		}
-		tmpPhiR = *phiR + phiDotR[0] * dt / 2.0;
-		tmpPhiI = *phiI + phiDotI[0] * dt / 2.0;
-	}
-	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
-
-	if (processRank == rootRank)
-	{
-		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
-		PerformCholeskyDecomposition(matrix);
-		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR[1], uDotI[1], &(phiDotR[1]), &(phiDotI[1]));
-		for (int i = 0; i < N_PARAM; i++)
-		{
-			tmpUR[i] = uR[i] + uDotR[1][i] * dt / 2.0;
-			tmpUI[i] = uI[i] + uDotI[1][i] * dt / 2.0;
-		}
-		tmpPhiR = *phiR + phiDotR[1] * dt / 2.0;
-		tmpPhiI = *phiI + phiDotI[1] * dt / 2.0;
-	}
-	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
-
-	if (processRank == rootRank)
-	{
-		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
-		PerformCholeskyDecomposition(matrix);
-		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR[2], uDotI[2], &(phiDotR[2]), &(phiDotI[2]));
-		for (int i = 0; i < N_PARAM; i++)
-		{
-			tmpUR[i] = uR[i] + uDotR[2][i] * dt;
-			tmpUI[i] = uI[i] + uDotI[2][i] * dt;
-		}
-		tmpPhiR = *phiR + phiDotR[2] * dt;
-		tmpPhiI = *phiI + phiDotI[2] * dt;
-	}
-	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
-
-	if (processRank == rootRank)
-	{
-		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
-		PerformCholeskyDecomposition(matrix);
-		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR[3], uDotI[3], &(phiDotR[3]), &(phiDotI[3]));
-		for (int i = 0; i < N_PARAM; i++)
-		{
-			uR[i] = uR[i] + ((uDotR[0][i] + 2.0 * uDotR[1][i] + 2.0 * uDotR[2][i] + uDotR[3][i]) / 6.0) * dt;
-			uI[i] = uI[i] + ((uDotI[0][i] + 2.0 * uDotI[1][i] + 2.0 * uDotI[2][i] + uDotI[3][i]) / 6.0) * dt;
-		}
-		*phiR = *phiR + ((phiDotR[0] + 2.0 * phiDotR[1] + 2.0 * phiDotR[2] + phiDotR[3]) / 6.0) * dt;
-		*phiI = *phiI + ((phiDotI[0] + 2.0 * phiDotI[1] + 2.0 * phiDotI[2] + phiDotI[3]) / 6.0) * dt;
-	}
-}
-
-
-void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
-{
-	vector<double> energiesReal; //rhs of the equation that corresponds to uDotR;
-	vector<double> energiesImag; //rhs of the equation that corresponds to uDotI;
-	vector<vector<double> > matrix;
-
-	vector<double> tmpUR(N_PARAM);
-	vector<double> tmpUI(N_PARAM);
-	double tmpPhiR = 0;
-	double tmpPhiI = 0;
-
-	vector<vector<double> > uDotR;
-	vector<vector<double> > uDotI;
-	vector<double> phiDotR;
-	vector<double> phiDotI;
-
-	//TODO: is this initialization needed?
-	for (int i = 0; i < N_PARAM; i++)
-	{
-		tmpUR[i] = 0;
-		tmpUI[i] = 0;
-	}
-	uDotR.resize(4);
-	uDotI.resize(4);
-	phiDotR.resize(4);
-	phiDotI.resize(4);
-
-	if (processRank == rootRank)
-	{
-		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
-
-		//if (sys->GetStep() % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
-		//{
-		//	WriteDataToFile(matrix, "eq_matrix" + to_string(sys->GetStep()), "matrix");
-		//	WriteDataToFile(energiesReal, "eq_rhs_uR_" + to_string(sys->GetStep()), "energiesReal");
-		//	WriteDataToFile(energiesImag, "eq_rhs_uI_" + to_string(sys->GetStep()), "energiesImag");
-		//}
-
-		PerformCholeskyDecomposition(matrix);
-		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR[0], uDotI[0], &(phiDotR[0]), &(phiDotI[0]));
-		for (int i = 0; i < N_PARAM; i++)
-		{
-			tmpUR[i] = uR[i] + uDotR[0][i] * dt / 2.0;
-			tmpUI[i] = uI[i] + uDotI[0][i] * dt / 2.0;
-		}
-		tmpPhiR = *phiR + phiDotR[0] * dt / 2.0;
-		tmpPhiI = *phiI + phiDotI[0] * dt / 2.0;
-
-		//if (sys->GetStep() % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
-		//{
-		//	WriteDataToFile(uDotR[0], "eq_result_uRDot" + to_string(sys->GetStep()), to_string(phiDotR[0]));
-		//	WriteDataToFile(uDotI[0], "eq_result_uIDot" + to_string(sys->GetStep()), to_string(phiDotI[0]));
-		//}
-	}
-	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
-
-	if (processRank == rootRank)
-	{
-		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
-		PerformCholeskyDecomposition(matrix);
-		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR[1], uDotI[1], &(phiDotR[1]), &(phiDotI[1]));
-		for (int i = 0; i < N_PARAM; i++)
-		{
-			tmpUR[i] = uR[i] + uDotR[1][i] * dt / 2.0;
-			tmpUI[i] = uI[i] + uDotI[1][i] * dt / 2.0;
-		}
-		tmpPhiR = *phiR + phiDotR[1] * dt / 2.0;
-		tmpPhiI = *phiI + phiDotI[1] * dt / 2.0;
-	}
-	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
-
-	if (processRank == rootRank)
-	{
-		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
-		PerformCholeskyDecomposition(matrix);
-		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR[2], uDotI[2], &(phiDotR[2]), &(phiDotI[2]));
-		for (int i = 0; i < N_PARAM; i++)
-		{
-			tmpUR[i] = uR[i] + uDotR[2][i] * dt;
-			tmpUI[i] = uI[i] + uDotI[2][i] * dt;
-		}
-		tmpPhiR = *phiR + phiDotR[2] * dt;
-		tmpPhiI = *phiI + phiDotI[2] * dt;
-	}
-	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
-
-	if (processRank == rootRank)
-	{
-		BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
-		PerformCholeskyDecomposition(matrix);
-		SolveForParametersDot(matrix, energiesReal, energiesImag, uDotR[3], uDotI[3], &(phiDotR[3]), &(phiDotI[3]));
-		for (int i = 0; i < N_PARAM; i++)
-		{
-			uR[i] = uR[i] + ((uDotR[0][i] + 2.0 * uDotR[1][i] + 2.0 * uDotR[2][i] + uDotR[3][i]) / 6.0) * dt;
-			uI[i] = uI[i] + ((uDotI[0][i] + 2.0 * uDotI[1][i] + 2.0 * uDotI[2][i] + uDotI[3][i]) / 6.0) * dt;
-		}
-		*phiR = *phiR + ((phiDotR[0] + 2.0 * phiDotR[1] + 2.0 * phiDotR[2] + phiDotR[3]) / 6.0) * dt;
-		*phiI = *phiI + ((phiDotI[0] + 2.0 * phiDotI[1] + 2.0 * phiDotI[2] + phiDotI[3]) / 6.0) * dt;
-	}
-}
-
-
-void CalculateNextParametersImplicitEuler(double dt, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
-{
-	//TODO: implement
-}
-
-
-void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
-{
-	Timer t;
-	if (processRank == rootRank)
-	{
-		t.start();
-	}
-
-	if (ODE_SOLVER_TYPE == 0)
-	{
-		CalculateNextParametersEuler(dt, uR, uI, phiR, phiI);
-	}
-	else if (ODE_SOLVER_TYPE == 1)
-	{
-		vector<vector<double> >& Rcopy(R);
-		CalculateNextParametersPC(dt, Rcopy, uR, uI, phiR, phiI);
-	}
-	else if (ODE_SOLVER_TYPE == 2)
-	{
-		vector<vector<double> >& Rcopy(R);
-		CalculateNextParametersRK4(dt, Rcopy, uR, uI, phiR, phiI);
-	}
-	else if (ODE_SOLVER_TYPE == 3)
-	{
-		CalculateNextParametersRK4ReuseSamples(dt, uR, uI, phiR, phiI);
-	}
-	else if (ODE_SOLVER_TYPE == 4)
-	{
-		CalculateNextParametersImplicitEuler(dt, uR, uI, phiR, phiI);
-	}
-
-	if (processRank == rootRank)
-	{
-		t.stop();
-		Log("DGL duration = " + to_string(t.duration()) + " ms");
-	}
-}
-
-
-void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI)
-{
-	double tmpPhiR = 0;
-	double tmpPhiI = 0;
-	CalculateNextParameters(dt, R, uR, uI, &tmpPhiR, &tmpPhiI);
-}
-
-
-void NormalizeWavefunction(double wf, double *phiR)
-{
-	*phiR = *phiR - log(wf);
-}
-
-
-void AdjustParameters(vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
-{
-	//double last = uR.back() + 0.00908425;
-	//for (unsigned int i = 0; i < uR.size(); i++)
-	//{
-	//	uR[i] += -last;
-	//}
-	//uR[uR.size() - 1] = 0.0;
-	//uR[0] = uR[2];
-	//uR[1] = uR[2];
-}
-
-
 void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	int percent = 0;
@@ -1681,7 +1076,6 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
 	}
 }
 
-
 void ParallelCalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	CalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
@@ -1689,6 +1083,575 @@ void ParallelCalculateAdditionalSystemProperties(vector<vector<double> >& R, vec
 	MPIMethods::ReduceToAverage(additionalSystemProperties);
 }
 
+/////////////////////////////////
+/// build system of equations ///
+/////////////////////////////////
+
+void BuildSystemOfEquationsForParametersNoPhi(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
+{
+	energiesReal.resize(N_PARAM);
+	energiesImag.resize(N_PARAM);
+	matrix.resize(N_PARAM);
+	for (auto &i : matrix)
+	{
+		i.resize(N_PARAM);
+	}
+
+	for (int i = 0; i < N_PARAM; i++)
+	{
+		if (IMAGINARY_TIME == 0)
+		{
+			energiesReal[i] = localOperatorlocalEnergyI[i];
+			energiesImag[i] = -localOperatorlocalEnergyR[i];
+		}
+		else
+		{
+			energiesReal[i] = -localOperatorlocalEnergyR[i];
+			energiesImag[i] = -localOperatorlocalEnergyI[i];
+		}
+		for (int j = 0; j <= i; j++)
+		{
+			matrix[i][j] = localOperatorsMatrix[i][j];
+			matrix[j][i] = matrix[i][j];
+		}
+	}
+}
+
+void BuildSystemOfEquationsForParametersIncludePhiWithTimeRotation(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
+{
+	double rotation = 1.499 * M_PI; // 3/2 Pi -> real time; Pi -> imaginary time
+	double cosRotation = cos(rotation);
+	double sinRotation = sin(rotation);
+
+	energiesReal.resize(N_PARAM);
+	energiesImag.resize(N_PARAM);
+	matrix.resize(N_PARAM);
+	for (auto &i : matrix)
+	{
+		i.resize(N_PARAM);
+	}
+
+	for (int i = 0; i < N_PARAM; i++)
+	{
+		energiesReal[i] = cosRotation * (localOperatorlocalEnergyR[i] - localEnergyR * localOperators[i]) - sinRotation * (localOperatorlocalEnergyI[i]);
+		energiesImag[i] = sinRotation * (localOperatorlocalEnergyR[i] - localEnergyR * localOperators[i]) + cosRotation * (localOperatorlocalEnergyI[i]);
+		for (int j = 0; j <= i; j++)
+		{
+			matrix[i][j] = localOperatorsMatrix[i][j] - localOperators[i] * localOperators[j];
+			matrix[j][i] = matrix[i][j];
+		}
+	}
+}
+
+void BuildSystemOfEquationsForParametersIncludePhi(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
+{
+	energiesReal.resize(N_PARAM);
+	energiesImag.resize(N_PARAM);
+	matrix.resize(N_PARAM);
+	for (auto &i : matrix)
+	{
+		i.resize(N_PARAM);
+	}
+
+	for (int i = 0; i < N_PARAM; i++)
+	{
+		if (IMAGINARY_TIME == 0)
+		{
+			energiesReal[i] = localOperatorlocalEnergyI[i];
+			energiesImag[i] = -localOperatorlocalEnergyR[i] + localEnergyR * localOperators[i];
+		}
+		else
+		{
+			energiesReal[i] = -localOperatorlocalEnergyR[i] + localEnergyR * localOperators[i];
+			energiesImag[i] = -localOperatorlocalEnergyI[i];
+		}
+		for (int j = 0; j <= i; j++)
+		{
+			matrix[i][j] = localOperatorsMatrix[i][j] - localOperators[i] * localOperators[j];
+			matrix[j][i] = matrix[i][j];
+		}
+	}
+}
+
+void BuildSystemOfEquationsForParameters(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
+{
+	if (IMAGINARY_TIME == -1)
+	{
+		BuildSystemOfEquationsForParametersIncludePhiWithTimeRotation(matrix, energiesReal, energiesImag);
+	}
+	else if (sys->USE_NORMALIZATION_AND_PHASE)
+	{
+		BuildSystemOfEquationsForParametersIncludePhi(matrix, energiesReal, energiesImag);
+	}
+	else
+	{
+		//BuildSystemOfEquationsForParametersNoPhi(matrix, energiesReal, energiesImag);
+		BuildSystemOfEquationsForParametersIncludePhi(matrix, energiesReal, energiesImag);
+	}
+}
+
+/////////////////////////////////
+/// solve system of equations ///
+/////////////////////////////////
+
+void PerformCholeskyDecomposition(vector<vector<double> >& matrix)
+{
+	double sum = 0;
+	bool logged = false;
+	for (int i = 0; i < N_PARAM; i++)
+	{
+		for (int j = 0; j <= i; j++)
+		{
+			sum = matrix[i][j];
+			for (int k = 0; k < j; k++)
+			{
+				sum -= matrix[i][k] * matrix[j][k];
+			}
+			if (i > j)
+			{
+				matrix[i][j] = sum / matrix[j][j];
+			}
+			else if (sum > 0)
+			{
+				matrix[i][i] = sqrt(sum);
+			}
+			else
+			{
+				if (!logged)
+				{
+					Log("!!!!! NOT POSITIVE SEMI DEFINITE !!!! @ i=" + to_string(i) + ", j=" + to_string(j), ERROR);
+					doNotAcceptStep = true;
+					logged = true;
+				}
+			}
+		}
+	}
+}
+
+void SolveCholeskyDecomposedEquationSystem(vector<vector<double> >& matrix, vector<double>& rhs, vector<double>& solution)
+{
+	int size = rhs.size();
+	double sum = 0;
+	vector<double> tmp;
+	tmp.resize(size);
+
+	solution.resize(size);
+
+	for (int i = 0; i < N_PARAM; i++)
+	{
+		sum = 0;
+		for (int j = 0; j < i; j++)
+		{
+			sum += matrix[i][j] * tmp[j];
+		}
+		tmp[i] = 1.0 / matrix[i][i] * (rhs[i] - sum);
+	}
+
+	for (int i = N_PARAM - 1; i >= 0; i--)
+	{
+		sum = 0;
+		for (int j = N_PARAM - 1; j > i; j--)
+		{
+			sum += matrix[j][i] * solution[j];
+		}
+		solution[i] = 1.0 / matrix[i][i] * (tmp[i] - sum);
+	}
+}
+
+void SolveEquationSystem(vector<vector<double> >& matrix, vector<double>& rhs, vector<double>& solution)
+{
+	PerformCholeskyDecomposition(matrix);
+	SolveCholeskyDecomposedEquationSystem(matrix, rhs, solution);
+}
+
+void CalculatePhiDot(vector<double>& uDotR, vector<double>& uDotI, double *phiDotR, double *phiDotI)
+{
+	for (int i = 0; i < N_PARAM; i++)
+	{
+		*phiDotR -= localOperators[i] * uDotR[i];
+		*phiDotI -= localOperators[i] * uDotI[i];
+	}
+
+	if (IMAGINARY_TIME == -1)
+	{
+		double rotation = 1.499 * M_PI; // 3/2 Pi -> real time; Pi -> imaginary time
+		double cosRotation = cos(rotation);
+		double sinRotation = sin(rotation);
+		*phiDotI -= cosRotation * localEnergyR;
+		*phiDotR -= sinRotation * localEnergyR;
+	}
+	else if (IMAGINARY_TIME == 0)
+	{
+		*phiDotI -= localEnergyR;
+	}
+	else
+	{
+		*phiDotR -= localEnergyR;
+	}
+}
+
+void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double *phiDotR, double *phiDotI)
+{
+	vector<double> energiesReal; //rhs of the equation that corresponds to uDotR;
+	vector<double> energiesImag; //rhs of the equation that corresponds to uDotI;
+	vector<vector<double> > matrix;
+
+	BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
+
+	//WriteDataToFile(matrix, "BBmatrix", "BBmatrix");
+	//WriteDataToFile(energiesReal, "BBenergiesReal", "BBenergiesReal");
+	//WriteDataToFile(energiesImag, "BBenergiesImag", "BBenergiesImag");
+
+	PerformCholeskyDecomposition(matrix);
+	SolveCholeskyDecomposedEquationSystem(matrix, energiesReal, uDotR);
+	SolveCholeskyDecomposedEquationSystem(matrix, energiesImag, uDotI);
+	CalculatePhiDot(uDotR, uDotI, phiDotR, phiDotI);
+
+	//WriteDataToFile(matrix, "BBcholesky", "BBcholesky");
+	//WriteDataToFile(uDotR, "BBuDotR", "BBuDotR");
+}
+
+///////////////////////
+/// ODE integrators ///
+///////////////////////
+
+void CalculateNextParametersEuler(double dt, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
+{
+	if (processRank == rootRank)
+	{
+		vector<double> uDotR;
+		vector<double> uDotI;
+		double phiDotR = 0;
+		double phiDotI = 0;
+
+		SolveForParametersDot(uDotR, uDotI, &phiDotR, &phiDotI);
+
+		uR = uR + uDotR * dt;
+		uI = uI + uDotI * dt;
+		*phiR = *phiR + phiDotR * dt;
+		*phiI = *phiI + phiDotI * dt;
+	}
+}
+
+void CalculateNextParametersPC(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
+{
+	double dt_2 = dt / 2.0;
+
+	vector<double> uDotR;
+	vector<double> uDotI;
+	double phiDotR = 0;
+	double phiDotI = 0;
+
+	int PCsteps = 1;
+	vector<double> tmpUR(N_PARAM);
+	vector<double> tmpUI(N_PARAM);
+	double tmpPhiR = 0;
+	double tmpPhiI = 0;
+	vector<double> nextUDotR;
+	vector<double> nextUDotI;
+	double nextPhiDotR = 0;
+	double nextPhiDotI = 0;
+
+	ClearVector(tmpUR);
+	ClearVector(tmpUI);
+
+	if (processRank == rootRank)
+	{
+		SolveForParametersDot(uDotR, uDotI, &phiDotR, &phiDotI);
+
+		tmpUR = uR + uDotR * dt;
+		tmpUI = uI + uDotI * dt;
+		tmpPhiR = *phiR + phiDotR * dt;
+		tmpPhiI = *phiI + phiDotI * dt;
+	}
+	for (int s = 0; s < PCsteps; s++)
+	{
+		//BroadcastNewParameters(uR, uI, phiR, phiI);
+		//BroadcastValues(tmpUR, N_PARAM);
+		//BroadcastValues(tmpUI, N_PARAM);
+		//BroadcastValue(&tmpPhiR);
+		//BroadcastValue(&tmpPhiI);
+		BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
+		ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
+		if (processRank == rootRank)
+		{
+			SolveForParametersDot(nextUDotR, nextUDotI, &nextPhiDotR, &nextPhiDotI);
+
+			tmpUR = uR + (uDotR + nextUDotR) * dt_2;
+			tmpUI = uI + (uDotI + nextUDotI) * dt_2;
+			tmpPhiR = *phiR + (phiDotR + nextPhiDotR) * dt_2;
+			tmpPhiI = *phiI + (phiDotI + nextPhiDotI) * dt_2;
+		}
+	}
+
+	uR = tmpUR;
+	uI = tmpUI;
+	*phiR = tmpPhiR;
+	*phiI = tmpPhiI;
+}
+
+void CalculateNextParametersRK4(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
+{
+	double dt_2 = dt / 2.0;
+
+	vector<double> tmpUR(N_PARAM);
+	vector<double> tmpUI(N_PARAM);
+	double tmpPhiR = 0;
+	double tmpPhiI = 0;
+
+	vector<vector<double> > uDotR;
+	vector<vector<double> > uDotI;
+	vector<double> phiDotR;
+	vector<double> phiDotI;
+
+	ClearVector(tmpUR);
+	ClearVector(tmpUI);
+	uDotR.resize(4);
+	uDotI.resize(4);
+	phiDotR.resize(4);
+	phiDotI.resize(4);
+
+	if (processRank == rootRank)
+	{
+		SolveForParametersDot(uDotR[0], uDotI[0], &(phiDotR[0]), &(phiDotI[0]));
+
+		tmpUR = uR + uDotR[0] * dt_2;
+		tmpUI = uI + uDotI[0] * dt_2;
+		tmpPhiR = *phiR + phiDotR[0] * dt_2;
+		tmpPhiI = *phiI + phiDotI[0] * dt_2;
+	}
+	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
+	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
+
+	if (processRank == rootRank)
+	{
+		SolveForParametersDot(uDotR[1], uDotI[1], &(phiDotR[1]), &(phiDotI[1]));
+
+		tmpUR = uR + uDotR[1] * dt_2;
+		tmpUI = uI + uDotI[1] * dt_2;
+		tmpPhiR = *phiR + phiDotR[1] * dt_2;
+		tmpPhiI = *phiI + phiDotI[1] * dt_2;
+	}
+	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
+	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
+
+	if (processRank == rootRank)
+	{
+		SolveForParametersDot(uDotR[2], uDotI[2], &(phiDotR[2]), &(phiDotI[2]));
+
+		tmpUR = uR + uDotR[2] * dt;
+		tmpUI = uI + uDotI[2] * dt;
+		tmpPhiR = *phiR + phiDotR[2] * dt;
+		tmpPhiI = *phiI + phiDotI[2] * dt;
+	}
+	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
+	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
+
+	if (processRank == rootRank)
+	{
+		SolveForParametersDot(uDotR[3], uDotI[3], &(phiDotR[3]), &(phiDotI[3]));
+
+		uR = uR + ((uDotR[0] + uDotR[1] * 2.0 + uDotR[2] * 2.0 + uDotR[3]) / 6.0) * dt;
+		uI = uI + ((uDotI[0] + uDotI[1] * 2.0 + uDotI[2] * 2.0 + uDotI[3]) / 6.0) * dt;
+		*phiR = *phiR + ((phiDotR[0] + phiDotR[1] * 2.0 + phiDotR[2] * 2.0 + phiDotR[3]) / 6.0) * dt;
+		*phiI = *phiI + ((phiDotI[0] + phiDotI[1] * 2.0 + phiDotI[2] * 2.0 + phiDotI[3]) / 6.0) * dt;
+	}
+}
+
+void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
+{
+	double dt_2 = dt / 2.0;
+
+	vector<double> tmpUR(N_PARAM);
+	vector<double> tmpUI(N_PARAM);
+	double tmpPhiR = 0;
+	double tmpPhiI = 0;
+
+	vector<vector<double> > uDotR;
+	vector<vector<double> > uDotI;
+	vector<double> phiDotR;
+	vector<double> phiDotI;
+
+	ClearVector(tmpUR);
+	ClearVector(tmpUI);
+	uDotR.resize(4);
+	uDotI.resize(4);
+	phiDotR.resize(4);
+	phiDotI.resize(4);
+
+	if (processRank == rootRank)
+	{
+		SolveForParametersDot(uDotR[0], uDotI[0], &(phiDotR[0]), &(phiDotI[0]));
+
+		tmpUR = uR + uDotR[0] * dt_2;
+		tmpUI = uI + uDotI[0] * dt_2;
+		tmpPhiR = *phiR + phiDotR[0] * dt_2;
+		tmpPhiI = *phiI + phiDotI[0] * dt_2;
+	}
+	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
+	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
+
+	if (processRank == rootRank)
+	{
+		SolveForParametersDot(uDotR[1], uDotI[1], &(phiDotR[1]), &(phiDotI[1]));
+
+		tmpUR = uR + uDotR[1] * dt_2;
+		tmpUI = uI + uDotI[1] * dt_2;
+		tmpPhiR = *phiR + phiDotR[1] * dt_2;
+		tmpPhiI = *phiI + phiDotI[1] * dt_2;
+	}
+	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
+	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
+
+	if (processRank == rootRank)
+	{
+		SolveForParametersDot(uDotR[2], uDotI[2], &(phiDotR[2]), &(phiDotI[2]));
+
+		tmpUR = uR + uDotR[2] * dt;
+		tmpUI = uI + uDotI[2] * dt;
+		tmpPhiR = *phiR + phiDotR[2] * dt;
+		tmpPhiI = *phiI + phiDotI[2] * dt;
+	}
+	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
+	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
+
+	if (processRank == rootRank)
+	{
+		SolveForParametersDot(uDotR[3], uDotI[3], &(phiDotR[3]), &(phiDotI[3]));
+
+		uR = uR + ((uDotR[0] + uDotR[1] * 2.0 + uDotR[2] * 2.0 + uDotR[3]) / 6.0) * dt;
+		uI = uI + ((uDotI[0] + uDotI[1] * 2.0 + uDotI[2] * 2.0 + uDotI[3]) / 6.0) * dt;
+		*phiR = *phiR + ((phiDotR[0] + 2.0 * phiDotR[1] + 2.0 * phiDotR[2] + phiDotR[3]) / 6.0) * dt;
+		*phiI = *phiI + ((phiDotI[0] + 2.0 * phiDotI[1] + 2.0 * phiDotI[2] + phiDotI[3]) / 6.0) * dt;
+	}
+}
+
+void CalculateNextParametersImplicitEuler(double dt, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
+{
+	if (processRank == rootRank)
+	{
+		vector<double> uDotR;
+		vector<double> uDotI;
+		double phiDotR = 0;
+		double phiDotI = 0;
+
+		SolveForParametersDot(uDotR, uDotI, &phiDotR, &phiDotI);
+
+		vector<double> gn_uR;
+		vector<double> gn_uI;
+		double gn_phiR;
+		double gn_phiI;
+		vector<double> uDotRDelta;
+		vector<double> uDotIDelta;
+		double phiDotRDelta = 0;
+		double phiDotIDelta = 0;
+		vector<vector<double> > JR(N_PARAM);
+		vector<vector<double> > JI(N_PARAM);
+		double eps = 1e-3;
+		double diff = 1;
+		vector<double> uRn(uR); //INFO: start values for iterations in Newton method (could also use values from explicit Euler: uR[i] = uR[i] + uDotR[i] * dt)
+		vector<double> uIn(uI);
+		double phiRn = *phiR;
+		double phiIn = *phiI;
+		double delta = 1e-4;
+		while(diff < eps)
+		{
+			gn_uR = uRn - uR - uDotR * dt;
+			gn_uI = uIn - uI - uDotI * dt;
+			gn_phiR = phiRn - *phiR - dt * phiDotR;
+			gn_phiI = phiIn - *phiI - dt * phiDotI;
+
+			for (int i = 0; i < N_PARAM; i++)
+			{
+				double deltaUR = delta * gn_uR[i];
+				uR[i] += deltaUR;
+				ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR, uI, *phiR, *phiI);
+				uR[i] -= deltaUR;
+			}
+			for (int i = 0; i < N_PARAM; i++)
+			{
+				double deltaUI = delta * gn_uI[i];
+				uI[i] += deltaUI;
+				ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR, uI, *phiR, *phiI);
+				uI[i] -= deltaUI;
+			}
+			double deltaPhiR = delta * gn_phiR;
+			*phiR += deltaPhiR;
+			ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR, uI, *phiR, *phiI);
+			*phiR -= deltaPhiR;
+			double deltaPhiI = delta * gn_phiI;
+			*phiI += deltaPhiI;
+			ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR, uI, *phiR, *phiI);
+			*phiI -= deltaPhiI;
+		}
+	}
+}
+
+void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
+{
+	Timer t;
+	if (processRank == rootRank)
+	{
+		t.start();
+	}
+
+	if (ODE_SOLVER_TYPE == 0)
+	{
+		CalculateNextParametersEuler(dt, uR, uI, phiR, phiI);
+	}
+	else if (ODE_SOLVER_TYPE == 1)
+	{
+		vector<vector<double> >& Rcopy(R);
+		CalculateNextParametersPC(dt, Rcopy, uR, uI, phiR, phiI);
+	}
+	else if (ODE_SOLVER_TYPE == 2)
+	{
+		vector<vector<double> >& Rcopy(R);
+		CalculateNextParametersRK4(dt, Rcopy, uR, uI, phiR, phiI);
+	}
+	else if (ODE_SOLVER_TYPE == 3)
+	{
+		CalculateNextParametersRK4ReuseSamples(dt, uR, uI, phiR, phiI);
+	}
+	else if (ODE_SOLVER_TYPE == 4)
+	{
+		CalculateNextParametersImplicitEuler(dt, uR, uI, phiR, phiI);
+	}
+
+	if (processRank == rootRank)
+	{
+		t.stop();
+		Log("DGL duration = " + to_string(t.duration()) + " ms");
+	}
+}
+
+void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI)
+{
+	double tmpPhiR = 0;
+	double tmpPhiI = 0;
+	CalculateNextParameters(dt, R, uR, uI, &tmpPhiR, &tmpPhiI);
+}
+
+////////////
+/// misc ///
+////////////
+
+void NormalizeWavefunction(double wf, double *phiR)
+{
+	*phiR = *phiR - log(wf);
+}
+
+void AdjustParameters(vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
+{
+	//double last = uR.back() + 0.00908425;
+	//for (unsigned int i = 0; i < uR.size(); i++)
+	//{
+	//	uR[i] += -last;
+	//}
+	//uR[uR.size() - 1] = 0.0;
+	//uR[0] = uR[2];
+	//uR[1] = uR[2];
+}
 
 void AlignCoordinates(vector<vector<double> >& R)
 {
@@ -1706,7 +1669,6 @@ void AlignCoordinates(vector<vector<double> >& R)
 }
 
 //TODO: find better criteria when to accept new parameters
-
 bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	bool accept = true;
@@ -1779,6 +1741,9 @@ bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double
 	return accept;
 }
 
+////////////
+/// main ///
+////////////
 
 int mainMPI(int argc, char** argv)
 {
@@ -2351,7 +2316,6 @@ void startVMCSampler()
 
 	cout << "E=" << JoinVector(energy) << endl;
 }
-
 
 int main(int argc, char **argv)
 {
