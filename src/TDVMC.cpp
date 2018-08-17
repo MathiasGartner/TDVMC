@@ -28,6 +28,7 @@
 //#undef SEEK_END
 //#undef SEEK_CUR
 
+#include <armadillo>
 #include <cstring>
 #include <ctime>
 #include <fstream>
@@ -85,9 +86,11 @@ int MC_NSTEP_MULTIPLICATION_FACTOR_FOR_WRITE_DATA;
 int USE_MEAN_FOR_FINAL_PARAMETERS;
 int USE_NORMALIZE_WF;
 int USE_ADJUST_PARAMETERS;
+int UPDATE_SAMPLES_EVERY_NTH_STEP;
+double UPDATE_SAMPLES_PERCENT;
 vector<double> SYSTEM_PARAMS;
 
-string requiredConfigVersion = "0.11";
+string requiredConfigVersion = "0.12";
 int numOfProcesses = 1;
 int rootRank = 0;
 int processRank = 0;
@@ -299,6 +302,8 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("USE_MEAN_FOR_FINAL_PARAMETERS", &USE_MEAN_FOR_FINAL_PARAMETERS, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("USE_NORMALIZE_WF", &USE_NORMALIZE_WF, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("USE_ADJUST_PARAMETERS", &USE_ADJUST_PARAMETERS, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("UPDATE_SAMPLES_EVERY_NTH_STEP", &UPDATE_SAMPLES_EVERY_NTH_STEP, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("UPDATE_SAMPLES_PERCENT", &UPDATE_SAMPLES_PERCENT, ConfigItemType::DOUBLE));
 	configItems.push_back(ConfigItem("SYSTEM_PARAMS", SYSTEM_PARAMS, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("PARAMS_REAL", PARAMS_REAL, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("PARAMS_IMAGINARY", PARAMS_IMAGINARY, ConfigItemType::ARR_DOUBLE));
@@ -348,9 +353,18 @@ void WriteConfig(string fileName, vector<double>& uR, vector<double>& uI, double
 	configFile.precision(8);
 
 	configFile << "{" << endl;
-	for (auto ci : configItems)
+	for (unsigned int i = 0; i < configItems.size(); i++)
 	{
-		configFile << "\t" << "\"" << ci.name << "\"" << " : " << ci.getJsonString() << "," << endl;
+		auto ci = configItems[i];
+		configFile << "\t" << "\"" << ci.name << "\"" << " : " << ci.getJsonString();
+		if (i == configItems.size() - 1)
+		{
+			configFile << endl;
+		}
+		else
+		{
+			configFile << "," << endl;
+		}
 	}
 	configFile << "}";
 
@@ -686,7 +700,7 @@ bool NeedToUpdateSamples(vector<ICorrelatedSamplingData*>& samples, vector<doubl
 
 void UpdateSamplesRandom(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
-	double percent = 0.2;
+	double percent = UPDATE_SAMPLES_PERCENT;
 	int count = samples.size();
 	int nrOfUpdates = count * percent / 100.0;
 
@@ -698,6 +712,7 @@ void UpdateSamplesRandom(vector<ICorrelatedSamplingData*>& samples, vector<doubl
 		{
 			DoMetropolisStep(samples[randomSample]->R, uR, uI, phiR, phiI);
 		}
+		sys->CalculateWavefunction(samples[randomSample]->R,  uR, uI, phiR, phiI); //TODO: it would be sufficient to call sys->RefreshLocalOperators() since the splineSums should be kept up to date for samples[randomSample]->R during the MetropolisSteps
 		sys->CalculateOtherLocalOperators(samples[randomSample]->R);
 
 		samples[randomSample]->wf = sys->GetWf();
@@ -838,13 +853,13 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 		if ((10 * i) % MC_NSTEPS == 0)
 		{
 			//cout << (i / (double)MC_NSTEPS * 100.0) << "%" << endl;
-			if (processRank == rootRank)
+			if (processRank == rootRank && !intermediateStep)
 			{
 				cout << "." << flush;
 			}
 		}
 	}
-	if (processRank == rootRank)
+	if (processRank == rootRank && !intermediateStep)
 	{
 		cout << endl;
 	}
@@ -933,12 +948,12 @@ void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>&
 	//}
 }
 
-void UpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void UpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI, bool intermediateStep = false)
 {
 	int count = samples.size();
 	double dblCount = (double) count;
-	double weight = 1.0;
-	double weightSum = 0.0;
+	//double weight = 1.0;
+	//double weightSum = 0.0;
 
 	//vector<double> newWf2s;
 	//vector<double> weights;
@@ -961,16 +976,19 @@ void UpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingData*>& sa
 		sys->CalculateExpectationValues(samples[i], uR, uI, phiR, phiI);
 
 		//weight = sys->GetWf() * sys->GetWf() / wfValues2[i];
-		weight = exp(2.0 * sys->GetExponent() - 2.0 * samples[i]->exponent);
-		weightSum += weight;
+		//weight = exp(2.0 * sys->GetExponent() - 2.0 * samples[i]->exponent);
+		//weight = sys->GetExponent() / samples[i]->exponent;
+		//weight = 1.0;
+		//weights.push_back(weight);
+		//weightSum += weight;
 		//INFO: calculate contribution to average value
-		localOperators += sys->GetLocalOperators() / dblCount * weight;
-		localEnergyR += sys->GetLocalEnergyR() / dblCount * weight;
-		localEnergyI += sys->GetLocalEnergyI() / dblCount * weight;
-		localOperatorsMatrix += sys->GetLocalOperatorsMatrix() / dblCount * weight;
-		localOperatorlocalEnergyR += sys->GetLocalOperatorlocalEnergyR() / dblCount * weight;
-		localOperatorlocalEnergyI += sys->GetLocalOperatorlocalEnergyI() / dblCount * weight;
-		otherExpectationValues += sys->GetOtherExpectationValues() / dblCount * weight;
+		localOperators += sys->GetLocalOperators() / dblCount;// * weight;
+		localEnergyR += sys->GetLocalEnergyR() / dblCount;// * weight;
+		localEnergyI += sys->GetLocalEnergyI() / dblCount;// * weight;
+		localOperatorsMatrix += sys->GetLocalOperatorsMatrix() / dblCount;// * weight;
+		localOperatorlocalEnergyR += sys->GetLocalOperatorlocalEnergyR() / dblCount;// * weight;
+		localOperatorlocalEnergyI += sys->GetLocalOperatorlocalEnergyI() / dblCount;// * weight;
+		otherExpectationValues += sys->GetOtherExpectationValues() / dblCount;// * weight;
 
 		//weights.push_back(weight);
 		//newWf2s.push_back(sys->GetWf() * sys->GetWf());
@@ -979,39 +997,47 @@ void UpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingData*>& sa
 		if ((10 * i) % count == 0)
 		{
 			//cout << (i / (double)MC_NSTEPS * 100.0) << "%" << endl;
-			if (processRank == rootRank)
+			if (processRank == rootRank && !intermediateStep)
 			{
 				cout << "." << flush;
+				//cout << weight << endl;
 			}
 		}
 	}
 
-	//WriteDataToFile(weights, "__Test_weights", "phiR=" + to_string(phiR));
-	//WriteDataToFile(los, "__Test_los", "los");
-	//WriteDataToFile(newWf2s, "__Test_newWf2s", "newWf2s");
+	//if (processRank == rootRank && sys->GetStep() > 1 && !intermediateStep)
+	//{
+	//	WriteDataToFile(weights, "__Test_weights", "phiR=" + to_string(phiR));
+	//	WriteDataToFile(los, "__Test_los", "los");
+	//	WriteDataToFile(newWf2s, "__Test_newWf2s", "newWf2s");
+	//}
 
-	double inverseWeightMean = dblCount / weightSum;
-	localOperators *= inverseWeightMean;
-	localEnergyR *= inverseWeightMean;
-	localEnergyI *= inverseWeightMean;
-	localOperatorsMatrix *= inverseWeightMean;
-	localOperatorlocalEnergyR *= inverseWeightMean;
-	localOperatorlocalEnergyI *= inverseWeightMean;
-	otherExpectationValues *= inverseWeightMean;
+	//double inverseWeightMean = dblCount / weightSum;
+	//if (processRank == rootRank && !intermediateStep)
+	//{
+	//	cout << "mean: " << (1.0/inverseWeightMean) << endl;
+	//}
+	//localOperators *= inverseWeightMean;
+	//localEnergyR *= inverseWeightMean;
+	//localEnergyI *= inverseWeightMean;
+	//localOperatorsMatrix *= inverseWeightMean;
+	//localOperatorlocalEnergyR *= inverseWeightMean;
+	//localOperatorlocalEnergyI *= inverseWeightMean;
+	//otherExpectationValues *= inverseWeightMean;
 
-	if (processRank == rootRank)
+	if (processRank == rootRank && !intermediateStep)
 	{
 		cout << endl;
 	}
 }
 
-void ParallelUpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void ParallelUpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI, bool intermediateStep = false)
 {
 	//Timer t;
 	//double dblDuration;
 	//t.start();
 
-	UpdateExpectationValuesForGivenSamples(samples, uR, uI, phiR, phiI);
+	UpdateExpectationValuesForGivenSamples(samples, uR, uI, phiR, phiI, intermediateStep);
 
 	//t.stop();
 	//dblDuration = (double) t.duration();
@@ -1264,6 +1290,29 @@ void SolveEquationSystem(vector<vector<double> >& matrix, vector<double>& rhs, v
 	SolveCholeskyDecomposedEquationSystem(matrix, rhs, solution);
 }
 
+void SolveEquationSystemArmadillo(vector<vector<double> >& matrix, vector<double>& rhs, vector<double>& solution)
+{
+	arma::mat m(N_PARAM, N_PARAM);
+	arma::vec b(N_PARAM);
+	arma::vec x(N_PARAM);
+
+	for (int i = 0; i < N_PARAM; i++)
+	{
+		for (int j = 0; j < N_PARAM; j++)
+		{
+			m(i, j) = matrix[i][j];
+		}
+		b[i] = rhs[i];
+	}
+
+	x = arma::solve(m, b);
+
+	for (int i = 0; i < N_PARAM; i++)
+	{
+		solution[i] = x[i];
+	}
+}
+
 void CalculatePhiDot(vector<double>& uDotR, vector<double>& uDotI, double *phiDotR, double *phiDotI)
 {
 	for (int i = 0; i < N_PARAM; i++)
@@ -1390,6 +1439,63 @@ void CalculateNextParametersPC(double dt, vector<vector<double> >& R, vector<dou
 	*phiI = tmpPhiI;
 }
 
+void CalculateNextParametersPCReuseSamples(double dt, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
+{
+	double dt_2 = dt / 2.0;
+
+	vector<double> uDotR;
+	vector<double> uDotI;
+	double phiDotR = 0;
+	double phiDotI = 0;
+
+	int PCsteps = 1;
+	vector<double> tmpUR(N_PARAM);
+	vector<double> tmpUI(N_PARAM);
+	double tmpPhiR = 0;
+	double tmpPhiI = 0;
+	vector<double> nextUDotR;
+	vector<double> nextUDotI;
+	double nextPhiDotR = 0;
+	double nextPhiDotI = 0;
+
+	ClearVector(tmpUR);
+	ClearVector(tmpUI);
+
+	if (processRank == rootRank)
+	{
+		SolveForParametersDot(uDotR, uDotI, &phiDotR, &phiDotI);
+
+		tmpUR = uR + uDotR * dt;
+		tmpUI = uI + uDotI * dt;
+		tmpPhiR = *phiR + phiDotR * dt;
+		tmpPhiI = *phiI + phiDotI * dt;
+	}
+	for (int s = 0; s < PCsteps; s++)
+	{
+		//BroadcastNewParameters(uR, uI, phiR, phiI);
+		//BroadcastValues(tmpUR, N_PARAM);
+		//BroadcastValues(tmpUI, N_PARAM);
+		//BroadcastValue(&tmpPhiR);
+		//BroadcastValue(&tmpPhiI);
+		BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
+		ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
+		if (processRank == rootRank)
+		{
+			SolveForParametersDot(nextUDotR, nextUDotI, &nextPhiDotR, &nextPhiDotI);
+
+			tmpUR = uR + (uDotR + nextUDotR) * dt_2;
+			tmpUI = uI + (uDotI + nextUDotI) * dt_2;
+			tmpPhiR = *phiR + (phiDotR + nextPhiDotR) * dt_2;
+			tmpPhiI = *phiI + (phiDotI + nextPhiDotI) * dt_2;
+		}
+	}
+
+	uR = tmpUR;
+	uI = tmpUI;
+	*phiR = tmpPhiR;
+	*phiI = tmpPhiI;
+}
+
 void CalculateNextParametersRK4(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
 	double dt_2 = dt / 2.0;
@@ -1489,7 +1595,7 @@ void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vecto
 		tmpPhiI = *phiI + phiDotI[0] * dt_2;
 	}
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
+	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
 
 	if (processRank == rootRank)
 	{
@@ -1501,7 +1607,7 @@ void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vecto
 		tmpPhiI = *phiI + phiDotI[1] * dt_2;
 	}
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
+	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
 
 	if (processRank == rootRank)
 	{
@@ -1513,7 +1619,7 @@ void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vecto
 		tmpPhiI = *phiI + phiDotI[2] * dt;
 	}
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
-	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI);
+	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
 
 	if (processRank == rootRank)
 	{
@@ -1526,65 +1632,274 @@ void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vecto
 	}
 }
 
-void CalculateNextParametersImplicitEuler(double dt, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
+void CalculateNextParametersImplicitEuler2(double dt, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
+	vector<double> uR_Start(uR);
+	vector<double> uI_Start(uI);
+	double phiR_Start = *phiR;
+	double phiI_Start = *phiI;
+
+	vector<double> uDotR(N_PARAM);
+	vector<double> uDotI(N_PARAM);
+	double phiDotR = 0;
+	double phiDotI = 0;
+
+	vector<double> uDotR_n(N_PARAM);
+	vector<double> uDotI_n(N_PARAM);
+	double phiDotR_n = 0;
+	double phiDotI_n = 0;
+
+	vector<double> uDotR_n_delta(N_PARAM);
+	vector<double> uDotI_n_delta(N_PARAM);
+	double phiDotR_n_delta = 0;
+	double phiDotI_n_delta = 0;
+
+	vector<vector<double> > JR(N_PARAM);
+	vector<vector<double> > JI(N_PARAM);
+	for (int i = 0; i < N_PARAM; i++)
+	{
+		JR[i].resize(N_PARAM);
+		JI[i].resize(N_PARAM);
+	}
+
 	if (processRank == rootRank)
 	{
-		vector<double> uDotR;
-		vector<double> uDotI;
-		double phiDotR = 0;
-		double phiDotI = 0;
-
 		SolveForParametersDot(uDotR, uDotI, &phiDotR, &phiDotI);
 
-		vector<double> gn_uR;
-		vector<double> gn_uI;
-		double gn_phiR;
-		double gn_phiI;
-		vector<double> uDotRDelta;
-		vector<double> uDotIDelta;
-		double phiDotRDelta = 0;
-		double phiDotIDelta = 0;
-		vector<vector<double> > JR(N_PARAM);
-		vector<vector<double> > JI(N_PARAM);
-		double eps = 1e-3;
-		double diff = 1;
-		vector<double> uRn(uR); //INFO: start values for iterations in Newton method (could also use values from explicit Euler: uR[i] = uR[i] + uDotR[i] * dt)
-		vector<double> uIn(uI);
-		double phiRn = *phiR;
-		double phiIn = *phiI;
-		double delta = 1e-4;
-		while(diff < eps)
-		{
-			gn_uR = uRn - uR - uDotR * dt;
-			gn_uI = uIn - uI - uDotI * dt;
-			gn_phiR = phiRn - *phiR - dt * phiDotR;
-			gn_phiI = phiIn - *phiI - dt * phiDotI;
-
-			for (int i = 0; i < N_PARAM; i++)
-			{
-				double deltaUR = delta * gn_uR[i];
-				uR[i] += deltaUR;
-				ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR, uI, *phiR, *phiI);
-				uR[i] -= deltaUR;
-			}
-			for (int i = 0; i < N_PARAM; i++)
-			{
-				double deltaUI = delta * gn_uI[i];
-				uI[i] += deltaUI;
-				ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR, uI, *phiR, *phiI);
-				uI[i] -= deltaUI;
-			}
-			double deltaPhiR = delta * gn_phiR;
-			*phiR += deltaPhiR;
-			ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR, uI, *phiR, *phiI);
-			*phiR -= deltaPhiR;
-			double deltaPhiI = delta * gn_phiI;
-			*phiI += deltaPhiI;
-			ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR, uI, *phiR, *phiI);
-			*phiI -= deltaPhiI;
-		}
+		uR_Start = uR_Start + uDotR * dt;
+		uI_Start = uI_Start + uDotI * dt;
+		phiR_Start = phiR_Start + phiDotR * dt;
+		phiI_Start = phiI_Start + phiDotI * dt;
 	}
+
+	BroadcastNewParameters(uR_Start, uI_Start, &phiR_Start, &phiI_Start);
+	BroadcastNewParameters(uDotR, uDotI, &phiDotR, &phiDotI);
+
+	double eps = 1e-4;
+	double diff = 1;
+	double delta = 1e-4;
+	int iterations = 0;
+
+	vector<double> uR_n(uR_Start);
+	vector<double> uI_n(uI_Start);
+	double phiR_n = phiR_Start;
+	double phiI_n = phiI_Start;
+	//vector<double> uR_n(uR);
+	//vector<double> uI_n(uI);
+	//double phiR_n = *phiR;
+	//double phiI_n = *phiI;
+
+	while (diff > eps && iterations < 10)
+	{
+		iterations++;
+		ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR_n, uI_n, phiR_n, phiI_n, true);
+		if (processRank == rootRank)
+		{
+			SolveForParametersDot(uDotR_n, uDotI_n, &phiDotR_n, &phiDotI_n);
+		}
+		BroadcastNewParameters(uDotR_n, uDotI_n, &phiDotR_n, &phiDotI_n);
+
+		vector<double> gR_n = uR_n - uR - uDotR_n * dt;
+		vector<double> gI_n = uI_n - uI - uDotI_n * dt;
+
+		for (int i = 0; i < N_PARAM; i++)
+		{
+			double dUR = delta * uR[i];
+			uR_n[i] -= dUR;
+			ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR_n, uI_n, phiR_n, phiI_n, true);
+			if (processRank == rootRank)
+			{
+				SolveForParametersDot(uDotR_n_delta, uDotI_n_delta, &phiDotR_n_delta, &phiDotI_n_delta);
+				JR[i] = (uDotR_n_delta - uDotR_n) * dt / dUR * (-1.0);
+				JR[i][i] = JR[i][i] + 1.0;
+			}
+			uR_n[i] += dUR;
+
+			double dUI = delta * uI[i];
+			uI_n[i] -= dUI;
+			ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR_n, uI_n, phiR_n, phiI_n, true);
+			if (processRank == rootRank)
+			{
+				SolveForParametersDot(uDotR_n_delta, uDotI_n_delta, &phiDotR_n_delta, &phiDotI_n_delta);
+				JI[i] = (uDotI_n_delta - uDotI_n) * dt / dUI * (-1.0);
+				JI[i][i] = JI[i][i] + 1.0;
+			}
+			uI_n[i] += dUI;
+		}
+		if (processRank == rootRank)
+		{
+			vector<double> delta_uR(N_PARAM);
+			vector<double> delta_uI(N_PARAM);
+			//double delta_phiR = 0;
+			//double delta_phiI = 0;
+
+			cout << "solve JR" << endl;
+			//WriteDataToFile(JR, "BBJR_" + to_string(iterations), "JR");
+			//WriteDataToFile(gR_n, "BBgR_n_" + to_string(iterations), "gR_n");
+			//WriteDataToFile(uR_n, "BBuR_n_" + to_string(iterations), "uR_n");
+			SolveEquationSystemArmadillo(JR, gR_n, delta_uR);
+			//WriteDataToFile(delta_uR, "BBdelta_uR_" + to_string(iterations), "delta_uR");
+
+			cout << "solve JI" << endl;
+			//WriteDataToFile(JI, "BBJI_" + to_string(iterations), "JI");
+			//WriteDataToFile(gI_n, "BBgI_n_" + to_string(iterations), "gI_n");
+			//WriteDataToFile(uI_n, "BBuI_n_" + to_string(iterations), "uI_n");
+			SolveEquationSystemArmadillo(JI, gI_n, delta_uI);
+			//WriteDataToFile(delta_uI, "BBdelta_uI_" + to_string(iterations), "delta_uI");
+
+			double max = abs(delta_uR[0] / uR_n[0]);
+			double tmp = 0;
+			for (int i = 0; i < N_PARAM; i++)
+			{
+				tmp = abs(delta_uR[0] / uR_n[0]);
+				if (tmp > max)
+				{
+					max = tmp;
+				}
+				tmp = abs(delta_uI[0] / uI_n[0]);
+				if (tmp > max)
+				{
+					max = tmp;
+				}
+			}
+			diff = max;
+			cout << "diff=" << diff << endl;
+
+			cout << "compute u_n+1" << endl;
+			uR_n = uR_n - delta_uR;
+			uI_n = uI_n - delta_uI;
+		}
+
+		MPIMethods::BroadcastValue(&diff);
+		BroadcastNewParameters(uR_n, uI_n, &phiR_n, &phiI_n);
+	}
+
+	if (processRank == rootRank)
+	{
+		uR = uR_n;
+		uI = uI_n;
+	}
+}
+
+void CalculateNextParametersImplicitEuler(double dt, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
+{
+	vector<double> uDotR;
+	vector<double> uDotI;
+	double phiDotR = 0;
+	double phiDotI = 0;
+
+	vector<double> energiesReal; //rhs of the equation that corresponds to uDotR;
+	vector<double> energiesImag; //rhs of the equation that corresponds to uDotI;
+	vector<vector<double> > matrix;
+
+	if (processRank == rootRank)
+	{
+		SolveForParametersDot(uDotR, uDotI, &phiDotR, &phiDotI);
+	}
+	BroadcastNewParameters(uDotR, uDotI, &phiDotR, &phiDotI);
+
+	vector<double> gn_uR;
+	vector<double> gn_uI;
+	vector<double> delta_uR;
+	vector<double> delta_uI;
+	vector<double> uDotRDelta;
+	vector<double> uDotIDelta;
+	vector<vector<double> > JR(N_PARAM);
+	vector<vector<double> > JI(N_PARAM);
+	double eps = 1e-3;
+	double diff = 1;
+	vector<double> uRn(uR); //INFO: start values for iterations in Newton method (could also use values from explicit Euler: uR[i] = uR[i] + uDotR[i] * dt)
+	vector<double> uIn(uI);
+	double delta = 1e-2;
+	int iterations = 0;
+	while (diff > eps && iterations < 10)
+	{
+		iterations++;
+		gn_uR = uRn - uR - uDotR * dt;
+		gn_uI = uIn - uI - uDotI * dt;
+
+		for (int i = 0; i < N_PARAM; i++)
+		{
+			cout << "*" << flush;
+			double dUR = delta * uR[i];
+			uRn[i] += dUR;
+			ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uRn, uIn, *phiR, *phiI, true);
+			if (processRank == rootRank)
+			{
+				BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
+				PerformCholeskyDecomposition(matrix);
+				SolveCholeskyDecomposedEquationSystem(matrix, energiesReal, uDotRDelta);
+				JR[i] = (uDotRDelta - uDotR) / dUR * dt;
+				for (int j = 0; j < N_PARAM; j++)
+				{
+					JR[i][j] = 1 - JR[i][j];
+				}
+			}
+			uRn[i] -= dUR;
+		}
+		cout << endl;
+		for (int i = 0; i < N_PARAM; i++)
+		{
+			cout << "*" << flush;
+			double dUI = delta * uI[i];
+			uIn[i] += dUI;
+			ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uRn, uIn, *phiR, *phiI, true);
+			if (processRank == rootRank)
+			{
+				BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
+				PerformCholeskyDecomposition(matrix);
+				SolveCholeskyDecomposedEquationSystem(matrix, energiesImag, uDotIDelta);
+				JI[i] = (uDotIDelta - uDotI) / dUI * dt;
+				for (int j = 0; j < N_PARAM; j++)
+				{
+					JI[i][j] = 1 - JI[i][j];
+				}
+			}
+			uIn[i] -= dUI;
+		}
+		cout << endl;
+
+		if (processRank == rootRank)
+		{
+			cout << "solve JR" << endl;
+			WriteDataToFile(JR, "BBJR_" + to_string(sys->GetStep()), "JR");
+			WriteDataToFile(gn_uR, "BBrhsR_" + to_string(sys->GetStep()), "rhsR");
+			SolveEquationSystem(JR, gn_uR, delta_uR);
+
+			cout << "solve JI" << endl;
+			WriteDataToFile(JI, "BBJI_" + to_string(sys->GetStep()), "JI");
+			WriteDataToFile(gn_uI, "BBrhsI_" + to_string(sys->GetStep()), "rhsI");
+			SolveEquationSystem(JI, gn_uI, delta_uI);
+
+			cout << "compute u_n+1" << endl;
+			uRn = uRn - delta_uR;
+			uIn = uIn - delta_uI;
+
+			double min = abs(delta_uR[0]);
+			for (int i = 0; i < N_PARAM; i++)
+			{
+				if (abs(delta_uR[i]) < min)
+				{
+					min = abs(delta_uR[i]);
+				}
+				if (abs(delta_uI[i]) < min)
+				{
+					min = abs(delta_uI[i]);
+				}
+			}
+			cout << "diff=" << diff << endl;
+			diff = min;
+		}
+
+		MPIMethods::BroadcastValue(&diff);
+	}
+
+	if (processRank == rootRank)
+	{
+		uR = uRn;
+		uI = uIn;
+	}
+	BroadcastNewParameters(uR, uI, phiR, phiI);
 }
 
 void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
@@ -1615,7 +1930,18 @@ void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<doubl
 	}
 	else if (ODE_SOLVER_TYPE == 4)
 	{
-		CalculateNextParametersImplicitEuler(dt, uR, uI, phiR, phiI);
+		if (sys->GetStep() < 2)
+		{
+			CalculateNextParametersRK4ReuseSamples(dt, uR, uI, phiR, phiI);
+		}
+		else
+		{
+			CalculateNextParametersImplicitEuler2(dt, uR, uI, phiR, phiI);
+		}
+	}
+	else if (ODE_SOLVER_TYPE == 5)
+	{
+		CalculateNextParametersPCReuseSamples(dt, uR, uI, phiR, phiI);
 	}
 
 	if (processRank == rootRank)
@@ -1968,7 +2294,10 @@ int mainMPI(int argc, char** argv)
 			}
 			else
 			{
-				UpdateSamplesRandom(correlatedSamplingData, uR, uI, phiR, phiI);
+				if (UPDATE_SAMPLES_EVERY_NTH_STEP > 0 && step % UPDATE_SAMPLES_EVERY_NTH_STEP == 0)
+				{
+					UpdateSamplesRandom(correlatedSamplingData, uR, uI, phiR, phiI);
+				}
 				ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR, uI, phiR, phiI);
 
 				//bool update = NeedToUpdateSamples(mcSamples, uR, uI, phiR, phiI);
@@ -2129,6 +2458,7 @@ int mainMPI(int argc, char** argv)
 		{
 			if (FileExist("./stop"))
 			{
+				//TODO: read content of stop-file and interpret as new TOTALTIME instead of stopping immediately
 				Log("Detected stop-file!", WARNING);
 				cancel = 1;
 			}
