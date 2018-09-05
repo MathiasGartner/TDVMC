@@ -1,6 +1,6 @@
 #include "ConfigItem.h"
 
-ConfigItem::ConfigItem(string name, ConfigItemType type)
+ConfigItem::ConfigItem(string name, ConfigItemType type, bool allowChangeAtRuntime)
 {
 	this->name = name;
 	this->variableString = 0;
@@ -8,28 +8,29 @@ ConfigItem::ConfigItem(string name, ConfigItemType type)
 	this->variableDouble = 0;
 	this->variableArrDouble = 0;
 	this->type = type;
+	this->allowChangeAtRuntime = allowChangeAtRuntime;
 }
 
-ConfigItem::ConfigItem(string name, string* variable, ConfigItemType type) :
-		ConfigItem(name, type)
+ConfigItem::ConfigItem(string name, string* variable, ConfigItemType type, bool allowChangeAtRuntime) :
+		ConfigItem(name, type, allowChangeAtRuntime)
 {
 	this->variableString = variable;
 }
 
-ConfigItem::ConfigItem(string name, int* variable, ConfigItemType type) :
-		ConfigItem(name, type)
+ConfigItem::ConfigItem(string name, int* variable, ConfigItemType type, bool allowChangeAtRuntime) :
+		ConfigItem(name, type, allowChangeAtRuntime)
 {
 	this->variableInt = variable;
 }
 
-ConfigItem::ConfigItem(string name, double* variable, ConfigItemType type) :
-		ConfigItem(name, type)
+ConfigItem::ConfigItem(string name, double* variable, ConfigItemType type, bool allowChangeAtRuntime) :
+		ConfigItem(name, type, allowChangeAtRuntime)
 {
 	this->variableDouble = variable;
 }
 
-ConfigItem::ConfigItem(string name, vector<double>& variable, ConfigItemType type) :
-		ConfigItem(name, type)
+ConfigItem::ConfigItem(string name, vector<double>& variable, ConfigItemType type, bool allowChangeAtRuntime) :
+		ConfigItem(name, type, allowChangeAtRuntime)
 {
 	this->variableArrDouble = &variable;
 }

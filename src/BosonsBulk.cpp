@@ -125,8 +125,8 @@ void BosonsBulk::InitSystem()
 		}
 	}
 
-	cout << "maxDistance=" << maxDistance << endl;
-	cout << "nodePointSpacing=" << nodePointSpacing << endl;
+	//cout << "maxDistance=" << maxDistance << endl;
+	//cout << "nodePointSpacing=" << nodePointSpacing << endl;
 }
 
 void BosonsBulk::RefreshLocalOperators()
