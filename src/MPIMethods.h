@@ -186,7 +186,7 @@ void ReduceToAverage(vector<double>& data)
 void ReduceToAverage(vector<vector<double> >& data)
 {
 	int size1 = data.size();
-	int size2 = data[0].size();
+	int size2 = size1 > 0 ? data[0].size() : 0;
 	int totalSize = size1 * size2;
 	//TODO: besseres kriterium überlegen und auch auf anderen servern testen
 	//		der wert 500 ist für zusie bie 256 prozessen.

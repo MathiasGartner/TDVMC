@@ -9,6 +9,7 @@
 #include "ConfigItem.h"
 #include "Constants.h"
 #include "GaussianWavepacket.h"
+#include "HardSphereBosons.h"
 #include "HeBulk.h"
 #include "HeDrop.h"
 #include "ICorrelatedSamplingData.h"
@@ -559,7 +560,7 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 		{
 			cout << "LBOX=" << LBOX << endl;
 		}
-		int type = 2;
+		int type = 1;
 		if (type == 0)
 		{
 			//Random
@@ -659,6 +660,7 @@ void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<dou
 		R[randomParticle][i] += randomNormal(MC_STEP, MC_STEP_OFFSET);
 	}
 	double wfQuotient = sys->CalculateWFQuotient(R, uR, uI, phiR, phiI, randomParticle, oldPosition);
+	//cout << wfQuotient << endl;
 
 	//if (wfQuotient == 0 || sys->GetWfNew() == 0 || sys->GetWf() == 0)
 	//{
@@ -727,7 +729,7 @@ void UpdateSamplesRandom(int nrOfSamplesToUpdate, vector<ICorrelatedSamplingData
 		{
 			DoMetropolisStep(samples[randomSample]->R, uR, uI, phiR, phiI);
 		}
-		sys->CalculateWavefunction(samples[randomSample]->R,  uR, uI, phiR, phiI); //TODO: it would be sufficient to call sys->RefreshLocalOperators() since the splineSums should be kept up to date for samples[randomSample]->R during the MetropolisSteps
+		sys->CalculateWavefunction(samples[randomSample]->R, uR, uI, phiR, phiI); //TODO: it would be sufficient to call sys->RefreshLocalOperators() since the splineSums should be kept up to date for samples[randomSample]->R during the MetropolisSteps
 		sys->CalculateOtherLocalOperators(samples[randomSample]->R);
 
 		samples[randomSample]->wf = sys->GetWf();
@@ -997,13 +999,13 @@ void UpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingData*>& sa
 		//weights.push_back(weight);
 		//weightSum += weight;
 		//INFO: calculate contribution to average value
-		localOperators += sys->GetLocalOperators() / dblCount;// * weight;
-		localEnergyR += sys->GetLocalEnergyR() / dblCount;// * weight;
-		localEnergyI += sys->GetLocalEnergyI() / dblCount;// * weight;
-		localOperatorsMatrix += sys->GetLocalOperatorsMatrix() / dblCount;// * weight;
-		localOperatorlocalEnergyR += sys->GetLocalOperatorlocalEnergyR() / dblCount;// * weight;
-		localOperatorlocalEnergyI += sys->GetLocalOperatorlocalEnergyI() / dblCount;// * weight;
-		otherExpectationValues += sys->GetOtherExpectationValues() / dblCount;// * weight;
+		localOperators += sys->GetLocalOperators() / dblCount;		// * weight;
+		localEnergyR += sys->GetLocalEnergyR() / dblCount;		// * weight;
+		localEnergyI += sys->GetLocalEnergyI() / dblCount;		// * weight;
+		localOperatorsMatrix += sys->GetLocalOperatorsMatrix() / dblCount;		// * weight;
+		localOperatorlocalEnergyR += sys->GetLocalOperatorlocalEnergyR() / dblCount;		// * weight;
+		localOperatorlocalEnergyI += sys->GetLocalOperatorlocalEnergyI() / dblCount;		// * weight;
+		otherExpectationValues += sys->GetOtherExpectationValues() / dblCount;		// * weight;
 
 		//weights.push_back(weight);
 		//newWf2s.push_back(sys->GetWf() * sys->GetWf());
@@ -1727,7 +1729,7 @@ void CalculateNextParametersImplicitEuler(double dt, vector<double>& uR, vector<
 
 		for (int i = 0; i < N_PARAM; i++)
 		{
-			double dUR = delta * uR[i];// * directionR[i];
+			double dUR = delta * uR[i]; // * directionR[i];
 			uR_n[i] += dUR;
 			ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR_n, uI_n, phiR_n, phiI_n, true);
 			if (processRank == rootRank)
@@ -1738,7 +1740,7 @@ void CalculateNextParametersImplicitEuler(double dt, vector<double>& uR, vector<
 			}
 			uR_n[i] -= dUR;
 
-			double dUI = delta * uI[i];// * directionI[i];
+			double dUI = delta * uI[i]; // * directionI[i];
 			uI_n[i] += dUI;
 			ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR_n, uI_n, phiR_n, phiI_n, true);
 			if (processRank == rootRank)
@@ -1902,7 +1904,7 @@ void CalculateNextParametersCrankNicolson(double dt, vector<double>& uR, vector<
 
 		for (int i = 0; i < N_PARAM; i++)
 		{
-			double dUR = delta * uR[i];// * directionR[i];
+			double dUR = delta * uR[i]; // * directionR[i];
 			uR_n[i] += dUR;
 			ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR_n, uI_n, phiR_n, phiI_n, true);
 			if (processRank == rootRank)
@@ -1913,7 +1915,7 @@ void CalculateNextParametersCrankNicolson(double dt, vector<double>& uR, vector<
 			}
 			uR_n[i] -= dUR;
 
-			double dUI = delta * uI[i];// * directionI[i];
+			double dUI = delta * uI[i]; // * directionI[i];
 			uI_n[i] += dUI;
 			ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR_n, uI_n, phiR_n, phiI_n, true);
 			if (processRank == rootRank)
@@ -2188,7 +2190,9 @@ void PerformSystemParameterChange()
 		{
 			if (ci.allowChangeAtRuntime && !configData[ci.name].empty())
 			{
+				string oldValue = ci.getJsonString();
 				ci.setValue(configData[ci.name]);
+				Log("changed: " + ci.name + " from \"" + oldValue + "\" to \"" + ci.getJsonString() + "\"", WARNING);
 			}
 		}
 	}
@@ -2289,6 +2293,10 @@ int mainMPI(int argc, char** argv)
 	{
 		sys = new BosonsBulk(SYSTEM_PARAMS, configDirectory);
 	}
+	else if (SYSTEM_TYPE == "HardSphereBosons")
+	{
+		sys = new HardSphereBosons(SYSTEM_PARAMS, configDirectory);
+	}
 	else
 	{
 		if (processRank == rootRank)
@@ -2362,10 +2370,9 @@ int mainMPI(int argc, char** argv)
 	int nrOfAcceptParameterTrials;
 	int maxNrOfAcceptParameterTrials = 4;
 
-
 	double nrOfSamplesToUpdate;
 	double percentForExtraSampleToUpdate;
-	percentForExtraSampleToUpdate =  modf(MC_NSTEPS * UPDATE_SAMPLES_PERCENT / 100.0, &nrOfSamplesToUpdate);
+	percentForExtraSampleToUpdate = modf(MC_NSTEPS * UPDATE_SAMPLES_PERCENT / 100.0, &nrOfSamplesToUpdate);
 
 	double dynTimestep = TIMESTEP;
 	for (currentTime = 0; currentTime <= TOTALTIME; currentTime += dynTimestep)
@@ -2642,7 +2649,7 @@ int mainMPI(int argc, char** argv)
 		if (configChanged != 0)
 		{
 			BroadcastChangeableConfigItems();
-			percentForExtraSampleToUpdate =  modf(MC_NSTEPS * UPDATE_SAMPLES_PERCENT / 100.0, &nrOfSamplesToUpdate);
+			percentForExtraSampleToUpdate = modf(MC_NSTEPS * UPDATE_SAMPLES_PERCENT / 100.0, &nrOfSamplesToUpdate);
 		}
 
 		if (processRank == rootRank)
@@ -2768,6 +2775,218 @@ int mainMPI(int argc, char** argv)
 	return 0;
 }
 
+int startVMCSamplerMPI(int argc, char** argv)
+{
+	//////////////////////////
+	/// Init MPI processes ///
+	//////////////////////////
+
+	char processName[80];
+	int processNameLength;
+
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &processRank);
+	MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
+	MPI_Get_processor_name(processName, &processNameLength);
+
+	MPIMethods::numOfProcesses = numOfProcesses;
+	MPIMethods::processRank = processRank;
+	MPIMethods::rootRank = rootRank;
+
+	MPIMethods::GetCPUAllocation(false);
+
+	////////////////////////////////////////
+	/// Read and Broadcast configuration ///
+	////////////////////////////////////////
+
+	RegisterAllConfigItems();
+	if (processRank == rootRank)
+	{
+		Log("Master process started...");
+
+		if (FileExist(configFilePath))
+		{
+			ReadConfig(configFilePath);
+			if (requiredConfigVersion != CONFIG_VERSION)
+			{
+				Log("Config file is out of date.\nrequired: \"" + requiredConfigVersion + "\"\nfound: \"" + CONFIG_VERSION + "\"", ERROR);
+				return 1;
+			}
+			CreateOutputDirectory();
+			//PrintConfig();
+		}
+		else
+		{
+			cout << "config file not found. path=\"" << configFilePath << "\"" << endl;
+			MPI_Abort(MPI_COMM_WORLD, 0);
+			return 1;
+		}
+	}
+	configDirectory = configFilePath.substr(0, configFilePath.find_last_of("\\/")) + "/"; //TODO: restrict all file access to main process
+	MPIMethods::BroadcastValue(&OUT_DIR, 300);
+	//cout << "configDirectory=\"" << configDirectory << "\"" << endl;
+	BroadcastConfig();
+	//PrintConfig();
+
+	//////////////////////////////////
+	/// Initialize Physical System ///
+	//////////////////////////////////
+
+	if (SYSTEM_TYPE == "HeDrop")
+	{
+		sys = new HeDrop(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "HeBulk")
+	{
+		sys = new HeBulk(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BulkSplines")
+	{
+		//sys = new BulkSplines(SYSTEM_PARAMS, configDirectory);
+		sys = new BulkSplinesPhi(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BulkSplinesScaled")
+	{
+		sys = new BulkSplinesScaled(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BulkQT")
+	{
+		//sys = new BulkQT(SYSTEM_PARAMS, configDirectory);
+		sys = new BulkQTPhi(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "GaussianWavepacket")
+	{
+		sys = new GaussianWavepacket(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BosonsBulk")
+	{
+		sys = new BosonsBulk(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "HardSphereBosons")
+	{
+		sys = new HardSphereBosons(SYSTEM_PARAMS, configDirectory);
+	}
+	else
+	{
+		if (processRank == rootRank)
+		{
+			Log("System type \"" + SYSTEM_TYPE + "\" not available.", ERROR);
+		}
+		return 1;
+	}
+
+	/////////////////////////////
+	/// other Initializations ///
+	/////////////////////////////
+
+	Init();
+
+	vector<vector<double> > R(N);
+	vector<double> uR(N_PARAM);
+	vector<double> uI(N_PARAM);
+	double phiR;
+	double phiI;
+	PARAMS_REAL.resize(N_PARAM, 0.0);
+	PARAMS_IMAGINARY.resize(N_PARAM, 0.0);
+
+	for (unsigned int i = 0; i < R.size(); i++)
+	{
+		R[i].resize(DIM);
+	}
+
+	InitCoordinateConfiguration(R);
+	if (processRank == rootRank)
+	{
+		WriteParticleInputFile("particleconfiguration.csv", R);
+	}
+	if (processRank == rootRank)
+	{
+		for (int i = 0; i < N_PARAM; i++)
+		{
+			uR[i] = PARAMS_REAL[i];
+			uI[i] = PARAMS_IMAGINARY[i];
+		}
+		phiR = PARAM_PHIR;
+		phiI = PARAM_PHII;
+		//PrintData(uR);
+		//PrintData(uI);
+
+		if (processRank == rootRank)		// && USE_ADJUST_PARAMETERS == true)
+		{
+			//AdjustParameters(uR, uI, &phiR, &phiI);
+		}
+
+		WriteDataToFile(uR, "parametersR0", "parameterR");
+		WriteDataToFile(uI, "parametersI0", "parameterI");
+	}
+
+	sys->InitSystem();
+	PostSystemInit();
+
+	////////////////////////
+	/// start simulation ///
+	////////////////////////
+
+	Timer t;
+	if (processRank == rootRank)
+	{
+		t.start();
+	}
+	nAcceptances = 0;
+	nTrials = 0;
+
+	BroadcastNewParameters(uR, uI, &phiR, &phiI);
+
+	AlignCoordinates(R);
+
+	ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
+
+	int step = 1;
+	WriteDataToFile(localOperators, "localOperators" + to_string(step), "localOperators");
+	WriteDataToFile(localEnergyR, "localEnergyR" + to_string(step), "localEnergyR");
+	WriteDataToFile(localEnergyI, "localEnergyI" + to_string(step), "localEnergyI");
+	WriteDataToFile(localOperatorsMatrix, "localOperatorsMatrix" + to_string(step), "localOperatorsMatrix");
+	WriteDataToFile(localOperatorlocalEnergyR, "localOperatorlocalEnergyR" + to_string(step), "localOperatorlocalEnergyR");
+	WriteDataToFile(localOperatorlocalEnergyI, "localOperatorlocalEnergyI" + to_string(step), "localOperatorlocalEnergyI");
+	WriteDataToFile(otherExpectationValues, "otherExpectationValues" + to_string(step), "Ekin, Ekin_cor, Epot, Epot_corr, wf, g(r)_1, ..., g(r)_100");
+
+	if (processRank == rootRank)
+	{
+		cout << "t=" << currentTime << endl;
+		cout << "localEnergyR/N=" << localEnergyR / (double) N << " (" << otherExpectationValues[0] / (double) N << " + " << otherExpectationValues[1] / (double) N << " + " << endl;
+	}
+
+	MPIMethods::Barrier(); // wait for main process to create directory
+	WriteRandomGeneratorStatesToFile("random/state");
+
+	nAcceptances = 0;
+	nTrials = 0;
+
+	AlignCoordinates(R);
+	ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
+	if (processRank == rootRank)
+	{
+		WriteDataToFile(additionalSystemProperties, "AdditionalSystemProperties", "g(r), ...");
+		WriteDataToFile(AllAdditionalSystemProperties, "AllAdditionalSystemProperties", "g(r), ...");
+	}
+
+	//Log("free memory ...");
+	//TODO: how to properly delete the IPhysicalSystem pointer?
+	//delete sys;
+	for (int i = 0; i < MC_NSTEPS; i++)
+	{
+		delete correlatedSamplingData[i];
+	}
+
+	//Log("finalize ...");
+	MPIMethods::Barrier();
+	MPI_Finalize();
+
+	//Log("done");
+
+	return 0;
+}
+
 void startVMCSampler()
 {
 	int processRank = 0;
@@ -2829,8 +3048,9 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BulkQT";
 		//SYSTEM_TYPE = "BulkSplines";
 		//SYSTEM_TYPE = "BulkSplinesScaled";
-		SYSTEM_TYPE = "BosonsBulk";
+		//SYSTEM_TYPE = "HardSphereBosons";
 		//SYSTEM_TYPE = "HeDrop";
+		SYSTEM_TYPE = "BosonsBulk";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/drop_20.config";
@@ -2860,11 +3080,16 @@ int main(int argc, char **argv)
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonsBulk.config";
 		}
-		if (processRank == rootRank)
+		else if (SYSTEM_TYPE == "HardSphereBosons")
 		{
-			Log("configFilePath: " + configFilePath);
+			configFilePath = "/home/gartner/Sources/TDVMC/config/HardSphereBosons.config";
 		}
+		//if (processRank == rootRank) //INFO: no processRank assigned so far. this is done in mainMPI or startVMCSamplerMPI
+		//{
+		//	Log("configFilePath: " + configFilePath);
+		//}
 		val = mainMPI(argc, argv);
+		//val = startVMCSamplerMPI(argc, argv);
 	}
 	else if (argc > 1)
 	{
