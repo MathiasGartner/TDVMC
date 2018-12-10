@@ -15,6 +15,8 @@ CPP_SRCS += \
 ../src/CSDataBulkSplines.cpp \
 ../src/ConfigItem.cpp \
 ../src/GaussianWavepacket.cpp \
+../src/HardSphereBosons.cpp \
+../src/HardSphereBosonsExp.cpp \
 ../src/HeBulk.cpp \
 ../src/HeDrop.cpp \
 ../src/MathOperators.cpp \
@@ -34,6 +36,8 @@ OBJS += \
 ./src/CSDataBulkSplines.o \
 ./src/ConfigItem.o \
 ./src/GaussianWavepacket.o \
+./src/HardSphereBosons.o \
+./src/HardSphereBosonsExp.o \
 ./src/HeBulk.o \
 ./src/HeDrop.o \
 ./src/MathOperators.o \
@@ -53,6 +57,8 @@ CPP_DEPS += \
 ./src/CSDataBulkSplines.d \
 ./src/ConfigItem.d \
 ./src/GaussianWavepacket.d \
+./src/HardSphereBosons.d \
+./src/HardSphereBosonsExp.d \
 ./src/HeBulk.d \
 ./src/HeDrop.d \
 ./src/MathOperators.d \

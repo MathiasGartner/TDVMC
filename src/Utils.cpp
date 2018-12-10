@@ -75,7 +75,7 @@ double VectorDisplacement(vector<double>& ri, vector<double>& rj, vector<double>
 double GetCoordinateNIC(double r)
 {
 	int k;
-	k = (int) r * LBOX_R + ((r >= 0.0) ? 0.5 : -0.5);
+	k = (int) (r * LBOX_R + ((r >= 0.0) ? 0.5 : -0.5));
 	return r - k * LBOX;
 }
 
@@ -432,6 +432,17 @@ void WriteDataToFile(vector<vector<vector<double> > >& data, string filename, st
 		file << (i < data.size() - 1 ? "}," : "}") << endl;
 	}
 	file << "}" << endl;
+	file.close();
+}
+
+
+void AppendDataToFile(vector<double>& data, string filename)
+{
+	ofstream file;
+	//cout << OUT_DIR << filename << ".csv" << endl;
+	file.open(OUT_DIR + filename + ".csv", ios::app);
+	file.precision(exportPrecision);
+	file << fixed << JoinVector(data) << endl;
 	file.close();
 }
 

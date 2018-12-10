@@ -5,6 +5,7 @@
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
 ../src/BosonsBulk.cpp \
+../src/BosonsBulkDamped.cpp \
 ../src/BulkOnlySplines.cpp \
 ../src/BulkOnlySplinesOriginal.cpp \
 ../src/BulkQT.cpp \
@@ -15,6 +16,8 @@ CPP_SRCS += \
 ../src/CSDataBulkSplines.cpp \
 ../src/ConfigItem.cpp \
 ../src/GaussianWavepacket.cpp \
+../src/HardSphereBosons.cpp \
+../src/HardSphereBosonsExp.cpp \
 ../src/HeBulk.cpp \
 ../src/HeDrop.cpp \
 ../src/MathOperators.cpp \
@@ -24,6 +27,7 @@ CPP_SRCS += \
 
 OBJS += \
 ./src/BosonsBulk.o \
+./src/BosonsBulkDamped.o \
 ./src/BulkOnlySplines.o \
 ./src/BulkOnlySplinesOriginal.o \
 ./src/BulkQT.o \
@@ -34,6 +38,8 @@ OBJS += \
 ./src/CSDataBulkSplines.o \
 ./src/ConfigItem.o \
 ./src/GaussianWavepacket.o \
+./src/HardSphereBosons.o \
+./src/HardSphereBosonsExp.o \
 ./src/HeBulk.o \
 ./src/HeDrop.o \
 ./src/MathOperators.o \
@@ -43,6 +49,7 @@ OBJS += \
 
 CPP_DEPS += \
 ./src/BosonsBulk.d \
+./src/BosonsBulkDamped.d \
 ./src/BulkOnlySplines.d \
 ./src/BulkOnlySplinesOriginal.d \
 ./src/BulkQT.d \
@@ -53,6 +60,8 @@ CPP_DEPS += \
 ./src/CSDataBulkSplines.d \
 ./src/ConfigItem.d \
 ./src/GaussianWavepacket.d \
+./src/HardSphereBosons.d \
+./src/HardSphereBosonsExp.d \
 ./src/HeBulk.d \
 ./src/HeDrop.d \
 ./src/MathOperators.d \

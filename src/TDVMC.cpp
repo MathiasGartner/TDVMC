@@ -1,6 +1,7 @@
 #include "mpi.h"
 
 #include "BosonsBulk.h"
+#include "BosonsBulkDamped.h"
 #include "BulkSplines.h"
 #include "BulkSplinesPhi.h"
 #include "BulkSplinesScaled.h"
@@ -10,6 +11,7 @@
 #include "Constants.h"
 #include "GaussianWavepacket.h"
 #include "HardSphereBosons.h"
+#include "HardSphereBosonsExp.h"
 #include "HeBulk.h"
 #include "HeDrop.h"
 #include "ICorrelatedSamplingData.h"
@@ -520,16 +522,12 @@ bool LoadLastPositionsFromFile(string filename, vector<vector<double> >& R)
 		Log("init coordinates from file: " + filename);
 		coordinates = split(prevline, ',');
 		int j = 0;
-		for (unsigned int i = 0; i < coordinates.size(); i += 3)
+		for (unsigned int i = 0; i < coordinates.size(); i += DIM)
 		{
-			R[j][0] = stod(coordinates[i]);
-			R[j][1] = stod(coordinates[i + 1]);
-			R[j][2] = stod(coordinates[i + 2]);
-
-			//double factor = 1.2;
-			//R[j][0] *= factor;
-			//R[j][1] *= factor;
-			//R[j][2] *= factor;
+			for (int a = 0; a < DIM; a++)
+			{
+				R[j][a] = stod(coordinates[i + a]);
+			}
 			j++;
 		}
 		successful = true;
@@ -582,21 +580,44 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 			//Lattice
 			//TODO: funktioniert nicht
 			Log("init coordinates on lattice");
-			double n = round(pow(N, 1.0 / 3.0));
-			double l = pow(LBOX, 1.0 / 3.0);
+			int n = round(pow(N, 1.0 / ((double)DIM)));
+			double l = LBOX / n;
 			l *= 0.5;
 			int p = 0;
-			for (int i = 0; i < n; i++)
+			if (DIM == 3)
 			{
-				for (int j = 0; j < n; j++)
+				for (int i = 0; i < n; i++)
 				{
-					for (int k = 0; k < n; k++)
+					for (int j = 0; j < n; j++)
+					{
+						for (int k = 0; k < n; k++)
+						{
+							R[p][0] = i * l + (random01() - 0.5) * l / 10.0;
+							R[p][1] = j * l + (random01() - 0.5) * l / 10.0;
+							R[p][2] = k * l + (random01() - 0.5) * l / 10.0;
+							p++;
+						}
+					}
+				}
+			}
+			else if (DIM == 2)
+			{
+				for (int i = 0; i < n; i++)
+				{
+					for (int j = 0; j < n; j++)
 					{
 						R[p][0] = i * l + (random01() - 0.5) * l / 10.0;
 						R[p][1] = j * l + (random01() - 0.5) * l / 10.0;
-						R[p][2] = k * l + (random01() - 0.5) * l / 10.0;
 						p++;
 					}
+				}
+			}
+			else if (DIM == 1)
+			{
+				for (int i = 0; i < n; i++)
+				{
+					R[p][0] = i * l + (random01() - 0.5) * l / 10.0;
+					p++;
 				}
 			}
 		}
@@ -2084,6 +2105,13 @@ void AdjustParameters(vector<double>& uR, vector<double>& uI, double *phiR, doub
 	//uR[uR.size() - 1] = 0.0;
 	//uR[0] = uR[2];
 	//uR[1] = uR[2];
+
+	//for (int i = 40; i < N_PARAM; i++)
+	//{
+	//	//uR[i] *= (1.0 / (1.0 + exp((i-43.0)/1.3)) + 3.0) / 4.0;
+	//	//uR[i] = (uR[i] + (i - 35.0) * uRList.back()[i]) / (1.0 + i - 35.0);
+	//	//uR[i] += -uR[45];
+	//}
 }
 
 void AlignCoordinates(vector<vector<double> >& R)
@@ -2293,9 +2321,17 @@ int mainMPI(int argc, char** argv)
 	{
 		sys = new BosonsBulk(SYSTEM_PARAMS, configDirectory);
 	}
+	else if (SYSTEM_TYPE == "BosonsBulkDamped")
+	{
+		sys = new BosonsBulkDamped(SYSTEM_PARAMS, configDirectory);
+	}
 	else if (SYSTEM_TYPE == "HardSphereBosons")
 	{
 		sys = new HardSphereBosons(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "HardSphereBosonsExp")
+	{
+		sys = new HardSphereBosonsExp(SYSTEM_PARAMS, configDirectory);
 	}
 	else
 	{
@@ -2431,7 +2467,7 @@ int mainMPI(int argc, char** argv)
 			MC_NSTEPS *= nrOfAcceptParameterTrials;
 			AlignCoordinates(R);
 
-			if (step < 3)
+			if (step < 2)
 			{
 				ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
 				if (ODE_SOLVER_TYPE == 4 || ODE_SOLVER_TYPE == 6)
@@ -2445,8 +2481,11 @@ int mainMPI(int argc, char** argv)
 				if (UPDATE_SAMPLES_EVERY_NTH_STEP > 0 && step % UPDATE_SAMPLES_EVERY_NTH_STEP == 0)
 				{
 					UpdateSamplesRandom(nrOfSamplesToUpdate, correlatedSamplingData, uR, uI, phiR, phiI);
+					//cout << "nrOfSamplesToUpdate " << nrOfSamplesToUpdate << endl;
+					//cout << "percentForExtraSampleToUpdate " << percentForExtraSampleToUpdate << endl;
 					if (random01() < percentForExtraSampleToUpdate)
 					{
+						//cout << "update extra sample..." << endl;
 						UpdateSamplesRandom(1, correlatedSamplingData, uR, uI, phiR, phiI);
 					}
 				}
@@ -2609,13 +2648,14 @@ int mainMPI(int argc, char** argv)
 		//int setBackNSteps = 0;
 		if (processRank == rootRank)
 		{
+			//cout << "#" << localEnergyR << " - " << std::fpclassify(localEnergyR) << endl;
 			if (FileExist("./stop"))
 			{
 				//TODO: read content of stop-file and interpret as new TOTALTIME instead of stopping immediately
 				Log("Detected stop-file!", WARNING);
 				cancel = 1;
 			}
-			else if (!isfinite(localEnergyR) || std::isnan(localEnergyR))
+			else if (!std::isfinite(localEnergyR) || std::isnan(localEnergyR))
 			{
 				Log("Energy not finite", ERROR);
 				cancel = 2;
@@ -2862,9 +2902,17 @@ int startVMCSamplerMPI(int argc, char** argv)
 	{
 		sys = new BosonsBulk(SYSTEM_PARAMS, configDirectory);
 	}
+	else if (SYSTEM_TYPE == "BosonsBulkDamped")
+	{
+		sys = new BosonsBulkDamped(SYSTEM_PARAMS, configDirectory);
+	}
 	else if (SYSTEM_TYPE == "HardSphereBosons")
 	{
 		sys = new HardSphereBosons(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "HardSphereBosonsExp")
+	{
+		sys = new HardSphereBosonsExp(SYSTEM_PARAMS, configDirectory);
 	}
 	else
 	{
@@ -2897,7 +2945,7 @@ int startVMCSamplerMPI(int argc, char** argv)
 	InitCoordinateConfiguration(R);
 	if (processRank == rootRank)
 	{
-		WriteParticleInputFile("particleconfiguration.csv", R);
+		WriteParticleInputFile("particleconfiguration", R);
 	}
 	if (processRank == rootRank)
 	{
@@ -2932,28 +2980,56 @@ int startVMCSamplerMPI(int argc, char** argv)
 	{
 		t.start();
 	}
-	nAcceptances = 0;
-	nTrials = 0;
 
-	BroadcastNewParameters(uR, uI, &phiR, &phiI);
+	vector<vector<double> > energies;
 
-	AlignCoordinates(R);
+	vector<double> startValues(uR);
+	vector<double> steps = {0.001, 0.01};
+	for (int i = 0; i < 60; i++)
+	{
+		for (int j = 0; j < 300; j++)
+		{
+			nAcceptances = 0;
+			nTrials = 0;
 
-	ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
+			BroadcastNewParameters(uR, uI, &phiR, &phiI);
 
-	int step = 1;
-	WriteDataToFile(localOperators, "localOperators" + to_string(step), "localOperators");
-	WriteDataToFile(localEnergyR, "localEnergyR" + to_string(step), "localEnergyR");
-	WriteDataToFile(localEnergyI, "localEnergyI" + to_string(step), "localEnergyI");
-	WriteDataToFile(localOperatorsMatrix, "localOperatorsMatrix" + to_string(step), "localOperatorsMatrix");
-	WriteDataToFile(localOperatorlocalEnergyR, "localOperatorlocalEnergyR" + to_string(step), "localOperatorlocalEnergyR");
-	WriteDataToFile(localOperatorlocalEnergyI, "localOperatorlocalEnergyI" + to_string(step), "localOperatorlocalEnergyI");
-	WriteDataToFile(otherExpectationValues, "otherExpectationValues" + to_string(step), "Ekin, Ekin_cor, Epot, Epot_corr, wf, g(r)_1, ..., g(r)_100");
+			AlignCoordinates(R);
+
+			ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
+
+			int step = i;
+			if (processRank == rootRank)
+			{
+				WriteDataToFile(otherExpectationValues, "otherExpectationValues" + to_string(step), "Ekin, Ekin_cor, Epot, Epot_corr, wf, g(r)_1, ..., g(r)_100");
+			}
+
+			if (processRank == rootRank)
+			{
+				energies.push_back(uR);
+				energies[energies.size() - 1].push_back(localEnergyR / (double) N);
+			}
+
+			if (processRank == rootRank)
+			{
+				cout << i << ":" << JoinVector(uR) << endl;
+				cout << "localEnergyR/N=" << localEnergyR / (double) N << " (" << otherExpectationValues[0] / (double) N << " + " << otherExpectationValues[1] / (double) N << " + " << endl;
+				cout << t.interval() << "ms " << endl;
+			}
+
+			if (processRank == rootRank)
+			{
+				AppendDataToFile(energies.back(), "energies");
+			}
+			uR[0] += steps[0];
+		}
+		uR[0] = startValues[0];
+		uR[1] += steps[1];
+	}
 
 	if (processRank == rootRank)
 	{
-		cout << "t=" << currentTime << endl;
-		cout << "localEnergyR/N=" << localEnergyR / (double) N << " (" << otherExpectationValues[0] / (double) N << " + " << otherExpectationValues[1] / (double) N << " + " << endl;
+		WriteDataToFile(energies, "energies", "a, energy");
 	}
 
 	MPIMethods::Barrier(); // wait for main process to create directory
@@ -3049,8 +3125,10 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BulkSplines";
 		//SYSTEM_TYPE = "BulkSplinesScaled";
 		//SYSTEM_TYPE = "HardSphereBosons";
+		//SYSTEM_TYPE = "HardSphereBosonsExp";
 		//SYSTEM_TYPE = "HeDrop";
 		SYSTEM_TYPE = "BosonsBulk";
+		//SYSTEM_TYPE = "BosonsBulkDamped";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/drop_20.config";
@@ -3078,11 +3156,19 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "BosonsBulk")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonsBulk.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/Bosons2D_100.config";
+		}
+		else if (SYSTEM_TYPE == "BosonsBulkDamped")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonsBulkDamped.config";
 		}
 		else if (SYSTEM_TYPE == "HardSphereBosons")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/HardSphereBosons.config";
+		}
+		else if (SYSTEM_TYPE == "HardSphereBosonsExp")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/HardSphereBosonsExp.config";
 		}
 		//if (processRank == rootRank) //INFO: no processRank assigned so far. this is done in mainMPI or startVMCSamplerMPI
 		//{
@@ -3119,6 +3205,7 @@ int main(int argc, char **argv)
 			//INFO: don't know why it does not work on zusie when configFilePath is passed as a third parameter to mainMPI -> therefore I use a global variable
 			configFilePath = string(argv[1]);
 			val = mainMPI(argc, argv);
+			//val = startVMCSamplerMPI(argc, argv);
 		}
 	}
 

@@ -65,7 +65,33 @@ void TestVectorDisplacements()
 	TestVectorDisplacement(4, 4, 4, 9.9, 0, 0, sqrt(1.9*1.9), -1.9, 0, 0);
 	TestVectorDisplacement(0.1, 0, 0, 3.9, 0, 0, sqrt(0.2*0.2), 0.2, 0, 0);
 	TestVectorDisplacement(0, 0, 0, 3.9, 3.9, 3.9, sqrt(0.1*0.1*3), 0.1, 0.1, 0.1);
+
+	TestVectorDisplacement(4.5, 2.1, -2.1, 0, 0, 0, sqrt(0.5*0.5 + 1.9*1.9 + 1.9*1.9), 0.5, -1.9, 1.9);
+	TestVectorDisplacement(0.5, 1.5, 2.5, 0, 0, 0, sqrt(0.5*0.5 + 1.5*1.5 + 1.5*1.5), 0.5, 1.5, -1.5);
+	TestVectorDisplacement(3.5, 4.5, 5.5, 0, 0, 0, sqrt(0.5*0.5 + 0.5*0.5 + 1.5*1.5), -0.5, 0.5, 1.5);
 	cout << endl;
+
+	LBOX = 5;
+	LBOX_R = 1.0 / LBOX;
+	DIM = 3;
+	TestVectorDisplacement(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+	TestVectorDisplacement(0, 0, 0, 1, 0, 0, 1, -1, 0, 0);
+	TestVectorDisplacement(1, 0, 0, 0, 0, 0, 1, 1, 0, 0);
+	TestVectorDisplacement(1, 0, 0, 6, 0, 0, 0, 0, 0, 0);
+	TestVectorDisplacement(1, 0, 0, 3, 0, 0, 2, -2, 0, 0);
+	TestVectorDisplacement(1, 0, 0, -1, 0, 0, 2, 2, 0, 0);
+	TestVectorDisplacement(0, 0, 0, 10, 10, 10, 0, 0, 0, 0);
+	TestVectorDisplacement(4, 4, 4, 10, 10, 10, sqrt(3), -1, -1, -1);
+	TestVectorDisplacement(4, 4, 4, 10.1, 0, 0, sqrt(1.1*1.1 + 1 + 1), 1.1, -1, -1);
+	TestVectorDisplacement(4, 4, 4, 9.9, 0, 0, sqrt(1 + 1 + 1.6*1.6), -1.6, -1, -1);
+	TestVectorDisplacement(0.1, 0, 0, 3.9, 0, 0, 1.2, 1.2, 0, 0);
+	TestVectorDisplacement(0, 0, 0, 4.9, 4.9, 4.9, sqrt(0.1*0.1*3), -0.1, -0.1, -0.1);
+
+	TestVectorDisplacement(1.25, 0, 0, -1.25, 0, 0, 2.5, -2.5, 0, 0);
+	TestVectorDisplacement(5.9, 2.6, -2.6, 0, 0, 0, sqrt(0.9*0.9 + 2.4*2.4 + 2.4*2.4), 0.9, -2.4, 2.4);
+
+	TestVectorDisplacement(0, 1, 2, 0, 0, 0, sqrt(1 + 2*2), 0, 1, 2);
+	TestVectorDisplacement(3, 4, 5, 0, 0, 0, sqrt(2*2 + 1), -2, -1, 0);
 }
 
 }

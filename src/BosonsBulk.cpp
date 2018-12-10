@@ -31,7 +31,7 @@ void BosonsBulk::InitSystem()
 {
 	numOfOtherLocalOperators = 4; //INFO: potentialIntern, potentialInternComplex, potentialExtern, potentialExternComplex
 	otherLocalOperators.resize(numOfOtherLocalOperators);
-	grBinCount = 100;
+	grBinCount = 200;
 	grBinStartIndex = 3;
 	numOfkValues = 300;
 	numOfOtherExpectationValues = 3 + grBinCount;
@@ -46,6 +46,7 @@ void BosonsBulk::InitSystem()
 
 	//cut off
 	bcFactors.push_back( { 1.0, -1.0 / 2.0, 1.0, 0.0 });
+	//bcFactors.push_back( { 1.0, 1.0, 1.0, 0.0 });
 	numberOfSpecialParameters = bcFactors.size();
 	numberOfStandardParameters = N_PARAM - numberOfSpecialParameters;
 
@@ -69,7 +70,7 @@ void BosonsBulk::InitSystem()
 	scalingFactors.resize(numberOfSplines);
 	for (int i = 0; i < numberOfSplines; i++)
 	{
-		scalingFactors[i] = 1.0 / ((i + 1) * (i + 1));
+		scalingFactors[i] = 1.0 / pow((i + 1), DIM - 1); //INFO: dV that is assigned to one spline scales with i^2 for 3D and i for 2D, 1 for 1D
 	}
 
 	localEnergyR = 0;
@@ -106,7 +107,18 @@ void BosonsBulk::InitSystem()
 	ClearVector(grBinVolumes);
 	for (int i = 0; i < grBinCount; i++)
 	{
-		grBinVolumes[i] = 4.0 * M_PI * pow(grNodePointSpacing * (i + 1), 3.0) / 3.0;
+		if (DIM == 3)
+		{
+			grBinVolumes[i] = 4.0 * M_PI * pow(grNodePointSpacing * (i + 1), 3.0) / 3.0; //INFO: 3D sphere volume
+		}
+		else if (DIM == 2)
+		{
+			grBinVolumes[i] = 2.0 * M_PI * pow(grNodePointSpacing * (i + 1), 2.0); //INFO: 2D "sphere" volume
+		}
+		else if (DIM == 1)
+		{
+			grBinVolumes[i] = pow(grNodePointSpacing * (i + 1), 1.0); //INFO: 1D "sphere" volume
+		}
 	}
 	for (int i = grBinCount - 1; i > 0; i--)
 	{
@@ -238,12 +250,12 @@ void BosonsBulk::CalculateOtherLocalOperators(vector<vector<double> >& R)
 					double rnia = rni / a;
 					potentialIntern += b * exp(-(rnia * rnia) / 2.0);
 
-					double rniAbsorption = rni - 1.3;
-					double absorptionFactor = 0.0;
-					if (rniAbsorption > 0)
-					{
-						potentialInternComplex += absorptionFactor * rniAbsorption * rniAbsorption;
-					}
+					//double rniAbsorption = rni - 4.5;
+					//double absorptionFactor = 0.0;//-3e-6;
+					//if (rniAbsorption > 0)
+					//{
+					//	potentialInternComplex += absorptionFactor * rniAbsorption * rniAbsorption;
+					//}
 				}
 
 				//kinetic energy
@@ -271,10 +283,11 @@ void BosonsBulk::CalculateOtherLocalOperators(vector<vector<double> >& R)
 							splineSumsD[bin + b][n][a] += tmp[b] * evecrni[a] / nodePointSpacing;
 						}
 					}
-					splineSumsD2[bin][n] += 1.0 / nodePointSpacing2 * (1.0 - res) + 2.0 / (nodePointSpacing * rni) * tmp[0];
-					splineSumsD2[bin + 1][n] += 1.0 / nodePointSpacing2 * (1.0 / 6.0 * (-12.0 + 18.0 * res)) + 2.0 / (nodePointSpacing * rni) * tmp[1];
-					splineSumsD2[bin + 2][n] += 1.0 / nodePointSpacing2 * (1.0 / 6.0 * (6.0 - 18.0 * res)) + 2.0 / (nodePointSpacing * rni) * tmp[2];
-					splineSumsD2[bin + 3][n] += 1.0 / nodePointSpacing2 * (res) + 2.0 / (nodePointSpacing * rni) * tmp[3];
+					double secondDerivativeFactor = DIM - 1.0; //INFO: at least correct for 2D and 3D (and 1D?)
+					splineSumsD2[bin][n] += 1.0 / nodePointSpacing2 * (1.0 - res) + secondDerivativeFactor / (nodePointSpacing * rni) * tmp[0];
+					splineSumsD2[bin + 1][n] += 1.0 / nodePointSpacing2 * (1.0 / 6.0 * (-12.0 + 18.0 * res)) + secondDerivativeFactor / (nodePointSpacing * rni) * tmp[1];
+					splineSumsD2[bin + 2][n] += 1.0 / nodePointSpacing2 * (1.0 / 6.0 * (6.0 - 18.0 * res)) + secondDerivativeFactor / (nodePointSpacing * rni) * tmp[2];
+					splineSumsD2[bin + 3][n] += 1.0 / nodePointSpacing2 * (res) + secondDerivativeFactor / (nodePointSpacing * rni) * tmp[3];
 				}
 			}
 			//binning for g(r)
