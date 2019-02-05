@@ -105,6 +105,16 @@ double VectorDisplacementNIC(vector<double>& ri, vector<double>& rj, vector<doub
 	return norm;
 }
 
+double GetRelativeError(double d1, double d2)
+{
+	return 1.0 - d2 / d1;
+}
+
+double GetRelativeErrorLastElements(vector<double> v)
+{
+	return GetRelativeError(v[v.size() - 2], v[v.size() - 1]);
+}
+
 double Sum(vector<double>& v)
 {
 	double sum = 0;

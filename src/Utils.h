@@ -50,6 +50,9 @@ void GetVectorNIC(vector<double>& r, vector<double>& rNIC);
 void VectorDiffNIC(vector<double>& ri, vector<double>& rj, vector<double>& result);
 double VectorDisplacementNIC(vector<double>& ri, vector<double>& rj, vector<double>& result);
 
+double GetRelativeError(double d1, double d2);
+double GetRelativeErrorLastElements(vector<double> v);
+
 double Sum(vector<double>& v);
 vector<double> Sum(vector<vector<double> >& v);
 vector<double> OuterSum(vector<vector<double> >& v);
