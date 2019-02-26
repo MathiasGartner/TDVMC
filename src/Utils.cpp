@@ -31,6 +31,29 @@ string PrintArrayValues(double* r, int length)
 	return s;
 }
 
+double (*VectorDotProduct_DIM)(vector<double>&, vector<double>&);
+
+double VectorDotProduct_1D(vector<double>& v1, vector<double>& v2)
+{
+	double sum = 0;
+	sum = v1[0] * v2[0];
+	return sum;
+}
+
+double VectorDotProduct_2D(vector<double>& v1, vector<double>& v2)
+{
+	double sum = 0;
+	sum = v1[0] * v2[0] + v1[1] * v2[1];
+	return sum;
+}
+
+double VectorDotProduct_3D(vector<double>& v1, vector<double>& v2)
+{
+	double sum = 0;
+	sum = v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
+	return sum;
+}
+
 double VectorDotProduct(vector<double>& v1, vector<double>& v2)
 {
 	double sum = 0;
@@ -38,6 +61,29 @@ double VectorDotProduct(vector<double>& v1, vector<double>& v2)
 	{
 		sum += v1[i] * v2[i];
 	}
+	return sum;
+}
+
+double (*VectorNorm2_DIM)(vector<double>& r);
+
+double VectorNorm2_1D(vector<double>& r)
+{
+	double sum = 0;
+	sum = r[0] * r[0];
+	return sum;
+}
+
+double VectorNorm2_2D(vector<double>& r)
+{
+	double sum = 0;
+	sum = r[0] * r[0] + r[1] * r[1];
+	return sum;
+}
+
+double VectorNorm2_3D(vector<double>& r)
+{
+	double sum = 0;
+	sum = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
 	return sum;
 }
 
@@ -49,14 +95,67 @@ double VectorNorm2(vector<double>& r)
 		sum += r[i] * r[i];
 	}
 	return sum;
-	//TODO: use explicit expression for 3D, 2D or 1D vectors. (a lot faster!!)
-	//return r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
+}
+
+double (*VectorNorm_DIM)(vector<double>& r);
+
+double VectorNorm_1D(vector<double>& r)
+{
+	double norm;
+	norm = sqrt(VectorNorm2_1D(r));
+	return norm;
+}
+
+double VectorNorm_2D(vector<double>& r)
+{
+	double norm;
+	norm = sqrt(VectorNorm2_2D(r));
+	return norm;
+}
+
+double VectorNorm_3D(vector<double>& r)
+{
+	double norm;
+	norm = sqrt(VectorNorm2_3D(r));
+	return norm;
 }
 
 double VectorNorm(vector<double>& r)
 {
 	double norm;
 	norm = sqrt(VectorNorm2(r));
+	return norm;
+}
+
+double (*VectorDisplacement_DIM)(vector<double>& ri, vector<double>& rj, vector<double>& result);
+
+double VectorDisplacement_1D(vector<double>& ri, vector<double>& rj, vector<double>& result)
+{
+	//INFO: result needs to have correct size
+	double norm;
+	result[0] = ri[0] - rj[0];
+	norm = VectorNorm_1D(result);
+	return norm;
+}
+
+double VectorDisplacement_2D(vector<double>& ri, vector<double>& rj, vector<double>& result)
+{
+	//INFO: result needs to have correct size
+	double norm;
+	result[0] = ri[0] - rj[0];
+	result[1] = ri[1] - rj[1];
+	norm = VectorNorm_2D(result);
+	return norm;
+}
+
+double VectorDisplacement_3D(vector<double>& ri, vector<double>& rj, vector<double>& result)
+{
+	//INFO: result needs to have correct size
+	double norm;
+	result[0] = ri[0] - rj[0];
+	result[1] = ri[1] - rj[1];
+	result[2] = ri[2] - rj[2];
+	norm = VectorNorm_3D(result);
 	return norm;
 }
 
@@ -79,12 +178,61 @@ double GetCoordinateNIC(double r)
 	return r - k * LBOX;
 }
 
+void (*GetVectorNIC_DIM)(vector<double>& r, vector<double>& rNIC);
+
+void GetVectorNIC_1D(vector<double>& r, vector<double>& rNIC)
+{
+	rNIC[0] = GetCoordinateNIC(r[0]);
+}
+
+void GetVectorNIC_2D(vector<double>& r, vector<double>& rNIC)
+{
+	rNIC[0] = GetCoordinateNIC(r[0]);
+	rNIC[1] = GetCoordinateNIC(r[1]);
+}
+
+void GetVectorNIC_3D(vector<double>& r, vector<double>& rNIC)
+{
+	rNIC[0] = GetCoordinateNIC(r[0]);
+	rNIC[1] = GetCoordinateNIC(r[1]);
+	rNIC[2] = GetCoordinateNIC(r[2]);
+}
+
 void GetVectorNIC(vector<double>& r, vector<double>& rNIC)
 {
 	for (unsigned int i = 0; i < r.size(); i++)
 	{
 		rNIC[i] = GetCoordinateNIC(r[i]);
 	}
+}
+
+void (*VectorDiffNIC_DIM)(vector<double>& ri, vector<double>& rj, vector<double>& result);
+
+void VectorDiffNIC_1D(vector<double>& ri, vector<double>& rj, vector<double>& result)
+{
+	double delta;
+	delta = ri[0] - rj[0];
+	result[0] = GetCoordinateNIC(delta);
+}
+
+void VectorDiffNIC_2D(vector<double>& ri, vector<double>& rj, vector<double>& result)
+{
+	double delta;
+	delta = ri[0] - rj[0];
+	result[0] = GetCoordinateNIC(delta);
+	delta = ri[1] - rj[1];
+	result[1] = GetCoordinateNIC(delta);
+}
+
+void VectorDiffNIC_3D(vector<double>& ri, vector<double>& rj, vector<double>& result)
+{
+	double delta;
+	delta = ri[0] - rj[0];
+	result[0] = GetCoordinateNIC(delta);
+	delta = ri[1] - rj[1];
+	result[1] = GetCoordinateNIC(delta);
+	delta = ri[2] - rj[2];
+	result[2] = GetCoordinateNIC(delta);
 }
 
 void VectorDiffNIC(vector<double>& ri, vector<double>& rj, vector<double>& result)
@@ -97,12 +245,97 @@ void VectorDiffNIC(vector<double>& ri, vector<double>& rj, vector<double>& resul
 	}
 }
 
+double (*VectorDisplacementNIC_DIM)(vector<double>& ri, vector<double>& rj, vector<double>& result);
+
+double VectorDisplacementNIC_1D(vector<double>& ri, vector<double>& rj, vector<double>& result)
+{
+	double norm;
+	VectorDiffNIC_1D(ri, rj, result);
+	norm = VectorNorm_1D(result);
+	return norm;
+}
+
+double VectorDisplacementNIC_2D(vector<double>& ri, vector<double>& rj, vector<double>& result)
+{
+	double norm;
+	VectorDiffNIC_2D(ri, rj, result);
+	norm = VectorNorm_2D(result);
+	return norm;
+}
+
+double VectorDisplacementNIC_3D(vector<double>& ri, vector<double>& rj, vector<double>& result)
+{
+	double norm;
+	VectorDiffNIC_3D(ri, rj, result);
+	norm = VectorNorm_3D(result);
+	return norm;
+}
+
 double VectorDisplacementNIC(vector<double>& ri, vector<double>& rj, vector<double>& result)
 {
 	double norm;
 	VectorDiffNIC(ri, rj, result);
 	norm = VectorNorm(result);
 	return norm;
+}
+
+vector<double> AllVectorDisplacements(vector<double>& ri, vector<double>& rj, double maxDistance)
+{
+	//TODO: if i==j the distances are simply L, sqrt(2 L), 2L, ... for 2D
+	//TODO: do not include term with i=j=0 in periodics. this term is already calculated by VectorDiffNIC(ri, rj, originalDiff)
+	vector<double> displacements;
+	vector<double> originalDiff(ri.size());
+	VectorDiffNIC(ri, rj, originalDiff);
+	vector<vector<int> > periodics;
+	int max = 1;
+	for (int i = -max; i <= max; i++)
+	{
+		for (int j = -max; j <= max; j++)
+		{
+			periodics.push_back(vector<int>( { i, j }));
+		}
+	}
+	double newDistance;
+	vector<double> newVec;
+	for (unsigned int i = 0; i < periodics.size(); i++)
+	{
+		newVec = originalDiff + (periodics[i] * LBOX);
+		newDistance = VectorNorm(newVec);
+		if (newDistance < maxDistance && newDistance > 0)
+		{
+			displacements.push_back(newDistance);
+		}
+	}
+	return displacements;
+}
+
+vector<double> AllVectorDisplacements(vector<double>& ri, vector<double>& rj, double maxDistance, vector<vector<double> >& eVecs)
+{
+	vector<double> displacements;
+	vector<double> originalDiff(ri.size());
+	VectorDiffNIC(ri, rj, originalDiff);
+	vector<vector<int> > periodics;
+	int max = 1;
+	for (int i = -max; i <= max; i++)
+	{
+		for (int j = -max; j <= max; j++)
+		{
+			periodics.push_back(vector<int>( { i, j }));
+		}
+	}
+	double newDistance;
+	vector<double> newVec;
+	for (unsigned int i = 0; i < periodics.size(); i++)
+	{
+		newVec = originalDiff + (periodics[i] * LBOX);
+		newDistance = VectorNorm(newVec);
+		if (newDistance < maxDistance && newDistance > 0)
+		{
+			displacements.push_back(newDistance);
+			eVecs.push_back(newVec / newDistance);
+		}
+	}
+	return displacements;
 }
 
 double GetRelativeError(double d1, double d2)
@@ -287,6 +520,34 @@ vector<string> split(const string &s, char delim)
 	return elems;
 }
 
+void (*AssignVector_DIM)(vector<double>& original, vector<double>& copy);
+
+void AssignVector_1D(vector<double>& original, vector<double>& copy)
+{
+	copy[0] = original[0];
+}
+
+void AssignVector_2D(vector<double>& original, vector<double>& copy)
+{
+	copy[0] = original[0];
+	copy[1] = original[1];
+}
+
+void AssignVector_3D(vector<double>& original, vector<double>& copy)
+{
+	copy[0] = original[0];
+	copy[1] = original[1];
+	copy[2] = original[2];
+}
+
+void AssignVector(vector<double>& original, vector<double>& copy)
+{
+	for (unsigned int i = 0; i < original.size(); i++)
+	{
+		copy[i] = original[i];
+	}
+}
+
 double GetSizeOfVector(vector<double>& v)
 {
 	return (sizeof(v) + sizeof(double) * v.capacity()) / 1024.0 / 1024.0;
@@ -350,7 +611,7 @@ void WriteDataToFile(double* data, int n, string filename, string header)
 	file << header << endl;
 	for (int i = 0; i < n; i++)
 	{
-		file << fixed << data[i] << endl;
+		file << std::fixed << data[i] << endl;
 	}
 	file.close();
 }
@@ -366,7 +627,7 @@ void WriteDataToFile(double** data, int n1, int n2, string filename, string head
 	{
 		for (int j = 0; j < n2; j++)
 		{
-			file << fixed << data[i][j];
+			file << std::fixed << data[i][j];
 			if (j < n2 - 1)
 			{
 				file << ", ";
@@ -387,7 +648,7 @@ void WriteDataToFile(double data, string filename, string header)
 	file.open(OUT_DIR + filename + ".csv", ios::out);
 	file.precision(exportPrecision);
 	file << header << endl;
-	file << fixed << data << endl;
+	file << std::fixed << data << endl;
 	file.close();
 }
 
@@ -400,7 +661,7 @@ void WriteDataToFile(vector<double>& data, string filename, string header, int e
 	file << header << endl;
 	for (unsigned int i = everyNth - 1; i < data.size(); i += everyNth)
 	{
-		file << fixed << data[i] << endl;
+		file << std::fixed << data[i] << endl;
 	}
 	file.close();
 }
@@ -417,7 +678,7 @@ void WriteDataToFile(vector<vector<double> >& data, string filename, string head
 	}
 	for (unsigned int i = everyNth - 1; i < data.size(); i += everyNth)
 	{
-		file << fixed << JoinVector(data[i]) << endl;
+		file << std::fixed << JoinVector(data[i]) << endl;
 	}
 	file.close();
 }
@@ -436,7 +697,7 @@ void WriteDataToFile(vector<vector<vector<double> > >& data, string filename, st
 		for (unsigned int j = 0; j < data[i].size(); j++)
 		{
 			file << "{";
-			file << fixed << JoinVector(data[i][j]);
+			file << std::fixed << JoinVector(data[i][j]);
 			file << (j < data[i].size() - 1 ? "}," : "}") << endl;
 		}
 		file << (i < data.size() - 1 ? "}," : "}") << endl;
@@ -445,6 +706,15 @@ void WriteDataToFile(vector<vector<vector<double> > >& data, string filename, st
 	file.close();
 }
 
+void AppendDataToFile(double data, string filename)
+{
+	ofstream file;
+	//cout << OUT_DIR << filename << ".csv" << endl;
+	file.open(OUT_DIR + filename + ".csv", ios::app);
+	file.precision(exportPrecision);
+	file << std::fixed << data << endl;
+	file.close();
+}
 
 void AppendDataToFile(vector<double>& data, string filename)
 {
@@ -452,7 +722,7 @@ void AppendDataToFile(vector<double>& data, string filename)
 	//cout << OUT_DIR << filename << ".csv" << endl;
 	file.open(OUT_DIR + filename + ".csv", ios::app);
 	file.precision(exportPrecision);
-	file << fixed << JoinVector(data) << endl;
+	file << std::fixed << JoinVector(data) << endl;
 	file.close();
 }
 

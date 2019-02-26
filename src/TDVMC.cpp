@@ -18,6 +18,8 @@
 #include "IPhysicalSystem.h"
 #include "MathOperators.h"
 #include "MPIMethods.h"
+#include "NUBosonsBulk.h"
+#include "PBosonsBulk.h"
 #include "SimulationStepData.h"
 #include "Timer.h"
 #include "Utils.h"
@@ -44,7 +46,7 @@
 #include <unistd.h>
 #include <vector>
 
-#include "../resources/armadillo"
+//#include "../resources/armadillo"
 #include "../resources/json/json-forwards.h"
 #include "../resources/json/json.h"
 
@@ -64,7 +66,7 @@ int N;           	    		//number of particles
 int DIM;     	        	 	//number of dimensions
 int N_PARAM;	        	  	//number of parameters of trial function
 double MC_STEP;
-double MC_STEP_OFFSET;
+double MC_STEP_OFFSET;			//INFO: currently not used
 int MC_NSTEPS;
 int MC_NTHERMSTEPS;
 int MC_NINITIALIZATIONSTEPS;
@@ -86,15 +88,18 @@ double PARAM_PHII;
 int USE_PARAMETER_ACCEPTANCE_CHECK;
 int PARAMETER_ACCEPTANCE_CHECK_TYPE;
 int WRITE_EVERY_NTH_STEP_TO_FILE;
+int WRITE_SINGLE_FILES;
 int MC_NSTEP_MULTIPLICATION_FACTOR_FOR_WRITE_DATA;
 int USE_MEAN_FOR_FINAL_PARAMETERS;
 int USE_NORMALIZE_WF;
 int USE_ADJUST_PARAMETERS;
 int UPDATE_SAMPLES_EVERY_NTH_STEP;
 double UPDATE_SAMPLES_PERCENT;
+int USE_NURBS;
+vector<double> NURBS_GRID;
 vector<double> SYSTEM_PARAMS;
 
-string requiredConfigVersion = "0.12";
+string requiredConfigVersion = "0.14";
 int numOfProcesses = 1;
 int rootRank = 0;
 int processRank = 0;
@@ -125,12 +130,14 @@ vector<double> phiRListDiffs;
 vector<double> phiIListDiffs;
 
 vector<double> AllLocalEnergyR;
+vector<double> AllLocalEnergyI;
 vector<vector<double> > AllLocalOperators;
 vector<vector<double> > AllOtherExpectationValues;
 vector<vector<double> > AllParametersR;
 vector<vector<double> > AllParametersI;
 vector<vector<double> > AllAdditionalSystemProperties;
 
+int currentSampleIndexForUpdate;
 vector<ICorrelatedSamplingData*> correlatedSamplingData;
 
 vector<double> times;
@@ -140,6 +147,7 @@ vector<SimulationStepData> previousStepData;
 mt19937_64 generator;
 //default_random_engine generator;
 uniform_real_distribution<double> distUniform(0.0, 1.0);
+uniform_int_distribution<int> distParticleIndex;
 normal_distribution<double> distNormal(0.0, 1.0);
 
 ////////////////////
@@ -231,6 +239,11 @@ double randomNormal()
 	return distNormal(generator);
 }
 
+double randomNormal(double sigma)
+{
+	return randomNormal() * sigma;
+}
+
 double randomNormal(double sigma, double mu)
 {
 	return randomNormal() * sigma + mu;
@@ -238,13 +251,19 @@ double randomNormal(double sigma, double mu)
 
 int randomInt(int maxValue)
 {
-	//TODO: test for maxValue > 0 is only needed for Gaussian wavepacket simulation where only one  particle is used
+	//INFO: test for maxValue > 0 is only needed for Gaussian wavepacket simulation where only one  particle is used
 	return maxValue > 0 ? ((int) floor(random01() * maxValue)) % maxValue : maxValue;
+	//return ((int) floor(random01() * maxValue)) % maxValue;
 }
 
 int randomInt(int minValue, int maxValue)
 {
 	return randomInt(maxValue - minValue) + minValue;
+}
+
+int randomParticleIndex()
+{
+	return distParticleIndex(generator);
 }
 
 void ReadRandomGeneratorStatesFromFile(string fileNamePrefix)
@@ -258,6 +277,9 @@ void ReadRandomGeneratorStatesFromFile(string fileNamePrefix)
 	ifstream fNormal(configDirectory + fileNamePrefix + "_normal_" + to_string(processRank) + ".dat");
 	fNormal >> distNormal;
 	fNormal.close();
+	ifstream fParticle(configDirectory + fileNamePrefix + "_particleIndex_" + to_string(processRank) + ".dat");
+	fParticle >> distParticleIndex;
+	fParticle.close();
 }
 
 void WriteRandomGeneratorStatesToFile(string fileNamePrefix)
@@ -271,6 +293,37 @@ void WriteRandomGeneratorStatesToFile(string fileNamePrefix)
 	ofstream fNormal(OUT_DIR + fileNamePrefix + "_normal_" + to_string(processRank) + ".dat");
 	fNormal << distNormal;
 	fNormal.close();
+	ofstream fParticle(OUT_DIR + fileNamePrefix + "_particleIndex_" + to_string(processRank) + ".dat");
+	fParticle << distParticleIndex;
+	fParticle.close();
+}
+
+void (*RandomDisplaceParticle_DIM)(vector<double>& r);
+
+void RandomDisplaceParticle_1D(vector<double>& r)
+{
+	r[0] += randomNormal(MC_STEP);
+}
+
+void RandomDisplaceParticle_2D(vector<double>& r)
+{
+	r[0] += randomNormal(MC_STEP);
+	r[1] += randomNormal(MC_STEP);
+}
+
+void RandomDisplaceParticle_3D(vector<double>& r)
+{
+	r[0] += randomNormal(MC_STEP);
+	r[1] += randomNormal(MC_STEP);
+	r[2] += randomNormal(MC_STEP);
+}
+
+void RandomDisplaceParticle(vector<double>& r)
+{
+	for (unsigned int i = 0; i < r.size(); i++)
+	{
+		r[i] += randomNormal(MC_STEP);
+	}
 }
 
 ///////////////////////////
@@ -302,12 +355,15 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("USE_PARAMETER_ACCEPTANCE_CHECK", &USE_PARAMETER_ACCEPTANCE_CHECK, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("PARAMETER_ACCEPTANCE_CHECK_TYPE", &PARAMETER_ACCEPTANCE_CHECK_TYPE, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("WRITE_EVERY_NTH_STEP_TO_FILE", &WRITE_EVERY_NTH_STEP_TO_FILE, ConfigItemType::INT, true));
+	configItems.push_back(ConfigItem("WRITE_SINGLE_FILES", &WRITE_SINGLE_FILES, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("MC_NSTEP_MULTIPLICATION_FACTOR_FOR_WRITE_DATA", &MC_NSTEP_MULTIPLICATION_FACTOR_FOR_WRITE_DATA, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("USE_MEAN_FOR_FINAL_PARAMETERS", &USE_MEAN_FOR_FINAL_PARAMETERS, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("USE_NORMALIZE_WF", &USE_NORMALIZE_WF, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("USE_ADJUST_PARAMETERS", &USE_ADJUST_PARAMETERS, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("UPDATE_SAMPLES_EVERY_NTH_STEP", &UPDATE_SAMPLES_EVERY_NTH_STEP, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("UPDATE_SAMPLES_PERCENT", &UPDATE_SAMPLES_PERCENT, ConfigItemType::DOUBLE, true));
+	configItems.push_back(ConfigItem("USE_NURBS", &USE_NURBS, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("NURBS_GRID", NURBS_GRID, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("SYSTEM_PARAMS", SYSTEM_PARAMS, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("PARAMS_REAL", PARAMS_REAL, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("PARAMS_IMAGINARY", PARAMS_IMAGINARY, ConfigItemType::ARR_DOUBLE));
@@ -465,6 +521,7 @@ void Init()
 	{
 		generator = mt19937_64(processRank + 1);
 		//generator = default_random_engine(processRank + 1);
+		distParticleIndex = uniform_int_distribution<int>(0, N-1);
 		srand(processRank + 1);
 	}
 	LBOX = pow((N / RHO), 1.0 / DIM); //box with dimensions [-L/2, L/2]
@@ -476,11 +533,61 @@ void Init()
 	mc_nsteps_original = MC_NSTEPS;
 	mc_nadditionalsteps = (double) MC_NADDITIONALSTEPS;
 
+	currentSampleIndexForUpdate = 0;
 	correlatedSamplingData.resize(MC_NSTEPS);
 	//TODO: Let the IPhysicalSystem sys create the objects needed for storing the correlated sampling data
 	for (int i = 0; i < MC_NSTEPS; i++)
 	{
 		correlatedSamplingData[i] = new CSDataBulkSplines();
+	}
+
+	//INFO: Init Utils and dimension-dependent functions
+	switch (DIM)
+	{
+	case 1:
+		VectorDotProduct_DIM = VectorDotProduct_1D;
+		VectorNorm2_DIM = VectorNorm2_1D;
+		VectorNorm_DIM = VectorNorm_1D;
+		VectorDisplacement_DIM = VectorDisplacement_1D;
+		GetVectorNIC_DIM = GetVectorNIC_1D;
+		VectorDiffNIC_DIM = VectorDiffNIC_1D;
+		VectorDisplacementNIC_DIM = VectorDisplacementNIC_1D;
+		AssignVector_DIM = AssignVector_1D;
+		RandomDisplaceParticle_DIM = RandomDisplaceParticle_1D;
+		break;
+	case 2:
+		VectorDotProduct_DIM = VectorDotProduct_2D;
+		VectorNorm2_DIM = VectorNorm2_2D;
+		VectorNorm_DIM = VectorNorm_2D;
+		VectorDisplacement_DIM = VectorDisplacement_2D;
+		GetVectorNIC_DIM = GetVectorNIC_2D;
+		VectorDiffNIC_DIM = VectorDiffNIC_2D;
+		VectorDisplacementNIC_DIM = VectorDisplacementNIC_2D;
+		AssignVector_DIM = AssignVector_2D;
+		RandomDisplaceParticle_DIM = RandomDisplaceParticle_2D;
+		break;
+	case 3:
+		VectorDotProduct_DIM = VectorDotProduct_3D;
+		VectorNorm2_DIM = VectorNorm2_3D;
+		VectorNorm_DIM = VectorNorm_3D;
+		VectorDisplacement_DIM = VectorDisplacement_3D;
+		GetVectorNIC_DIM = GetVectorNIC_3D;
+		VectorDiffNIC_DIM = VectorDiffNIC_3D;
+		VectorDisplacementNIC_DIM = VectorDisplacementNIC_3D;
+		AssignVector_DIM = AssignVector_3D;
+		RandomDisplaceParticle_DIM = RandomDisplaceParticle_3D;
+		break;
+	default:
+		VectorDotProduct_DIM = VectorDotProduct;
+		VectorNorm2_DIM = VectorNorm2;
+		VectorNorm_DIM = VectorNorm;
+		VectorDisplacement_DIM = VectorDisplacement;
+		GetVectorNIC_DIM = GetVectorNIC;
+		VectorDiffNIC_DIM = VectorDiffNIC;
+		VectorDisplacementNIC_DIM = VectorDisplacementNIC;
+		AssignVector_DIM = AssignVector;
+		RandomDisplaceParticle_DIM = RandomDisplaceParticle;
+		break;
 	}
 }
 
@@ -580,7 +687,7 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 			//Lattice
 			//TODO: funktioniert nicht
 			Log("init coordinates on lattice");
-			int n = round(pow(N, 1.0 / ((double)DIM)));
+			int n = round(pow(N, 1.0 / ((double) DIM)));
 			double l = LBOX / n;
 			l *= 0.5;
 			int p = 0;
@@ -672,13 +779,21 @@ void MoveCenterOfMassToZero(vector<vector<double> >& R)
 
 void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
+	//INFO: no performance increase for dimension-dependent functions measureable on asterix
+	//int randomParticle = randomInt(N - 1);
+	//RandomDisplaceParticle_DIM(R[randomParticle]);
+	//R[randomParticle][0] += randomNormal(MC_STEP);
+	//R[randomParticle][1] += randomNormal(MC_STEP);
+	//AssignVector_DIM(oldPosition, R[randomParticle]);
+	//R[randomParticle][0] = oldPosition[0];
+	//R[randomParticle][1] = oldPosition[1];
 	double p;
 	bool sampleOkay = true;
-	int randomParticle = randomInt(N - 1);
+	int randomParticle = randomParticleIndex();
 	vector<double> oldPosition(R[randomParticle]);
 	for (int i = 0; i < DIM; i++)
 	{
-		R[randomParticle][i] += randomNormal(MC_STEP, MC_STEP_OFFSET);
+		R[randomParticle][i] += randomNormal(MC_STEP);
 	}
 	double wfQuotient = sys->CalculateWFQuotient(R, uR, uI, phiR, phiI, randomParticle, oldPosition);
 	//cout << wfQuotient << endl;
@@ -738,6 +853,24 @@ bool NeedToUpdateSamples(vector<ICorrelatedSamplingData*>& samples, vector<doubl
 	return updateNeeded;
 }
 
+void UpdateSample(int sampleIndex, vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+	sys->CalculateWavefunction(samples[sampleIndex]->R, uR, uI, phiR, phiI);
+	for (int n = 0; n < MC_NTHERMSTEPS; n++)
+	{
+		DoMetropolisStep(samples[sampleIndex]->R, uR, uI, phiR, phiI);
+	}
+	sys->CalculateWavefunction(samples[sampleIndex]->R, uR, uI, phiR, phiI); //TODO: it would be sufficient to call sys->RefreshLocalOperators() since the splineSums should be kept up to date for samples[randomSample]->R during the MetropolisSteps
+	sys->CalculateOtherLocalOperators(samples[sampleIndex]->R);
+
+	samples[sampleIndex]->wf = sys->GetWf();
+	samples[sampleIndex]->wf2 = samples[sampleIndex]->wf * samples[sampleIndex]->wf;
+	samples[sampleIndex]->exponent = sys->GetExponent();
+	samples[sampleIndex]->exponent2 = samples[sampleIndex]->exponent * samples[sampleIndex]->exponent;
+	samples[sampleIndex]->localOperators = sys->GetLocalOperators();
+	sys->FillCorrelatedSamplingData(samples[sampleIndex]);
+}
+
 void UpdateSamplesRandom(int nrOfSamplesToUpdate, vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	int count = samples.size();
@@ -745,20 +878,17 @@ void UpdateSamplesRandom(int nrOfSamplesToUpdate, vector<ICorrelatedSamplingData
 	for (int i = 0; i < nrOfSamplesToUpdate; i++)
 	{
 		int randomSample = randomInt(count - 1);
-		sys->CalculateWavefunction(samples[randomSample]->R, uR, uI, phiR, phiI);
-		for (int n = 0; n < MC_NTHERMSTEPS; n++)
-		{
-			DoMetropolisStep(samples[randomSample]->R, uR, uI, phiR, phiI);
-		}
-		sys->CalculateWavefunction(samples[randomSample]->R, uR, uI, phiR, phiI); //TODO: it would be sufficient to call sys->RefreshLocalOperators() since the splineSums should be kept up to date for samples[randomSample]->R during the MetropolisSteps
-		sys->CalculateOtherLocalOperators(samples[randomSample]->R);
+		UpdateSample(randomSample, samples, uR, uI, phiR, phiI);
+	}
+}
 
-		samples[randomSample]->wf = sys->GetWf();
-		samples[randomSample]->wf2 = samples[randomSample]->wf * samples[randomSample]->wf;
-		samples[randomSample]->exponent = sys->GetExponent();
-		samples[randomSample]->exponent2 = samples[randomSample]->exponent * samples[randomSample]->exponent;
-		samples[randomSample]->localOperators = sys->GetLocalOperators();
-		sys->FillCorrelatedSamplingData(samples[randomSample]);
+void UpdateSamplesConsecutive(int nrOfSamplesToUpdate, vector<ICorrelatedSamplingData*>& samples, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+	int count = samples.size();
+	for (int i = 0; i < nrOfSamplesToUpdate; i++)
+	{
+		UpdateSample(currentSampleIndexForUpdate, samples, uR, uI, phiR, phiI);
+		currentSampleIndexForUpdate = (currentSampleIndexForUpdate + 1) % count;
 	}
 }
 
@@ -1330,25 +1460,30 @@ void SolveEquationSystem(vector<vector<double> >& matrix, vector<double>& rhs, v
 
 void SolveEquationSystemArmadillo(vector<vector<double> >& matrix, vector<double>& rhs, vector<double>& solution)
 {
-	arma::mat m(N_PARAM, N_PARAM);
-	arma::vec b(N_PARAM);
-	arma::vec x(N_PARAM);
-
-	for (int i = 0; i < N_PARAM; i++)
-	{
-		for (int j = 0; j < N_PARAM; j++)
-		{
-			m(i, j) = matrix[i][j];
-		}
-		b[i] = rhs[i];
-	}
-
-	x = arma::solve(m, b);
-
-	for (int i = 0; i < N_PARAM; i++)
-	{
-		solution[i] = x[i];
-	}
+	cout << "#############################################" << endl;
+	cout << "#############################################" << endl;
+	cout << "SolveEquationSystemArmadillo NOT IMPLEMENTED!" << endl;
+	cout << "#############################################" << endl;
+	cout << "#############################################" << endl;
+	//arma::mat m(N_PARAM, N_PARAM);
+	//arma::vec b(N_PARAM);
+	//arma::vec x(N_PARAM);
+    //
+	//for (int i = 0; i < N_PARAM; i++)
+	//{
+	//	for (int j = 0; j < N_PARAM; j++)
+	//	{
+	//		m(i, j) = matrix[i][j];
+	//	}
+	//	b[i] = rhs[i];
+	//}
+    //
+	//x = arma::solve(m, b);
+    //
+	//for (int i = 0; i < N_PARAM; i++)
+	//{
+	//	solution[i] = x[i];
+	//}
 }
 
 void CalculatePhiDot(vector<double>& uDotR, vector<double>& uDotI, double *phiDotR, double *phiDotI)
@@ -2112,6 +2247,25 @@ void AdjustParameters(vector<double>& uR, vector<double>& uI, double *phiR, doub
 	//	//uR[i] = (uR[i] + (i - 35.0) * uRList.back()[i]) / (1.0 + i - 35.0);
 	//	//uR[i] += -uR[45];
 	//}
+
+	//for (int i = 91; i < N_PARAM; i++)
+	//{
+	//	uR[i] = -uR[90];
+	//}
+
+	//for (int i = N_PARAM - 15; i < N_PARAM; i++)
+	//{
+	//	uR[i] = (uR[i] + (i - 14) * uRList.back()[i]) / (1.0 + (i - 14));
+	//	uI[i] = (uI[i] + (i - 14) * uIList.back()[i]) / (1.0 + (i - 14));
+	//}
+
+	for (int i = 0; i < N_PARAM; i++)
+	{
+		//uR[i] = (uR[i] + 0.1 * i * uRList.back()[i]) / (1.0 + 0.1 * i);
+		//uI[i] = (uI[i] + 0.1 * i * uIList.back()[i]) / (1.0 + 0.1 * i);
+		uR[i] = uR[i] - uR[N_PARAM - 1];
+		uI[i] = uI[i] - uI[N_PARAM - 1];
+	}
 }
 
 void AlignCoordinates(vector<vector<double> >& R)
@@ -2130,10 +2284,10 @@ void AlignCoordinates(vector<vector<double> >& R)
 }
 
 //TODO: find better criteria when to accept new parameters
-bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double phiI, double timestep)
 {
 	bool accept = true;
-	if (doNotAcceptStep)
+	if (doNotAcceptStep) //INFO: An error already occured in PerformCholeskyDecomposition
 	{
 		doNotAcceptStep = false;
 		return false;
@@ -2157,7 +2311,7 @@ bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double
 	}
 	else if (PARAMETER_ACCEPTANCE_CHECK_TYPE == 2)
 	{
-		double threshold = 0.05;
+		double threshold = 0.1;
 		if (uRList.size() > 1)
 		{
 			for (int p = 0; p < N_PARAM; p++)
@@ -2194,6 +2348,38 @@ bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double
 				newValue = abs(uR[p] - uRList.back()[p]);
 				if (newValue > value * 5)
 				{
+					return false;
+				}
+			}
+		}
+	}
+	else if (PARAMETER_ACCEPTANCE_CHECK_TYPE == 4)
+	{
+		double thresholdParamR = timestep * 1e5;
+		double thresholdEnergyR = timestep * 1e5;
+		//double thresholdEnergyI = 1.0;
+		if (AllLocalEnergyR.size() > 1 && abs(GetRelativeErrorLastElements(AllLocalEnergyR)) > thresholdEnergyR)
+		{
+			cout << "Energy change: " << GetRelativeErrorLastElements(AllLocalEnergyR) << endl;
+			return false;
+		}
+		//if (AllLocalEnergyI.size() > 5 && abs(GetRelativeErrorLastElements(AllLocalEnergyI)) > thresholdEnergyI)
+		//{
+		//	PrintData(AllLocalEnergyI);
+		//	cout << "err=" << GetRelativeErrorLastElements(AllLocalEnergyI) << endl;
+		//	return false;
+		//}
+		if (uRList.size() > 1)
+		{
+			for (int p = 0; p < N_PARAM; p++)
+			{
+				if (!isfinite(uR[p]))
+				{
+					return false;
+				}
+				if (abs(GetRelativeError(uRList.back()[p], uR[p])) > thresholdParamR)
+				{
+					cout << "Parameter nr " << p << " change: " << GetRelativeError(uRList.back()[p], uR[p]) << endl;
 					return false;
 				}
 			}
@@ -2262,6 +2448,7 @@ int mainMPI(int argc, char** argv)
 	if (processRank == rootRank)
 	{
 		Log("Master process started...");
+		cout << "read config from path=\"" << configFilePath << "\"" << endl;
 
 		if (FileExist(configFilePath))
 		{
@@ -2333,6 +2520,22 @@ int mainMPI(int argc, char** argv)
 	{
 		sys = new HardSphereBosonsExp(SYSTEM_PARAMS, configDirectory);
 	}
+	else if (SYSTEM_TYPE == "NUBosonsBulk")
+	{
+		sys = new NUBosonsBulk(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<NUBosonsBulk*>(sys)->SetNodes(NURBS_GRID);
+		}
+	}
+	else if (SYSTEM_TYPE == "PBosonsBulk")
+	{
+		sys = new PBosonsBulk(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PBosonsBulk*>(sys)->SetNodes(NURBS_GRID);
+		}
+	}
 	else
 	{
 		if (processRank == rootRank)
@@ -2370,7 +2573,7 @@ int mainMPI(int argc, char** argv)
 	InitCoordinateConfiguration(R);
 	if (processRank == rootRank)
 	{
-		WriteParticleInputFile("particleconfiguration.csv", R);
+		WriteParticleInputFile("particleconfiguration", R);
 	}
 	if (processRank == rootRank)
 	{
@@ -2391,6 +2594,13 @@ int mainMPI(int argc, char** argv)
 
 		WriteDataToFile(uR, "parametersR0", "parameterR");
 		WriteDataToFile(uI, "parametersI0", "parameterI");
+
+		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER", WRITE_EVERY_NTH_STEP_TO_FILE);
+		WriteDataToFile(AllLocalEnergyI, "AllLocalEnergyI", "EI", WRITE_EVERY_NTH_STEP_TO_FILE);
+		WriteDataToFile(AllLocalOperators, "AllLocalOperators", "<O_k>", WRITE_EVERY_NTH_STEP_TO_FILE);
+		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", "kinetic, potential, wf, g(r)", WRITE_EVERY_NTH_STEP_TO_FILE);
+		WriteDataToFile(AllParametersR, "AllParametersR", "uR", WRITE_EVERY_NTH_STEP_TO_FILE);
+		WriteDataToFile(AllParametersI, "AllParametersI", "uI", WRITE_EVERY_NTH_STEP_TO_FILE);
 	}
 
 	sys->InitSystem();
@@ -2467,27 +2677,28 @@ int mainMPI(int argc, char** argv)
 			MC_NSTEPS *= nrOfAcceptParameterTrials;
 			AlignCoordinates(R);
 
-			if (step < 2)
+			if (step < 2 || UPDATE_SAMPLES_EVERY_NTH_STEP == 0)
 			{
 				ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
-				if (ODE_SOLVER_TYPE == 4 || ODE_SOLVER_TYPE == 6)
-				{
-					dynTimestep = 0.01 * TIMESTEP;
-				}
+				//if (ODE_SOLVER_TYPE == 4 || ODE_SOLVER_TYPE == 6)
+				//{
+				//	dynTimestep = 0.01 * TIMESTEP;
+				//}
 			}
 			else
 			{
 				dynTimestep = TIMESTEP;
-				if (UPDATE_SAMPLES_EVERY_NTH_STEP > 0 && step % UPDATE_SAMPLES_EVERY_NTH_STEP == 0)
+				if ((UPDATE_SAMPLES_EVERY_NTH_STEP > 0 && step % UPDATE_SAMPLES_EVERY_NTH_STEP == 0) || nrOfAcceptParameterTrials > 0)
 				{
-					UpdateSamplesRandom(nrOfSamplesToUpdate, correlatedSamplingData, uR, uI, phiR, phiI);
-					//cout << "nrOfSamplesToUpdate " << nrOfSamplesToUpdate << endl;
-					//cout << "percentForExtraSampleToUpdate " << percentForExtraSampleToUpdate << endl;
-					if (random01() < percentForExtraSampleToUpdate)
-					{
-						//cout << "update extra sample..." << endl;
-						UpdateSamplesRandom(1, correlatedSamplingData, uR, uI, phiR, phiI);
-					}
+					//UpdateSamplesRandom(nrOfSamplesToUpdate, correlatedSamplingData, uR, uI, phiR, phiI);
+					////cout << "nrOfSamplesToUpdate " << nrOfSamplesToUpdate << endl;
+					////cout << "percentForExtraSampleToUpdate " << percentForExtraSampleToUpdate << endl;
+					//if (random01() < percentForExtraSampleToUpdate)
+					//{
+					//	//cout << "update extra sample..." << endl;
+					//	UpdateSamplesRandom(1, correlatedSamplingData, uR, uI, phiR, phiI);
+					//}
+					UpdateSamplesConsecutive(nrOfSamplesToUpdate, correlatedSamplingData, uR, uI, phiR, phiI);
 				}
 				ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR, uI, phiR, phiI);
 
@@ -2539,9 +2750,10 @@ int mainMPI(int argc, char** argv)
 			//}
 			//ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
 
+			double avgAcceptances = MPIMethods::ReduceToAverage(&nAcceptances);
 			if (processRank == rootRank)
 			{
-				if (step % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
+				if (WRITE_SINGLE_FILES == 1 && step % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
 				{
 					WriteDataToFile(localOperators, "localOperators" + to_string(step), "localOperators");
 					WriteDataToFile(localEnergyR, "localEnergyR" + to_string(step), "localEnergyR");
@@ -2552,6 +2764,7 @@ int mainMPI(int argc, char** argv)
 					WriteDataToFile(otherExpectationValues, "otherExpectationValues" + to_string(step), "Ekin, Ekin_cor, Epot, Epot_corr, wf, g(r)_1, ..., g(r)_100");
 				}
 				cout << "t=" << currentTime << endl;
+				cout << "Acceptance AVG: " << (avgAcceptances / (nTrials / 100.0)) << "% (" << avgAcceptances << "/" << nTrials << ")" << endl;
 				//cout << "localEnergyR=" << localEnergyR << " (" << otherExpectationValues[0] << " + " << otherExpectationValues[1] << ")" << endl;
 				cout << "localEnergyR/N=" << localEnergyR / (double) N << " (" << otherExpectationValues[0] / (double) N << " + " << otherExpectationValues[1] / (double) N << " + " <<
 				//otherExpectationValues[2] / (double) N << " + " <<
@@ -2559,6 +2772,7 @@ int mainMPI(int argc, char** argv)
 						endl;
 				//cout << "localEnergyR/N=" << localEnergyR / (double)N << endl;
 				AllLocalEnergyR.push_back(localEnergyR);
+				AllLocalEnergyI.push_back(localEnergyI);
 				AllLocalOperators.push_back(localOperators);
 				AllOtherExpectationValues.push_back(otherExpectationValues);
 				AllParametersR.push_back(uR);
@@ -2588,7 +2802,7 @@ int mainMPI(int argc, char** argv)
 			{
 				if (processRank == rootRank)
 				{
-					acceptNewParams = AcceptNewParams(uR, uI, phiR, phiI) ? 1 : 0;
+					acceptNewParams = AcceptNewParams(uR, uI, phiR, phiI, dynTimestep) ? 1 : 0;
 					if (acceptNewParams != 1)
 					{
 						Log("PARAMETERS NOT ACCEPTED", ERROR);
@@ -2600,6 +2814,7 @@ int mainMPI(int argc, char** argv)
 					if (processRank == rootRank)
 					{
 						AllLocalEnergyR.pop_back();
+						AllLocalEnergyI.pop_back();
 						AllLocalOperators.pop_back();
 						AllOtherExpectationValues.pop_back();
 						AllParametersR.pop_back();
@@ -2622,23 +2837,30 @@ int mainMPI(int argc, char** argv)
 		/// parameters are accepted ///
 		/// write data to file      ///
 		///////////////////////////////
-
 		if (processRank == rootRank)
 		{
 			// Write current parameters
-			if (step % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
+			if (WRITE_SINGLE_FILES == 1 && step % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
 			{
 				WriteDataToFile(uR, "parametersR" + to_string(step), "parameterR, phiR=" + to_string(phiR) + ", wf=" + to_string(sys->GetWf()));
 				WriteDataToFile(uI, "parametersI" + to_string(step), "parameterI, phiI=" + to_string(phiI));
 			}
-			// Write every nth expectationvalue calculated until now
+			// Write every nth expectation value calculated until now
 			if (step % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
 			{
-				WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER", WRITE_EVERY_NTH_STEP_TO_FILE);
-				WriteDataToFile(AllLocalOperators, "AllLocalOperators", "<O_k>", WRITE_EVERY_NTH_STEP_TO_FILE);
-				WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", "kinetic, potential, wf, g(r)", WRITE_EVERY_NTH_STEP_TO_FILE);
-				WriteDataToFile(AllParametersR, "AllParametersR", "uR", WRITE_EVERY_NTH_STEP_TO_FILE);
-				WriteDataToFile(AllParametersI, "AllParametersI", "uI", WRITE_EVERY_NTH_STEP_TO_FILE);
+				//WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER", WRITE_EVERY_NTH_STEP_TO_FILE);
+				//WriteDataToFile(AllLocalEnergyI, "AllLocalEnergyI", "EI", WRITE_EVERY_NTH_STEP_TO_FILE);
+				//WriteDataToFile(AllLocalOperators, "AllLocalOperators", "<O_k>", WRITE_EVERY_NTH_STEP_TO_FILE);
+				//WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", "kinetic, potential, wf, g(r)", WRITE_EVERY_NTH_STEP_TO_FILE);
+				//WriteDataToFile(AllParametersR, "AllParametersR", "uR", WRITE_EVERY_NTH_STEP_TO_FILE);
+				//WriteDataToFile(AllParametersI, "AllParametersI", "uI", WRITE_EVERY_NTH_STEP_TO_FILE);
+
+				AppendDataToFile(AllLocalEnergyR.back(), "AllLocalEnergyR");
+				AppendDataToFile(AllLocalEnergyI.back(), "AllLocalEnergyI");
+				AppendDataToFile(AllLocalOperators.back(), "AllLocalOperators");
+				AppendDataToFile(AllOtherExpectationValues.back(), "AllOtherExpectationValues");
+				AppendDataToFile(AllParametersR.back(), "AllParametersR");
+				AppendDataToFile(AllParametersI.back(), "AllParametersI");
 			}
 		}
 
@@ -2649,7 +2871,7 @@ int mainMPI(int argc, char** argv)
 		if (processRank == rootRank)
 		{
 			//cout << "#" << localEnergyR << " - " << std::fpclassify(localEnergyR) << endl;
-			if (FileExist("./stop"))
+			if (step % WRITE_EVERY_NTH_STEP_TO_FILE == 0 && FileExist("./stop")) //TODO: do not do this in every timestep. maybe every 30 seconds?
 			{
 				//TODO: read content of stop-file and interpret as new TOTALTIME instead of stopping immediately
 				Log("Detected stop-file!", WARNING);
@@ -2665,7 +2887,7 @@ int mainMPI(int argc, char** argv)
 				Log("Parameters not accepted", ERROR);
 				cancel = 3;
 			}
-			else if (FileExist("./param"))
+			else if (step % WRITE_EVERY_NTH_STEP_TO_FILE == 0 && FileExist("./param")) //TODO: do not do this in every timestep. maybe every 30 seconds?
 			{
 				Log("Detected parameter change!", WARNING);
 				PerformSystemParameterChange();
@@ -2711,12 +2933,14 @@ int mainMPI(int argc, char** argv)
 	{
 		Log("Write last files ...");
 		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER");
+		WriteDataToFile(AllLocalEnergyI, "AllLocalEnergyI", "EI");
 		WriteDataToFile(AllLocalOperators, "AllLocalOperators", "<O_k>");
 		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", "kinetic, potential, wf, g(r)");
 		WriteDataToFile(AllParametersR, "AllParametersR", "uR");
 		WriteDataToFile(AllParametersI, "AllParametersI", "uI");
 
 		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR_every100th", "ER", 100);
+		WriteDataToFile(AllLocalEnergyI, "AllLocalEnergyI_every100th", "EI", 100);
 		WriteDataToFile(AllLocalOperators, "AllLocalOperators_every100th", "ER", 100);
 		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues_every100th", "kinetic, potential, wf, g(r)", 100);
 		WriteDataToFile(AllParametersR, "AllParametersR_every100th", "uR", 100);
@@ -2914,6 +3138,22 @@ int startVMCSamplerMPI(int argc, char** argv)
 	{
 		sys = new HardSphereBosonsExp(SYSTEM_PARAMS, configDirectory);
 	}
+	else if (SYSTEM_TYPE == "NUBosonsBulk")
+	{
+		sys = new NUBosonsBulk(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<NUBosonsBulk*>(sys)->SetNodes(NURBS_GRID);
+		}
+	}
+	else if (SYSTEM_TYPE == "PBosonsBulk")
+	{
+		sys = new PBosonsBulk(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PBosonsBulk*>(sys)->SetNodes(NURBS_GRID);
+		}
+	}
 	else
 	{
 		if (processRank == rootRank)
@@ -2984,7 +3224,7 @@ int startVMCSamplerMPI(int argc, char** argv)
 	vector<vector<double> > energies;
 
 	vector<double> startValues(uR);
-	vector<double> steps = {0.001, 0.01};
+	vector<double> steps = { 0.001, 0.01 };
 	for (int i = 0; i < 60; i++)
 	{
 		for (int j = 0; j < 300; j++)
@@ -3116,18 +3356,21 @@ int main(int argc, char **argv)
 
 	if (argc == 0) //INFO: started with pbs on mach
 	{
+		//cout << "Starting on MACH (argc=0)" << endl << endl;
 		configFilePath = "/home/k3501/k354522/tVMC/bin/tVMC.config";
 		val = mainMPI(argc, argv);
 	}
 	else if (argc == 1) //INFO: started without specifying config-file. used for local execution
 	{
+		//cout << "Starting (argc=1)" << endl << endl;
 		//SYSTEM_TYPE = "BulkQT";
 		//SYSTEM_TYPE = "BulkSplines";
 		//SYSTEM_TYPE = "BulkSplinesScaled";
 		//SYSTEM_TYPE = "HardSphereBosons";
 		//SYSTEM_TYPE = "HardSphereBosonsExp";
 		//SYSTEM_TYPE = "HeDrop";
-		SYSTEM_TYPE = "BosonsBulk";
+		SYSTEM_TYPE = "NUBosonsBulk";
+		//SYSTEM_TYPE = "PBosonsBulk";
 		//SYSTEM_TYPE = "BosonsBulkDamped";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
@@ -3156,7 +3399,7 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "BosonsBulk")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/Bosons2D_100.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonsBulk1D.config";
 		}
 		else if (SYSTEM_TYPE == "BosonsBulkDamped")
 		{
@@ -3170,6 +3413,15 @@ int main(int argc, char **argv)
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/HardSphereBosonsExp.config";
 		}
+		else if (SYSTEM_TYPE == "NUBosonsBulk")
+		{
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulk1D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulk2D.config";
+		}
+		else if (SYSTEM_TYPE == "PBosonsBulk")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/PBosonsBulk2D.config";
+		}
 		//if (processRank == rootRank) //INFO: no processRank assigned so far. this is done in mainMPI or startVMCSamplerMPI
 		//{
 		//	Log("configFilePath: " + configFilePath);
@@ -3179,6 +3431,7 @@ int main(int argc, char **argv)
 	}
 	else if (argc > 1)
 	{
+		//cout << "Starting (argc>1)" << endl << endl;
 		if (strcmp(argv[1], "-test") == 0)
 		{
 			Test::CalculatePi(argc, argv);

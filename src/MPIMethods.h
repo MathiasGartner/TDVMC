@@ -56,6 +56,18 @@ void BroadcastValues(vector<vector<double> >& data)
 	}
 }
 
+void BroadcastValues(vector<vector<vector<double> > >& data)
+{
+	//TODO: if needed in TDVMC-calculations -> check performance
+	for (unsigned int i = 0; i < data.size(); i++)
+	{
+		for (unsigned int j = 0; j < data.size(); j++)
+		{
+			BroadcastValues(data[i][j]);
+		}
+	}
+}
+
 vector<double> ReduceToMinMaxMean(double data)
 {
 	vector<double> result = { };

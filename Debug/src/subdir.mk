@@ -5,6 +5,7 @@
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
 ../src/BosonsBulk.cpp \
+../src/BosonsBulkDamped.cpp \
 ../src/BulkOnlySplines.cpp \
 ../src/BulkOnlySplinesOriginal.cpp \
 ../src/BulkQT.cpp \
@@ -20,12 +21,16 @@ CPP_SRCS += \
 ../src/HeBulk.cpp \
 ../src/HeDrop.cpp \
 ../src/MathOperators.cpp \
+../src/NUBosonsBulk.cpp \
+../src/PBosonsBulk.cpp \
 ../src/SimulationStepData.cpp \
+../src/SplineFactory.cpp \
 ../src/TDVMC.cpp \
 ../src/Utils.cpp 
 
 OBJS += \
 ./src/BosonsBulk.o \
+./src/BosonsBulkDamped.o \
 ./src/BulkOnlySplines.o \
 ./src/BulkOnlySplinesOriginal.o \
 ./src/BulkQT.o \
@@ -41,12 +46,16 @@ OBJS += \
 ./src/HeBulk.o \
 ./src/HeDrop.o \
 ./src/MathOperators.o \
+./src/NUBosonsBulk.o \
+./src/PBosonsBulk.o \
 ./src/SimulationStepData.o \
+./src/SplineFactory.o \
 ./src/TDVMC.o \
 ./src/Utils.o 
 
 CPP_DEPS += \
 ./src/BosonsBulk.d \
+./src/BosonsBulkDamped.d \
 ./src/BulkOnlySplines.d \
 ./src/BulkOnlySplinesOriginal.d \
 ./src/BulkQT.d \
@@ -62,7 +71,10 @@ CPP_DEPS += \
 ./src/HeBulk.d \
 ./src/HeDrop.d \
 ./src/MathOperators.d \
+./src/NUBosonsBulk.d \
+./src/PBosonsBulk.d \
 ./src/SimulationStepData.d \
+./src/SplineFactory.d \
 ./src/TDVMC.d \
 ./src/Utils.d 
 

@@ -8,3 +8,5 @@ Release/src/*.d
 Release/src/*.o
 Release/resources/*.d
 Release/resources/*.o
+resources/armadillo
+resources/armadillo_bits/*.*
