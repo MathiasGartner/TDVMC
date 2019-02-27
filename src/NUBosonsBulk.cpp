@@ -44,8 +44,11 @@ void NUBosonsBulk::InitSystem()
 	numOfAdditionalSystemProperties = numOfOtherExpectationValues + numOfkValues;
 	//numOfAdditionalSystemProperties = numOfOtherExpectationValues + numOfkValues + numberOfSplines + numberOfSplines * N * DIM + numberOfSplines * N; //expectationValues + s(k) + splines + splinesD + splinesD2
 
-	//INFO: (N_PARAM + 2) for imaginary time with BC1.1; N_PARAM + 2 - 2 for no BC and real time;
-	numberOfSplines = N_PARAM + 2;// - 2;
+	//INFO: (N_PARAM + 2) for imaginary time with BC1.1;
+	//INFO: (N_PARAM + 1) for BC2.2
+	//INFO: N_PARAM + 2 - 2 for no BC and real time;
+	//INFO: +1 for ignoring first one
+	numberOfSplines = N_PARAM + 1 + 1;// + 2;// - 2;
 	halfLength = LBOX / 2.0;
 	nodePointSpacing = halfLength / (double) (numberOfSplines - 3.0);
 	maxDistance = halfLength;
@@ -174,7 +177,7 @@ void NUBosonsBulk::RefreshLocalOperators()
 {
 	for (int i = 0; i < numberOfStandardParameters; i++)
 	{
-		this->localOperators[i] = splineSums[i];
+		this->localOperators[i] = splineSums[i + 1];
 	}
 	for (int i = 0; i < numberOfSpecialParameters; i++)
 	{
@@ -377,11 +380,11 @@ void NUBosonsBulk::CalculateExpectationValues(vector<double>& O, vector<vector<v
 		{
 			for (int a = 0; a < DIM; a++)
 			{
-				vecKineticSumR1[a] += uR[k] * sD[k][n][a];
-				vecKineticSumI1[a] += uI[k] * sD[k][n][a];
+				vecKineticSumR1[a] += uR[k] * sD[k + 1][n][a];
+				vecKineticSumI1[a] += uI[k] * sD[k + 1][n][a];
 			}
-			kineticSumR2 += uR[k] * sD2[k][n];
-			kineticSumI2 += uI[k] * sD2[k][n];
+			kineticSumR2 += uR[k] * sD2[k + 1][n];
+			kineticSumI2 += uI[k] * sD2[k + 1][n];
 		}
 		for (int i = 0; i < numberOfSpecialParameters; i++)
 		{
@@ -598,7 +601,7 @@ void NUBosonsBulk::CalculateWFChange(vector<vector<double> >& R, vector<double>&
 
 	for (int i = 0; i < numberOfStandardParameters; i++)
 	{
-		sum += uR[i] * splineSumsNew[i];
+		sum += uR[i] * splineSumsNew[i + 1];
 	}
 	for (int i = 0; i < numberOfSpecialParameters; i++)
 	{
