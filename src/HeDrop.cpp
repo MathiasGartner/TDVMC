@@ -73,8 +73,8 @@ void HeDrop::InitSystem()
 	numOfAdditionalSystemProperties = numOfOtherExpectationValues + numOfkValues + 1; //+1: <r^2>
 
 	//rijSplit = 1.75;
-	rijSplit = 2.4;
-	nodePointSpacingShort = 0.05;
+	rijSplit = 3.0;
+	nodePointSpacingShort = 0.1;
 	nodePointSpacingLarge = 0.5;
 	//numberOfShortSplines = 83;
 	numberOfShortSplines = 70;
@@ -366,18 +366,25 @@ void HeDrop::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 				//}
 				if (i < n)
 				{
-					double rmFactor = 0.0;
-					double eFactor = 0.0;
-					double x = rni / (rm * (1.0 + rmFactor * pow(sin(6000.0 * this->time), 2)));
-					double x2 = pow(x, 2);
-					double xminus2 = 1.0 / x2;
-					double xminus6 = pow(xminus2, 3);
-					double F = 1;
-					if (x < d)
-					{
-						F = exp(-pow(d / x - 1, 2));
-					}
-					potentialIntern += (1.0 + eFactor * pow(sin(6000.0 * this->time), 2)) * e * (a * exp(-alpha * x + beta * x2) - F * xminus6 * (c6 + xminus2 * (c8 + xminus2 * c10)));
+					//double rmFactor = 0.0;
+					//double eFactor = 0.0;
+					//double x = rni / (rm * (1.0 + rmFactor * pow(sin(6000.0 * this->time), 2)));
+					//double x2 = pow(x, 2);
+					//double xminus2 = 1.0 / x2;
+					//double xminus6 = pow(xminus2, 3);
+					//double F = 1;
+					//if (x < d)
+					//{
+					//	F = exp(-pow(d / x - 1, 2));
+					//}
+					//potentialIntern += (1.0 + eFactor * pow(sin(6000.0 * this->time), 2)) * e * (a * exp(-alpha * x + beta * x2) - F * xminus6 * (c6 + xminus2 * (c8 + xminus2 * c10)));
+
+					double sigma = 4.0;
+					double eps = 3.56;
+					double LJ;
+					double sigma_r_6 = pow(sigma / rni, 6);
+					LJ = 4.0 * eps * sigma_r_6 * (sigma_r_6 - 1.0);
+					potentialIntern += LJ;
 				}
 
 				//kinetic energy

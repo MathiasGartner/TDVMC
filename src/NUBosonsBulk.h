@@ -59,6 +59,7 @@ private:
 
 public:
 	void SetNodes(vector<double> n);
+	void SetGrBinCount(double n);
 
 //Implementation of IPhysicalSystem
 public:

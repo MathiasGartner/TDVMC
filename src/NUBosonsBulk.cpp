@@ -33,11 +33,19 @@ void NUBosonsBulk::SetNodes(vector<double> n)
 	this->nodes = n;
 }
 
+void NUBosonsBulk::SetGrBinCount(double n)
+{
+	this->grBinCount = n;
+}
+
 void NUBosonsBulk::InitSystem()
 {
 	numOfOtherLocalOperators = 4; //INFO: potentialIntern, potentialInternComplex, potentialExtern, potentialExternComplex
 	otherLocalOperators.resize(numOfOtherLocalOperators);
-	grBinCount = 400;
+	if (grBinCount == 0)
+	{
+		grBinCount = 400;
+	}
 	grBinStartIndex = 3;
 	numOfkValues = 300;
 	numOfOtherExpectationValues = 3 + grBinCount;
@@ -48,7 +56,7 @@ void NUBosonsBulk::InitSystem()
 	//INFO: (N_PARAM + 1) for BC2.2
 	//INFO: N_PARAM + 2 - 2 for no BC and real time;
 	//INFO: +1 for ignoring first one
-	numberOfSplines = N_PARAM + 1 + 1;// + 2;// - 2;
+	numberOfSplines = N_PARAM + 2;// + 1;// + 2;// - 2;
 	halfLength = LBOX / 2.0;
 	nodePointSpacing = halfLength / (double) (numberOfSplines - 3.0);
 	maxDistance = halfLength;
@@ -76,7 +84,8 @@ void NUBosonsBulk::InitSystem()
 	splineWeights = SplineFactory::GetWeights(nodes);
 
 	//cut off
-	bcFactors.push_back(SplineFactory::GetBoundaryConditions1_1(nodes));
+	SplineFactory::SetBoundaryConditions1_1(nodes, bcFactors);
+	//SplineFactory::SetBoundaryConditions2_2(nodes, bcFactors);
 	numberOfSpecialParameters = bcFactors.size();
 	numberOfStandardParameters = N_PARAM - numberOfSpecialParameters;
 
@@ -177,7 +186,7 @@ void NUBosonsBulk::RefreshLocalOperators()
 {
 	for (int i = 0; i < numberOfStandardParameters; i++)
 	{
-		this->localOperators[i] = splineSums[i + 1];
+		this->localOperators[i] = splineSums[i];// + 1];
 	}
 	for (int i = 0; i < numberOfSpecialParameters; i++)
 	{
@@ -380,11 +389,11 @@ void NUBosonsBulk::CalculateExpectationValues(vector<double>& O, vector<vector<v
 		{
 			for (int a = 0; a < DIM; a++)
 			{
-				vecKineticSumR1[a] += uR[k] * sD[k + 1][n][a];
-				vecKineticSumI1[a] += uI[k] * sD[k + 1][n][a];
+				vecKineticSumR1[a] += uR[k] * sD[k][n][a];
+				vecKineticSumI1[a] += uI[k] * sD[k][n][a];
 			}
-			kineticSumR2 += uR[k] * sD2[k + 1][n];
-			kineticSumI2 += uI[k] * sD2[k + 1][n];
+			kineticSumR2 += uR[k] * sD2[k][n];
+			kineticSumI2 += uI[k] * sD2[k][n];
 		}
 		for (int i = 0; i < numberOfSpecialParameters; i++)
 		{
@@ -480,8 +489,8 @@ void NUBosonsBulk::CalculateAdditionalSystemProperties(vector<vector<double> >& 
 		{
 			for (unsigned int kn = 0; kn < kValues[k].size(); kn++)
 			{
-				sumSCos[k] += cos(kValues[k][kn][0] * R[i][0] + kValues[k][kn][1] * R[i][1] + kValues[k][kn][2] * R[i][2]);
-				sumSSin[k] += sin(kValues[k][kn][0] * R[i][0] + kValues[k][kn][1] * R[i][1] + kValues[k][kn][2] * R[i][2]);
+				//sumSCos[k] += cos(kValues[k][kn][0] * R[i][0] + kValues[k][kn][1] * R[i][1] + kValues[k][kn][2] * R[i][2]);
+				//sumSSin[k] += sin(kValues[k][kn][0] * R[i][0] + kValues[k][kn][1] * R[i][1] + kValues[k][kn][2] * R[i][2]);
 			}
 		}
 	}
@@ -601,7 +610,7 @@ void NUBosonsBulk::CalculateWFChange(vector<vector<double> >& R, vector<double>&
 
 	for (int i = 0; i < numberOfStandardParameters; i++)
 	{
-		sum += uR[i] * splineSumsNew[i + 1];
+		sum += uR[i] * splineSumsNew[i];
 	}
 	for (int i = 0; i < numberOfSpecialParameters; i++)
 	{

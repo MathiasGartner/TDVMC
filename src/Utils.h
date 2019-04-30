@@ -18,7 +18,7 @@ using namespace std;
 const int exportPrecision = 10;
 
 
-template<typename T> string JoinVector(const vector<T>& v, int everyNth = 1)
+template<typename T> string JoinVector(const vector<T>& v, int everyNth = 1, bool fixedForm = false)
 {
 	string text = "";
 
@@ -26,7 +26,7 @@ template<typename T> string JoinVector(const vector<T>& v, int everyNth = 1)
 	{
 		ostringstream oss;
 		oss.precision(exportPrecision);
-		oss << std::scientific << v[i];
+		oss << (fixedForm ? std::fixed : std::scientific) << v[i];
 		text += oss.str() + ",";
 	}
 	if (text.size() > 0)

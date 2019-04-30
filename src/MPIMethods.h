@@ -109,7 +109,6 @@ vector<bool> CollectValues(bool value)
 	vector<bool> values(numOfProcesses);
 	int ownValue = value ? 1 : 0;
 	int* gatheredValues = new int[numOfProcesses];
-	;
 	MPI_Gather(&ownValue, 1, MPI_INT, gatheredValues, 1, MPI_INT, rootRank, MPI_COMM_WORLD);
 	for (int i = 0; i < numOfProcesses; i++)
 	{
@@ -140,6 +139,22 @@ double ReduceToAverage(int* data)
 
 	ownValues = *data;
 	MPI_Reduce(&ownValues, &reducedValues, 1, MPI_INT, MPI_SUM, rootRank, MPI_COMM_WORLD);
+	if (processRank == rootRank)
+	{
+		average = reducedValues / (double) numOfProcesses;
+		*data = average;
+	}
+	return average;
+}
+
+double ReduceToAverage(long long* data)
+{
+	double average = 0;
+	long long ownValues;
+	long long reducedValues;
+
+	ownValues = *data;
+	MPI_Reduce(&ownValues, &reducedValues, 1, MPI_LONG_LONG_INT, MPI_SUM, rootRank, MPI_COMM_WORLD);
 	if (processRank == rootRank)
 	{
 		average = reducedValues / (double) numOfProcesses;

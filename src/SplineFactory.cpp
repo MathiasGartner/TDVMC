@@ -55,7 +55,7 @@ vector<vector<vector<double> > > GetWeights(vector<double> n)
 	return weights;
 }
 
-vector<double> GetBoundaryConditions1_1(vector<double> n)
+void SetBoundaryConditions1_1(vector<double> n, vector<vector<double> >& bcs)
 {
 	vector<double> bc(4);
 
@@ -66,7 +66,26 @@ vector<double> GetBoundaryConditions1_1(vector<double> n)
 	bc[2] = ((n[i+2] - n[i+3])*(n[i+3] - n[i+4])*((n[i+2] - n[i+3])*(n[i+3] - 2*n[i+4])*n[i+4] + (n[i+3]*(n[i+2] + n[i+3]) - 4*n[i+3]*n[i+4] + 2*pow(n[i+4],2))*n[i+5] + n[i+1]*((n[i+3] - 2*n[i+4])*n[i+4] + n[i+3]*n[i+5] - n[i+2]*(2*n[i+3] - 3*n[i+4] + n[i+5]))))/((n[i+1] - n[i+4])*(n[i+2] - n[i+5])*(-((n[i+2] - n[i+3])*n[i+4]*(n[i+2] + n[i+4])) + n[i+4]*(2*n[i+2] - 3*n[i+3] + n[i+4])*n[i+5] + (n[i+3] - n[i+4])*pow(n[i+5],2) + n[i+1]*(pow(n[i+2],2) - pow(n[i+4],2) + n[i+2]*(-n[i+3] + n[i+4] - 2*n[i+5]) + (n[i+3] + n[i+4])*n[i+5])));
 	bc[3] = 0.0;
 
-	return bc;
+	bcs.push_back(bc);
+}
+
+void SetBoundaryConditions2_2(vector<double> n, vector<vector<double> >& bcs)
+{
+	vector<double> bc(4);
+
+	int i = n.size() - 6;
+
+	bc[0] = 1.0;
+	bc[1] = 0.0;
+	bc[2] = (-n[i+2] + n[i+3])/(n[i+1] - n[i+4]);
+	bc[3] = 0.0;
+	bcs.push_back(bc);
+
+	bc[0] = 0.0;
+	bc[1] = 1.0;
+	bc[2] = (n[i+2] - n[i+4])*(1/(n[i+1] - n[i+3]) + 1/(n[i+2] - n[i+5]));
+	bc[3] = 0.0;
+	bcs.push_back(bc);
 }
 
 }

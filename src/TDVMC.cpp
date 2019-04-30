@@ -70,6 +70,7 @@ double MC_STEP_OFFSET;			//INFO: currently not used
 int MC_NSTEPS;
 int MC_NTHERMSTEPS;
 int MC_NINITIALIZATIONSTEPS;
+int MC_VERY_FIRST_NINITIALIZATIONSTEPS;
 int MC_NADDITIONALSTEPS;
 int MC_NADDITIONALTHERMSTEPS;
 int MC_NADDITIONALINITIALIZATIONSTEPS;
@@ -95,16 +96,17 @@ int USE_NORMALIZE_WF;
 int USE_ADJUST_PARAMETERS;
 int UPDATE_SAMPLES_EVERY_NTH_STEP;
 double UPDATE_SAMPLES_PERCENT;
+int GR_BIN_COUNT;
 int USE_NURBS;
 vector<double> NURBS_GRID;
 vector<double> SYSTEM_PARAMS;
 
-string requiredConfigVersion = "0.14";
+string requiredConfigVersion = "0.16";
 int numOfProcesses = 1;
 int rootRank = 0;
 int processRank = 0;
-int nAcceptances = 0;
-int nTrials = 0;
+long long nAcceptances = 0;
+long long nTrials = 0;
 double mc_nsteps;
 int mc_nsteps_original;
 double mc_nadditionalsteps;
@@ -345,6 +347,7 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("MC_NSTEPS", &MC_NSTEPS, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("MC_NTHERMSTEPS", &MC_NTHERMSTEPS, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("MC_NINITIALIZATIONSTEPS", &MC_NINITIALIZATIONSTEPS, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("MC_VERY_FIRST_NINITIALIZATIONSTEPS", &MC_VERY_FIRST_NINITIALIZATIONSTEPS, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("MC_NADDITIONALSTEPS", &MC_NADDITIONALSTEPS, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("MC_NADDITIONALTHERMSTEPS", &MC_NADDITIONALTHERMSTEPS, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("MC_NADDITIONALINITIALIZATIONSTEPS", &MC_NADDITIONALINITIALIZATIONSTEPS, ConfigItemType::INT));
@@ -362,6 +365,7 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("USE_ADJUST_PARAMETERS", &USE_ADJUST_PARAMETERS, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("UPDATE_SAMPLES_EVERY_NTH_STEP", &UPDATE_SAMPLES_EVERY_NTH_STEP, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("UPDATE_SAMPLES_PERCENT", &UPDATE_SAMPLES_PERCENT, ConfigItemType::DOUBLE, true));
+	configItems.push_back(ConfigItem("GR_BIN_COUNT", &GR_BIN_COUNT, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("USE_NURBS", &USE_NURBS, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("NURBS_GRID", NURBS_GRID, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("SYSTEM_PARAMS", SYSTEM_PARAMS, ConfigItemType::ARR_DOUBLE));
@@ -648,7 +652,7 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 	int fileFound = 0;
 	if (processRank == rootRank)
 	{
-		string filename = "particleconfiguration_" + to_string(N);
+		string filename = "coords/particleconfiguration_" + to_string(N) + "_" + to_string(DIM) + "D_" + to_string(processRank);
 		if (LoadLastPositionsFromFile(filename, R))
 		{
 			fileFound = 1;
@@ -657,7 +661,9 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 	MPIMethods::BroadcastValue(&fileFound);
 	if (fileFound)
 	{
-		MPIMethods::BroadcastValues(R);
+		//MPIMethods::BroadcastValues(R);
+		string filename = "coords/particleconfiguration_" + to_string(N) + "_" + to_string(DIM) + "D_" + to_string(processRank);
+		LoadLastPositionsFromFile(filename, R);
 	}
 	else
 	{
@@ -665,7 +671,7 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 		{
 			cout << "LBOX=" << LBOX << endl;
 		}
-		int type = 1;
+		int type = 2; //INFO: 1: lattice, 2: drop
 		if (type == 0)
 		{
 			//Random
@@ -2385,6 +2391,33 @@ bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double
 			}
 		}
 	}
+	else if (PARAMETER_ACCEPTANCE_CHECK_TYPE == 5)
+	{
+		if (uRList.size() > 1)
+		{
+			for (int p = 0; p < N_PARAM; p++)
+			{
+				if (!isfinite(uR[p]))
+				{
+					return false;
+				}
+			}
+		}
+		if (AllLocalEnergyR.size() > 20)
+		{
+			double maxLastRelativeDiff = 0.0;
+			double relativeDiff;
+			for (int i = 0; i < 10; i++)
+			{
+				maxLastRelativeDiff = max(maxLastRelativeDiff, abs(GetRelativeError(AllLocalEnergyR[AllLocalEnergyR.size() - i - 3], AllLocalEnergyR[AllLocalEnergyR.size() - 2])));
+			}
+			relativeDiff = abs(GetRelativeError(AllLocalEnergyR[AllLocalEnergyR.size() - 2], AllLocalEnergyR.back()));
+			if (relativeDiff / 10.0 > maxLastRelativeDiff)
+			{
+				return false;
+			}
+		}
+	}
 	return accept;
 }
 
@@ -2527,6 +2560,7 @@ int mainMPI(int argc, char** argv)
 		{
 			dynamic_cast<NUBosonsBulk*>(sys)->SetNodes(NURBS_GRID);
 		}
+		dynamic_cast<NUBosonsBulk*>(sys)->SetGrBinCount(GR_BIN_COUNT);
 	}
 	else if (SYSTEM_TYPE == "PBosonsBulk")
 	{
@@ -2621,6 +2655,14 @@ int mainMPI(int argc, char** argv)
 	percentForExtraSampleToUpdate = modf(MC_NSTEPS * UPDATE_SAMPLES_PERCENT / 100.0, &nrOfSamplesToUpdate);
 
 	double dynTimestep = TIMESTEP;
+	AlignCoordinates(R);
+	BroadcastNewParameters(uR, uI, &phiR, &phiI);
+	sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
+	for (int i = 0; i < MC_VERY_FIRST_NINITIALIZATIONSTEPS; i++)
+	{
+		DoMetropolisStep(R, uR, uI, phiR, phiI);
+	}
+	sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
 	for (currentTime = 0; currentTime <= TOTALTIME; currentTime += dynTimestep)
 	{
 		if (processRank == rootRank)
@@ -3000,8 +3042,16 @@ int mainMPI(int argc, char** argv)
 	AlignCoordinates(R);
 	if (processRank == rootRank)
 	{
+		int tmp = 0;
+		tmp = system(("mkdir " + OUT_DIR + "coords").c_str());
+		cout << tmp << endl;
+	}
+	MPIMethods::Barrier();
+	WriteParticleInputFile("coords/particleconfiguration_" + to_string(N) + "_" + to_string(DIM) + "D_" + to_string(processRank), R);
+	if (processRank == rootRank)
+	{
 		MC_NSTEPS = mc_nsteps_original;
-		WriteParticleInputFile("AAFinish_particleconfiguration_" + to_string(N), R);
+		WriteParticleInputFile("AAFinish_particleconfiguration_" + to_string(N) + "_" + to_string(DIM) + "D", R);
 		cout << "phiR=" << phiR << endl;
 		//cout << "log(additionalSystemProperties[2])=" << log(additionalSystemProperties[2]) << endl;
 		//phiR = phiR - log(additionalSystemProperties[2]);
@@ -3145,6 +3195,7 @@ int startVMCSamplerMPI(int argc, char** argv)
 		{
 			dynamic_cast<NUBosonsBulk*>(sys)->SetNodes(NURBS_GRID);
 		}
+		dynamic_cast<NUBosonsBulk*>(sys)->SetGrBinCount(GR_BIN_COUNT);
 	}
 	else if (SYSTEM_TYPE == "PBosonsBulk")
 	{
@@ -3368,13 +3419,14 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BulkSplinesScaled";
 		//SYSTEM_TYPE = "HardSphereBosons";
 		//SYSTEM_TYPE = "HardSphereBosonsExp";
-		//SYSTEM_TYPE = "HeDrop";
-		SYSTEM_TYPE = "NUBosonsBulk";
+		SYSTEM_TYPE = "HeDrop";
+		//SYSTEM_TYPE = "NUBosonsBulk";
 		//SYSTEM_TYPE = "PBosonsBulk";
 		//SYSTEM_TYPE = "BosonsBulkDamped";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/drop_20.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/drop_20.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/X4Drop.config";
 		}
 		else if (SYSTEM_TYPE == "HeBulk")
 		{

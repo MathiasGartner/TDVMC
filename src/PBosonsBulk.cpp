@@ -57,7 +57,7 @@ void PBosonsBulk::InitSystem()
 	splineWeights = SplineFactory::GetWeights(nodes);
 
 	//cut off
-	bcFactors.push_back(SplineFactory::GetBoundaryConditions1_1(nodes));
+	SplineFactory::SetBoundaryConditions1_1(nodes, bcFactors);
 	numberOfSpecialParameters = bcFactors.size();
 	numberOfStandardParameters = N_PARAM - numberOfSpecialParameters;
 
