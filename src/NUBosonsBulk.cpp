@@ -59,6 +59,7 @@ void NUBosonsBulk::InitSystem()
 	numberOfSplines = N_PARAM + 2;// + 1;// + 2;// - 2;
 	halfLength = LBOX / 2.0;
 	nodePointSpacing = halfLength / (double) (numberOfSplines - 3.0);
+	//maxDistance = nodes[nodes.size() - 4];
 	maxDistance = halfLength;
 	nodePointSpacing2 = nodePointSpacing * nodePointSpacing;
 

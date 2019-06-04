@@ -10,12 +10,10 @@
 
 using namespace std;
 
-class HeDrop: public IPhysicalSystem
+class BosonCluster: public IPhysicalSystem
 {
-private:
+protected:
 	int numberOfSplines;
-	int numberOfShortSplines;
-	int numberOfLargeSplines;
 	vector<double> splineSums; //indices: k (bin); for <O_k>
 	vector<vector<vector<double> > > splineSumsD; //indices: k (bin), n (particle), a (coordinate)
 	vector<vector<double> > splineSumsD2; //indices: k (bin), n (particle)
@@ -31,13 +29,10 @@ private:
 	double linearSum;
 	vector<vector<double> > linearSumD;
 	vector<double> linearSumD2;
+
 	double rijSplit;
-	double rijSplineSplit;
-	double nodePointSpacingShort;
-	double nodePointSpacingShort2;
-	double nodePointSpacingLarge;
-	double nodePointSpacingLarge2;
 	double rijTail;
+	double mcMillanFactor;
 
 	int grBinCount;
 	int grBinStartIndex;
@@ -54,9 +49,6 @@ private:
 	int densityProfileBin;
 	double densityProfileNodePointSpacing;
 
-	double mcMillanFactor;
-
-	double exponentNew;
 	double mcMillanSumNew;
 	double constSumNew;
 	//double logSumNew;
@@ -65,30 +57,22 @@ private:
 	vector<double> sumOldPerBin;
 	vector<double> sumNewPerBin;
 
-	double factorFirstSpline1;
-	double factorFirstSpline2;
-	double factorSecondSpline1;
-	double factorSecondSpline2;
-	double factorSecondLastSpline;
-	double factorSecondLastSplineConst;
-	//double factorSecondLastSplineLog;
-	double factorSecondLastSplineLinear;
-	double factorLastSpline;
-	double factorLastSplineConst;
-	//double factorLastSplineLog;
-	double factorLastSplineLinear;
-	double factorSecondLastShort;
-	double factorSecondLastLarge;
-	double factorLastShort;
-	double factorLastLarge;
-	double factorFirstShort;
-	double factorFirstLarge;
-	double factorSecondShort;
-	double factorSecondLarge;
+	vector<vector<double> > bcFactors; //factors according to the boundary conditions
+
+	vector<double> nodes;
+	vector<vector<vector<double> > > splineWeights;
+
+protected:
+	double exponentNew;
+	vector<double> scalingFactors;
+
+public:
+	void SetNodes(vector<double> n);
+	void SetDensityProfileBinCount(double n);
 
 //Implementation of IPhysicalSystem
 public:
-	HeDrop(vector<double>& params, string configDirectory);
+	BosonCluster(vector<double>& params, string configDirectory);
 
 	void InitSystem();
 

@@ -4,6 +4,7 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
+../src/BosonCluster.cpp \
 ../src/BosonsBulk.cpp \
 ../src/BosonsBulkDamped.cpp \
 ../src/BulkOnlySplines.cpp \
@@ -29,6 +30,7 @@ CPP_SRCS += \
 ../src/Utils.cpp 
 
 OBJS += \
+./src/BosonCluster.o \
 ./src/BosonsBulk.o \
 ./src/BosonsBulkDamped.o \
 ./src/BulkOnlySplines.o \
@@ -54,6 +56,7 @@ OBJS += \
 ./src/Utils.o 
 
 CPP_DEPS += \
+./src/BosonCluster.d \
 ./src/BosonsBulk.d \
 ./src/BosonsBulkDamped.d \
 ./src/BulkOnlySplines.d \

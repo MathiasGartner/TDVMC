@@ -2,6 +2,9 @@
 
 #include "BosonsBulk.h"
 #include "BosonsBulkDamped.h"
+#include "BosonCluster.h"
+#include "BosonClusterWithLog.h"
+#include "BosonClusterWithLogParam.h"
 #include "BulkSplines.h"
 #include "BulkSplinesPhi.h"
 #include "BulkSplinesScaled.h"
@@ -1558,6 +1561,9 @@ void CalculateNextParametersEuler(double dt, vector<double>& uR, vector<double>&
 		uI = uI + uDotI * dt;
 		*phiR = *phiR + phiDotR * dt;
 		*phiI = *phiI + phiDotI * dt;
+
+		//uR[N_PARAM - 2] += uDotR[N_PARAM - 2] * 9.0 * dt;
+		//uR[N_PARAM - 1] += uDotR[N_PARAM - 1] * 4.0 * dt;
 	}
 }
 
@@ -2449,6 +2455,41 @@ void PerformSystemParameterChange()
 	}
 }
 
+void SetBackNSteps(int n, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int& step, double dynTimeStep)
+{
+	//TODO: also check for urListDiff, correlated sampling, ...
+	if (processRank == rootRank)
+	{
+		for (int i = 0; i < n; i++)
+		{
+			currentTime -= dynTimeStep;
+			step--;
+			sys->SetTime(currentTime);
+			sys->SetStep(step);
+			times.pop_back();
+
+			AllLocalEnergyR.pop_back();
+			AllLocalEnergyI.pop_back();
+			AllLocalOperators.pop_back();
+			AllOtherExpectationValues.pop_back();
+			AllParametersR.pop_back();
+			AllParametersI.pop_back();
+			uR = uRList.back();
+			uI = uIList.back();
+			phiR = phiRList.back();
+			phiI = phiIList.back();
+		}
+	}
+	AlignCoordinates(R);
+	BroadcastNewParameters(uR, uI, &phiR, &phiI);
+	sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
+	for (int i = 0; i < MC_VERY_FIRST_NINITIALIZATIONSTEPS; i++)
+	{
+		DoMetropolisStep(R, uR, uI, phiR, phiI);
+	}
+	sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
+}
+
 ////////////
 /// main ///
 ////////////
@@ -2544,6 +2585,33 @@ int mainMPI(int argc, char** argv)
 	else if (SYSTEM_TYPE == "BosonsBulkDamped")
 	{
 		sys = new BosonsBulkDamped(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BosonCluster")
+	{
+		sys = new BosonCluster(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<BosonCluster*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<BosonCluster*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
+	}
+	else if (SYSTEM_TYPE == "BosonClusterWithLog")
+	{
+		sys = new BosonClusterWithLog(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<BosonClusterWithLog*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<BosonClusterWithLog*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
+	}
+	else if (SYSTEM_TYPE == "BosonClusterWithLogParam")
+	{
+		sys = new BosonClusterWithLogParam(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<BosonClusterWithLogParam*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<BosonClusterWithLogParam*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
 	}
 	else if (SYSTEM_TYPE == "HardSphereBosons")
 	{
@@ -2909,7 +2977,7 @@ int mainMPI(int argc, char** argv)
 		// check if simulation should be cancelled or set back to a previous timestep
 		int cancel = 0;
 		int configChanged = 0;
-		//int setBackNSteps = 0;
+		int setBack = 0;
 		if (processRank == rootRank)
 		{
 			//cout << "#" << localEnergyR << " - " << std::fpclassify(localEnergyR) << endl;
@@ -2927,7 +2995,8 @@ int mainMPI(int argc, char** argv)
 			else if (nrOfAcceptParameterTrials == maxNrOfAcceptParameterTrials)
 			{
 				Log("Parameters not accepted", ERROR);
-				cancel = 3;
+				//cancel = 3;
+				setBack = 5;
 			}
 			else if (step % WRITE_EVERY_NTH_STEP_TO_FILE == 0 && FileExist("./param")) //TODO: do not do this in every timestep. maybe every 30 seconds?
 			{
@@ -2945,6 +3014,7 @@ int mainMPI(int argc, char** argv)
 
 		MPIMethods::BroadcastValue(&cancel);
 		MPIMethods::BroadcastValue(&configChanged);
+		MPIMethods::BroadcastValue(&setBack);
 		if (cancel != 0)
 		{
 			TOTALTIME = currentTime;
@@ -2954,6 +3024,11 @@ int mainMPI(int argc, char** argv)
 		{
 			BroadcastChangeableConfigItems();
 			percentForExtraSampleToUpdate = modf(MC_NSTEPS * UPDATE_SAMPLES_PERCENT / 100.0, &nrOfSamplesToUpdate);
+		}
+		if (setBack != 0)
+		{
+			SetBackNSteps(setBack, R, uR, uI, phiR, phiI, step, dynTimestep);
+			setBack = 0;
 		}
 
 		if (processRank == rootRank)
@@ -3179,6 +3254,33 @@ int startVMCSamplerMPI(int argc, char** argv)
 	else if (SYSTEM_TYPE == "BosonsBulkDamped")
 	{
 		sys = new BosonsBulkDamped(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BosonCluster")
+	{
+		sys = new BosonCluster(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<BosonCluster*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<BosonCluster*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
+	}
+	else if (SYSTEM_TYPE == "BosonClusterWithLog")
+	{
+		sys = new BosonClusterWithLog(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<BosonClusterWithLog*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<BosonClusterWithLog*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
+	}
+	else if (SYSTEM_TYPE == "BosonClusterWithLogParam")
+	{
+		sys = new BosonClusterWithLogParam(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<BosonClusterWithLogParam*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<BosonClusterWithLogParam*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
 	}
 	else if (SYSTEM_TYPE == "HardSphereBosons")
 	{
@@ -3419,7 +3521,10 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BulkSplinesScaled";
 		//SYSTEM_TYPE = "HardSphereBosons";
 		//SYSTEM_TYPE = "HardSphereBosonsExp";
-		SYSTEM_TYPE = "HeDrop";
+		//SYSTEM_TYPE = "HeDrop";
+		//SYSTEM_TYPE = "BosonCluster";
+		//SYSTEM_TYPE = "BosonClusterWithLog";
+		SYSTEM_TYPE = "BosonClusterWithLogParam";
 		//SYSTEM_TYPE = "NUBosonsBulk";
 		//SYSTEM_TYPE = "PBosonsBulk";
 		//SYSTEM_TYPE = "BosonsBulkDamped";
@@ -3457,6 +3562,18 @@ int main(int argc, char **argv)
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonsBulkDamped.config";
 		}
+		else if (SYSTEM_TYPE == "BosonCluster")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonCluster.config";
+		}
+		else if (SYSTEM_TYPE == "BosonClusterWithLog")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonClusterWithLog.config";
+		}
+		else if (SYSTEM_TYPE == "BosonClusterWithLogParam")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonClusterWithLogParam.config";
+		}
 		else if (SYSTEM_TYPE == "HardSphereBosons")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/HardSphereBosons.config";
@@ -3467,8 +3584,8 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "NUBosonsBulk")
 		{
-			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulk1D.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulk2D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulk1D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulk2D.config";
 		}
 		else if (SYSTEM_TYPE == "PBosonsBulk")
 		{

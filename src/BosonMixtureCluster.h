@@ -10,12 +10,28 @@
 
 using namespace std;
 
-class HeDrop: public IPhysicalSystem
+class BosonMixtureCluster: public IPhysicalSystem
 {
-private:
+protected:
+
+	enum ParticleType
+	{
+		He3 = 0,
+		He4,
+		A
+	};
+
+	enum CorrelationType
+	{
+		He3He4 = 0,
+		He3A,
+		He4A
+	};
+
+	vector<ParticleType> particleTypes;
+	vector<vector<CorrelationType> > correlationTypes;
+
 	int numberOfSplines;
-	int numberOfShortSplines;
-	int numberOfLargeSplines;
 	vector<double> splineSums; //indices: k (bin); for <O_k>
 	vector<vector<vector<double> > > splineSumsD; //indices: k (bin), n (particle), a (coordinate)
 	vector<vector<double> > splineSumsD2; //indices: k (bin), n (particle)
@@ -25,19 +41,16 @@ private:
 	double constSum;
 	vector<vector<double> > constSumD;
 	vector<double> constSumD2;
-	//double logSum;
-	//vector<vector<double> > logSumD;
-	//vector<double> logSumD2;
+	double logSum;
+	vector<vector<double> > logSumD;
+	vector<double> logSumD2;
 	double linearSum;
 	vector<vector<double> > linearSumD;
 	vector<double> linearSumD2;
+
 	double rijSplit;
-	double rijSplineSplit;
-	double nodePointSpacingShort;
-	double nodePointSpacingShort2;
-	double nodePointSpacingLarge;
-	double nodePointSpacingLarge2;
 	double rijTail;
+	double mcMillanFactor;
 
 	int grBinCount;
 	int grBinStartIndex;
@@ -54,41 +67,35 @@ private:
 	int densityProfileBin;
 	double densityProfileNodePointSpacing;
 
-	double mcMillanFactor;
-
-	double exponentNew;
 	double mcMillanSumNew;
 	double constSumNew;
-	//double logSumNew;
+	double logSumNew;
 	double linearSumNew;
 	vector<double> splineSumsNew; //indices: k (bin); for <O_k>
 	vector<double> sumOldPerBin;
 	vector<double> sumNewPerBin;
 
-	double factorFirstSpline1;
-	double factorFirstSpline2;
-	double factorSecondSpline1;
-	double factorSecondSpline2;
-	double factorSecondLastSpline;
-	double factorSecondLastSplineConst;
-	//double factorSecondLastSplineLog;
-	double factorSecondLastSplineLinear;
-	double factorLastSpline;
-	double factorLastSplineConst;
-	//double factorLastSplineLog;
-	double factorLastSplineLinear;
-	double factorSecondLastShort;
-	double factorSecondLastLarge;
-	double factorLastShort;
-	double factorLastLarge;
-	double factorFirstShort;
-	double factorFirstLarge;
-	double factorSecondShort;
-	double factorSecondLarge;
+	vector<vector<double> > bcFactors; //factors according to the boundary conditions
+
+	vector<double> nodes;
+	vector<vector<vector<double> > > splineWeights;
+
+	double logPrefactor;
+
+protected:
+	double exponentNew;
+	vector<double> scalingFactors;
+
+	CorrelationType GetCorrelationType(ParticleType t1, ParticleType t2);
+
+public:
+	void SetNodes(vector<double> n);
+	void SetDensityProfileBinCount(double n);
+	void SetParticleType(vector<ParticleType> p);
 
 //Implementation of IPhysicalSystem
 public:
-	HeDrop(vector<double>& params, string configDirectory);
+	BosonMixtureCluster(vector<double>& params, string configDirectory);
 
 	void InitSystem();
 

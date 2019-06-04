@@ -35,6 +35,8 @@ HeDrop::HeDrop(vector<double>& params, string configDirectory) :
 	densityProfileBin = 0;
 	densityProfileNodePointSpacing = 0;
 
+	mcMillanFactor = 0.0;
+
 	exponentNew = 0;
 	mcMillanSumNew = 0;
 	constSumNew = 0;
@@ -65,6 +67,8 @@ HeDrop::HeDrop(vector<double>& params, string configDirectory) :
 
 void HeDrop::InitSystem()
 {
+	mcMillanFactor = -4.7;
+
 	grBinCount = 200;
 	grBinStartIndex = 3;
 	numOfkValues = 84;
@@ -101,9 +105,9 @@ void HeDrop::InitSystem()
 	//nodePointSpacingLarge2 = pow(nodePointSpacingLarge, 2);
 
 	//mcMillan
-	factorFirstSpline1 = 10.0 * nodePointSpacingShort / pow(rijSplit, 6.0);
+	factorFirstSpline1 = -2.0 * mcMillanFactor * nodePointSpacingShort * pow(rijSplit, mcMillanFactor - 1.0);
 	factorFirstSpline2 = 1.0;
-	factorSecondSpline1 = (-5.0 * nodePointSpacingShort + 3.0 * rijSplit) / (2.0 * pow(rijSplit, 6.0));
+	factorSecondSpline1 = (mcMillanFactor * nodePointSpacingShort + 3.0 * rijSplit) * pow(rijSplit, mcMillanFactor - 1.0) / 2.0;
 	factorSecondSpline2 = -1.0 / 2.0;
 
 	//Exponential
@@ -394,12 +398,12 @@ void HeDrop::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 				{
 					if (rni < rijSplit)
 					{
-						double rniMinus7 = pow(rni, -7);
+						double rniMinusD = pow(rni, mcMillanFactor - 2.0);
 						for (int a = 0; a < DIM; a++)
 						{
-							mcMillanSumD[n][a] += -5.0 * rniMinus7 * vecrni[a];
+							mcMillanSumD[n][a] += mcMillanFactor * rniMinusD * vecrni[a];
 						}
-						mcMillanSumD2[n] += 20.0 * rniMinus7;
+						mcMillanSumD2[n] += mcMillanFactor * (mcMillanFactor + 1.0) * rniMinusD;
 					}
 					else if (rni >= rijTail)
 					{
@@ -720,7 +724,7 @@ void HeDrop::CalculateWavefunction(vector<vector<double> >& R, vector<double>& u
 			{
 				if (rni < rijSplit)
 				{
-					mcMillanSum += pow(rni, -5.0);
+					mcMillanSum += pow(rni, mcMillanFactor);
 				}
 				else if (rni >= rijTail)
 				{
@@ -816,7 +820,7 @@ void HeDrop::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, v
 			{
 				if (rni < rijSplit)
 				{
-					mcMillanOld += pow(rni, -5.0);
+					mcMillanOld += pow(rni, mcMillanFactor);
 				}
 				else if (rni >= rijTail)
 				{
@@ -853,7 +857,7 @@ void HeDrop::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, v
 			{
 				if (rni < rijSplit)
 				{
-					mcMillanNew += pow(rni, -5.0);
+					mcMillanNew += pow(rni, mcMillanFactor);
 				}
 				else if (rni >= rijTail)
 				{
