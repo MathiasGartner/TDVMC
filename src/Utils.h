@@ -121,6 +121,11 @@ void ClearVector(vector<vector<double> >& v);
 void ClearVector(vector<vector<vector<double> > >& v);
 void ClearVector(vector<vector<vector<vector<double> > > >& v);
 
+void InitVector(vector<int>& v, int size, int initialValue);
+void InitVector(vector<vector<int> >& v, int size1, int size2, int initialValue);
+void InitVector(vector<double>& v, int size, double initialValue);
+void InitVector(vector<vector<double> >& v, int size1, int size2, double initialValue);
+
 void WriteDataToFile(double* data, int n, string filename, string header);
 void WriteDataToFile(double** data, int n1, int n2, string filename, string header);
 void WriteDataToFile(double data, string filename, string header);

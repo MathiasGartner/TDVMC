@@ -602,6 +602,37 @@ void ClearVector(vector<vector<vector<vector<double> > > >& v)
 	}
 }
 
+void InitVector(vector<int>& v, int size, int initialValue)
+{
+	v.resize(size);
+	fill(v.begin(), v.end(), initialValue);
+}
+
+void InitVector(vector<vector<int> >& v, int size1, int size2, int initialValue)
+{
+	v.resize(size1);
+	for (auto& i : v)
+	{
+		InitVector(i, size2, initialValue);
+	}
+}
+
+void InitVector(vector<double>& v, int size, double initialValue)
+{
+	v.resize(size);
+	fill(v.begin(), v.end(), initialValue);
+}
+
+void InitVector(vector<vector<double> >& v, int size1, int size2, double initialValue)
+{
+	v.resize(size1);
+	for (auto& i : v)
+	{
+		InitVector(i, size2, initialValue);
+	}
+}
+
+
 void WriteDataToFile(double* data, int n, string filename, string header)
 {
 	ofstream file;

@@ -5,6 +5,7 @@
 #include "BosonCluster.h"
 #include "BosonClusterWithLog.h"
 #include "BosonClusterWithLogParam.h"
+#include "BosonMixtureCluster.h"
 #include "BulkSplines.h"
 #include "BulkSplinesPhi.h"
 #include "BulkSplinesScaled.h"
@@ -102,9 +103,10 @@ double UPDATE_SAMPLES_PERCENT;
 int GR_BIN_COUNT;
 int USE_NURBS;
 vector<double> NURBS_GRID;
+vector<int> PARTICLE_TYPES;
 vector<double> SYSTEM_PARAMS;
 
-string requiredConfigVersion = "0.16";
+string requiredConfigVersion = "0.17";
 int numOfProcesses = 1;
 int rootRank = 0;
 int processRank = 0;
@@ -371,6 +373,7 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("GR_BIN_COUNT", &GR_BIN_COUNT, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("USE_NURBS", &USE_NURBS, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("NURBS_GRID", NURBS_GRID, ConfigItemType::ARR_DOUBLE));
+	configItems.push_back(ConfigItem("PARTICLE_TYPES", PARTICLE_TYPES, ConfigItemType::ARR_INT));
 	configItems.push_back(ConfigItem("SYSTEM_PARAMS", SYSTEM_PARAMS, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("PARAMS_REAL", PARAMS_REAL, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("PARAMS_IMAGINARY", PARAMS_IMAGINARY, ConfigItemType::ARR_DOUBLE));
@@ -394,6 +397,7 @@ void ReadConfig(string filePath)
 	{
 		for (auto ci : configItems)
 		{
+			//cout << "Read: " << ci.name << endl;
 			ci.setValue(configData[ci.name]);
 		}
 	}
@@ -452,6 +456,16 @@ void BroadcastConfigItem(ConfigItem& ci)
 	{
 		MPIMethods::BroadcastValue(ci.variableDouble);
 	}
+	else if (ci.type == ARR_INT)
+	{
+		int size = ci.variableArrInt->size();
+		MPIMethods::BroadcastValue(&size);
+		if (processRank != rootRank)
+		{
+			ci.variableArrInt->resize(size);
+		}
+		MPIMethods::BroadcastValues(*(ci.variableArrInt));
+	}
 	else if (ci.type == ARR_DOUBLE)
 	{
 		int size = ci.variableArrDouble->size();
@@ -479,6 +493,7 @@ void BroadcastConfig()
 {
 	for (auto ci : configItems)
 	{
+		//cout << "Broadcast: " << ci.name << endl;
 		BroadcastConfigItem(ci);
 	}
 }
@@ -2613,6 +2628,16 @@ int mainMPI(int argc, char** argv)
 		}
 		dynamic_cast<BosonClusterWithLogParam*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
 	}
+	else if (SYSTEM_TYPE == "BosonMixtureCluster")
+	{
+		sys = new BosonMixtureCluster(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<BosonMixtureCluster*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<BosonMixtureCluster*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
+		dynamic_cast<BosonMixtureCluster*>(sys)->SetParticleType(PARTICLE_TYPES);
+	}
 	else if (SYSTEM_TYPE == "HardSphereBosons")
 	{
 		sys = new HardSphereBosons(SYSTEM_PARAMS, configDirectory);
@@ -3282,6 +3307,16 @@ int startVMCSamplerMPI(int argc, char** argv)
 		}
 		dynamic_cast<BosonClusterWithLogParam*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
 	}
+	else if (SYSTEM_TYPE == "BosonMixtureCluster")
+	{
+		sys = new BosonMixtureCluster(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<BosonMixtureCluster*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<BosonMixtureCluster*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
+		dynamic_cast<BosonMixtureCluster*>(sys)->SetParticleType(PARTICLE_TYPES);
+	}
 	else if (SYSTEM_TYPE == "HardSphereBosons")
 	{
 		sys = new HardSphereBosons(SYSTEM_PARAMS, configDirectory);
@@ -3525,6 +3560,7 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BosonCluster";
 		//SYSTEM_TYPE = "BosonClusterWithLog";
 		SYSTEM_TYPE = "BosonClusterWithLogParam";
+		SYSTEM_TYPE = "BosonMixtureCluster";
 		//SYSTEM_TYPE = "NUBosonsBulk";
 		//SYSTEM_TYPE = "PBosonsBulk";
 		//SYSTEM_TYPE = "BosonsBulkDamped";
@@ -3573,6 +3609,10 @@ int main(int argc, char **argv)
 		else if (SYSTEM_TYPE == "BosonClusterWithLogParam")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonClusterWithLogParam.config";
+		}
+		else if (SYSTEM_TYPE == "BosonMixtureCluster")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonMixtureCluster.config";
 		}
 		else if (SYSTEM_TYPE == "HardSphereBosons")
 		{

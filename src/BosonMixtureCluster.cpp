@@ -1,4 +1,7 @@
 #include "BosonMixtureCluster.h"
+#include "Potentials/HFDB_He_He.h"
+#include "Potentials/KTTY_He_Na.h"
+#include "Potentials/LJ_He_He.h"
 #include "SplineFactory.h"
 
 using namespace std;
@@ -10,144 +13,204 @@ BosonMixtureCluster::BosonMixtureCluster(vector<double>& params, string configDi
 	this->USE_NIC = false;
 	this->USE_MOVE_COM_TO_ZERO = true;
 
-	numberOfSplines = 0;
-
-	mcMillanSum = 0;
-	constSum = 0;
-	logSum = 0;
-	linearSum = 0;
-
-	rijSplit = 0;
-	rijTail = 0;
-	mcMillanFactor = 0.0;
-
-	grBinCount = 0;
-	grBinStartIndex = 0;
-	grMaxDistance = 0;
-	grNodePointSpacing = 0;
-	numOfkValues = 0;
-	densityProfileMaxDistance = 0;
-	numOfDensityProfileValues = 0;
-	densityProfileBinInterval = 0;
-	densityProfileBin = 0;
-	densityProfileNodePointSpacing = 0;
-
 	exponentNew = 0;
-	mcMillanSumNew = 0;
-	constSumNew = 0;
-	logSumNew = 0;
-	linearSumNew = 0;
 
-	logPrefactor = -1.0 / 12.0 / 10.0;
+	globalDensityProfileMaxDistance = 0;
+	globalNumOfDensityProfileValues = 0;
+	globalDensityProfileBinInterval = 0;
+	globalDensityProfileBin = 0;
+	globalDensityProfileNodePointSpacing = 0;
+}
+
+BosonMixtureCluster::~BosonMixtureCluster()
+{
+	for (auto& ppp : this->particlePairProperties)
+	{
+		delete ppp.potential;
+	}
 }
 
 void BosonMixtureCluster::SetNodes(vector<double> n)
 {
-	this->nodes = n;
+	this->globalNodes = n;
 }
 
 void BosonMixtureCluster::SetDensityProfileBinCount(double n)
 {
-	this->numOfDensityProfileValues = n;
+	this->globalNumOfDensityProfileValues = n;
 }
 
-BosonMixtureCluster::CorrelationType BosonMixtureCluster::GetCorrelationType(ParticleType t1, ParticleType t2)
+void BosonMixtureCluster::SetParticleType(vector<int> p)
 {
-	if ((t1 == He3 && t2 == He4) || (t1 == He4 && t2 == He3))
+	vector<ParticleType> pt;
+	for (auto i : p)
 	{
-		return He3He4;
+		pt.push_back(static_cast<ParticleType>(i));
 	}
-	return CorrelationType::He3He4;
+	SetParticleType(pt);
 }
 
 void BosonMixtureCluster::SetParticleType(vector<ParticleType> p)
 {
-	this->particleTypes = p;
-	this->correlationTypes.resize(N);
+	this->originalParticleTypes = p;
+	InitVector(particleTypes, N, 0);
+	InitVector(correlationTypes, N, N, 0);
+
+	InitVector(particleTypeIndexMapping, ParticleType::ParticleType_COUNT, -1);
+	int particleIndex = 0;
 	for (int i = 0; i < N; i++)
 	{
-		this->correlationTypes[i].resize(N);
-		for (int j = 0; j < N; j++)
+		ParticleType pt = this->originalParticleTypes[i];
+		if (particleTypeIndexMapping[pt] == -1)
 		{
-			this->correlationTypes[i][j] = GetCorrelationType(this->particleTypes[i], this->particleTypes[j]);
+			particleTypeIndexMapping[pt] = particleIndex;
+			particleIndex++;
+		}
+		this->particleTypes[i] = particleTypeIndexMapping[pt];
+	}
+	int particleTypeCount = particleIndex;
+
+	InitVector(correlationIndexMapping, ParticleType::ParticleType_COUNT, ParticleType::ParticleType_COUNT, -1);
+	int correlationIndex = 0;
+	for (int i = 0; i < N; i++)
+	{
+		int pt1 = this->originalParticleTypes[i];
+		for (int j = 0; j <= i; j++)
+		{
+			int pt2 = this->originalParticleTypes[j];
+			if (correlationIndexMapping[pt1][pt2] == -1)
+			{
+				correlationIndexMapping[pt1][pt2] = correlationIndex;
+				correlationIndexMapping[pt2][pt1] = correlationIndex;
+				correlationIndex++;
+			}
+			this->correlationTypes[i][j] = correlationIndexMapping[pt1][pt2];
+			this->correlationTypes[j][i] = correlationIndexMapping[pt2][pt1];
 		}
 	}
+	int correlationsCount = correlationIndex;
+
+	this->corrFuncData.resize(correlationsCount);
+	this->particleProperties.resize(particleTypeCount);
+	this->particlePairProperties.resize(correlationsCount);
+	this->oneParticleData.resize(N);
 }
 
 void BosonMixtureCluster::InitSystem()
 {
-	mcMillanFactor = -4.7;
+	int index;
 
-	grBinCount = 200;
-	grBinStartIndex = 3;
-	numOfkValues = 84;
+	//TODO: set mass and hbarOver2m
+	index = this->particleTypeIndexMapping[ParticleType::He3];
+	if (index > -1)
+	{
+		ParticleProperties& pp = this->particleProperties[index];
+		pp.mass = 1.0;
+		pp.hbarOver2m = 6.06359;
+	}
+	index = this->particleTypeIndexMapping[ParticleType::He4];
+	if (index > -1)
+	{
+		ParticleProperties& pp = this->particleProperties[index];
+		pp.mass = 1.0;
+		pp.hbarOver2m = 6.06359;
+	}
+	index = this->particleTypeIndexMapping[ParticleType::Na];
+	if (index > -1)
+	{
+		ParticleProperties& pp = this->particleProperties[index];
+		pp.mass = 1.0;
+		pp.hbarOver2m = 6.06359;
+	}
+
+	index = this->correlationIndexMapping[He4][He4];
+	if (index > -1)
+	{
+		CorrelationFunctionData& cfd = this->corrFuncData[index];
+		cfd.isUsed = true;
+		cfd.mcMillanFactor = -4.7;
+		cfd.rijSplit = 3.0;
+		cfd.numberOfSplines = 26; //as in calculations performed for Split X_4 Cluster (BosonClusterWithLogParam)
+		cfd.nodes = this->globalNodes; //TODO: allow different nodes
+		cfd.rijTail = cfd.nodes[cfd.nodes.size() - 4];
+		cfd.splineWeights = SplineFactory::GetWeights(cfd.nodes);
+		SplineFactory::SetBoundaryConditions1_MM_1(cfd.nodes, cfd.bcFactors, cfd.rijSplit, cfd.mcMillanFactor);
+		SplineFactory::SetBoundaryConditions1_EXP_2(cfd.nodes, cfd.bcFactors, cfd.rijTail);
+		cfd.Init();
+	}
+
+	//INFO: copy
+	int he4he4Index = this->correlationIndexMapping[He4][He4];
+	index = this->correlationIndexMapping[He3][He3];
+	if (index > -1)
+	{
+		this->corrFuncData[index] = this->corrFuncData[he4he4Index];
+	}
+	index = this->correlationIndexMapping[Na][Na];
+	if (index > -1)
+	{
+		this->corrFuncData[index] = this->corrFuncData[he4he4Index];
+	}
+	index = this->correlationIndexMapping[He3][He4];
+	if (index > -1)
+	{
+		this->corrFuncData[index] = this->corrFuncData[he4he4Index];
+	}
+	index = this->correlationIndexMapping[He3][Na];
+	if (index > -1)
+	{
+		this->corrFuncData[index] = this->corrFuncData[he4he4Index];
+	}
+	index = this->correlationIndexMapping[He4][Na];
+	if (index > -1)
+	{
+		this->corrFuncData[index] = this->corrFuncData[he4he4Index];
+	}
+
+	index = this->correlationIndexMapping[He4][He4];
+	if (index > -1)
+	{
+		ParticlePairProperties& ppp = this->particlePairProperties[index];
+		ppp.potential = new Potentials::LJ_He_He();
+	}
+	index = this->correlationIndexMapping[He3][He3];
+	if (index > -1)
+	{
+		ParticlePairProperties& ppp = this->particlePairProperties[index];
+		ppp.potential = new Potentials::LJ_He_He();
+	}
+	index = this->correlationIndexMapping[Na][Na];
+	if (index > -1)
+	{
+		//TODO: what potential to use here?
+		ParticlePairProperties& ppp = this->particlePairProperties[index];
+		ppp.potential = new Potentials::KTTY_He_Na();
+	}
+	index = this->correlationIndexMapping[He3][He4];
+	if (index > -1)
+	{
+		ParticlePairProperties& ppp = this->particlePairProperties[index];
+		ppp.potential = new Potentials::LJ_He_He();
+	}
+	index = this->correlationIndexMapping[He3][Na];
+	if (index > -1)
+	{
+		ParticlePairProperties& ppp = this->particlePairProperties[index];
+		ppp.potential = new Potentials::KTTY_He_Na();
+	}
+	index = this->correlationIndexMapping[He4][Na];
+	if (index > -1)
+	{
+		ParticlePairProperties& ppp = this->particlePairProperties[index];
+		ppp.potential = new Potentials::KTTY_He_Na();
+	}
+
 	//numOfDensityProfileValues = 200;
-	numOfOtherExpectationValues = 3 + grBinCount + numOfDensityProfileValues;
-	numOfAdditionalSystemProperties = numOfOtherExpectationValues + numOfkValues + 1; //+1: <r^2>
-
-	rijSplit = 3.0;
-
-	numberOfSplines = N_PARAM + 1;
-	rijTail = nodes[nodes.size() - 4];
-
-	splineWeights = SplineFactory::GetWeights(nodes);
-
-	SplineFactory::SetBoundaryConditions1_MM_1(nodes, bcFactors, rijSplit, mcMillanFactor);
-	SplineFactory::SetBoundaryConditions1_EXP_2(nodes, bcFactors, rijTail);
+	numOfOtherExpectationValues = 3 + globalNumOfDensityProfileValues;
+	numOfAdditionalSystemProperties = numOfOtherExpectationValues + 1; //+1: <r^2>
 
 	wf = 0.0;
 	exponent = 0.0;
-	mcMillanSum = 0;
-	mcMillanSumD.resize(N);
-	for (auto &n : mcMillanSumD)
-	{
-		n.resize(DIM);
-	}
-	ClearVector(mcMillanSumD);
-	mcMillanSumD2.resize(N);
-	ClearVector(mcMillanSumD2);
-	constSum = 0;
-	constSumD.resize(N);
-	for (auto &n : constSumD)
-	{
-		n.resize(DIM);
-	}
-	ClearVector(constSumD);
-	constSumD2.resize(N);
-	ClearVector(constSumD2);
-	logSum = 0;
-	logSumD.resize(N);
-	for (auto &n : logSumD)
-	{
-		n.resize(DIM);
-	}
-	ClearVector(logSumD);
-	logSumD2.resize(N);
-	ClearVector(logSumD2);
-	linearSum = 0;
-	linearSumD.resize(N);
-	for (auto &n : linearSumD)
-	{
-		n.resize(DIM);
-	}
-	ClearVector(linearSumD);
-	linearSumD2.resize(N);
-	ClearVector(linearSumD2);
-	splineSums.resize(numberOfSplines);
-	splineSumsD.resize(numberOfSplines);
-	for (auto &k : splineSumsD)
-	{
-		k.resize(N);
-		for (auto &n : k)
-		{
-			n.resize(DIM);
-		}
-	}
-	splineSumsD2.resize(numberOfSplines);
-	for (auto &k : splineSumsD2)
-	{
-		k.resize(N);
-	}
 
 	localEnergyR = 0;
 	localEnergyI = 0;
@@ -170,45 +233,21 @@ void BosonMixtureCluster::InitSystem()
 
 	wfNew = 0.0;
 	exponentNew = 0.0;
-	mcMillanSumNew = 0.0;
-	constSumNew = 0.0;
-	logSumNew = 0.0;
-	linearSumNew = 0.0;
-	splineSumsNew.resize(numberOfSplines);
-	sumOldPerBin.resize(numberOfSplines);
-	sumNewPerBin.resize(numberOfSplines);
 
-	grBins.resize(grBinCount);
-	ClearVector(grBins);
-	grMaxDistance = rijTail * 2.0;
-	grNodePointSpacing = grMaxDistance / (double) grBinCount;
+	globalDensityProfileMaxDistance = globalNodes.back() * 5.0;
+	globalDensityProfileNodePointSpacing = globalDensityProfileMaxDistance / globalNumOfDensityProfileValues;
+	globalDensityProfileBins.resize(globalNumOfDensityProfileValues);
 
-	grBinVolumes.resize(grBinCount);
-	ClearVector(grBinVolumes);
-	for (int i = 0; i < grBinCount; i++)
+	globalDensityProfileBinVolumes.resize(globalNumOfDensityProfileValues);
+	ClearVector(globalDensityProfileBinVolumes);
+	for (int i = 0; i < globalNumOfDensityProfileValues; i++)
 	{
-		grBinVolumes[i] = 4.0 * M_PI * pow(grNodePointSpacing * (i + 1), 3.0) / 3.0;
+		globalDensityProfileBinVolumes[i] = 4.0 * M_PI * pow(globalDensityProfileNodePointSpacing * (i + 1), 3.0) / 3.0;
 	}
-	for (int i = grBinCount - 1; i > 0; i--)
+	for (int i = globalNumOfDensityProfileValues - 1; i > 0; i--)
 	{
-		grBinVolumes[i] = grBinVolumes[i] - grBinVolumes[i - 1];
+		globalDensityProfileBinVolumes[i] = globalDensityProfileBinVolumes[i] - globalDensityProfileBinVolumes[i - 1];
 	}
-
-	kValues = ReadKValuesFromJsonFile(this->configDirectory + "kVectors.json");
-	for (int k = 0; k < numOfkValues; k++)
-	{
-		for (unsigned int kn = 0; kn < kValues[k].size(); kn++)
-		{
-			for (int a = 0; a < DIM; a++)
-			{
-				kValues[k][kn][a] *= 2 * M_PI / LBOX / 2.0;
-			}
-		}
-	}
-
-	densityProfileMaxDistance = grMaxDistance;
-	densityProfileNodePointSpacing = grNodePointSpacing;
-	densityProfileBins.resize(numOfDensityProfileValues);
 
 	//cout << "nodePointSpacingShort=" << nodePointSpacingShort << ", nodePointSpacingLarge=" << nodePointSpacingLarge << ", rijSplit=" << rijSplit << ", rijSplineSplit=" << rijSplineSplit << ", rijTail=" << rijTail << endl;
 }
@@ -237,6 +276,9 @@ void BosonMixtureCluster::CalculateOtherLocalOperators(vector<vector<double> >& 
 
 void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
+	int ct; //mapped CorrelationType
+	int pt; //mapped ParticleType
+
 	double temp;
 
 	int s = 4;
@@ -248,48 +290,35 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 	double rni;
 	double rni2;
 
-	double grBinInterval;
-	int grBin;
-
 	double potentialExtern = 0;
 	double potentialIntern = 0;
 
-	//double sigma = 2.556;
-	//double eps = 10.22;
-	//double r_V = sigma * 2.5;
-	//double r_L = sigma * 2.0;
-
-	//Aziz potential
-	double e = 10.948;
-	double rm = 2.963;
-	double a = 184431.01;
-	double alpha = 10.43329537;
-	double beta = -2.27965105;
-	double d = 1.4826;
-	double c6 = 1.36745214;
-	double c8 = 0.42123807;
-	double c10 = 0.17473318;
-
 	double kineticR = 0;
 	double kineticI = 0;
-	vector<double> vecKineticSumR1(DIM);
-	vector<double> vecKineticSumI1(DIM);
-	double kineticSumR1 = 0;
-	double kineticSumI1 = 0;
-	double kineticSumR1I1 = 0;
-	double kineticSumR2 = 0;
-	double kineticSumI2 = 0;
 
-	ClearVector(mcMillanSumD);
-	ClearVector(mcMillanSumD2);
-	ClearVector(constSumD);
-	ClearVector(constSumD2);
-	ClearVector(logSumD);
-	ClearVector(logSumD2);
-	ClearVector(linearSumD);
-	ClearVector(linearSumD2);
-	ClearVector(splineSumsD);
-	ClearVector(splineSumsD2);
+	for (auto& cfd : this->corrFuncData)
+	{
+		ClearVector(cfd.mcMillanSumD);
+		ClearVector(cfd.mcMillanSumD2);
+		ClearVector(cfd.constSumD);
+		ClearVector(cfd.constSumD2);
+		ClearVector(cfd.logSumD);
+		ClearVector(cfd.logSumD2);
+		ClearVector(cfd.linearSumD);
+		ClearVector(cfd.linearSumD2);
+		ClearVector(cfd.splineSumsD);
+		ClearVector(cfd.splineSumsD2);
+	}
+	for (auto& opd : this->oneParticleData)
+	{
+		ClearVector(opd.vecKineticSumR1);
+		ClearVector(opd.vecKineticSumI1);
+		opd.kineticSumR1 = 0;
+		opd.kineticSumI1 = 0;
+		opd.kineticSumR1I1 = 0;
+		opd.kineticSumR2 = 0;
+		opd.kineticSumI2 = 0;
+	}
 
 	localEnergyR = 0;
 	localEnergyI = 0;
@@ -298,62 +327,31 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 	ClearVector(localOperatorlocalEnergyR);
 	ClearVector(localOperatorlocalEnergyI);
 	ClearVector(otherExpectationValues);
-	ClearVector(grBins);
-	ClearVector(densityProfileBins);
+	ClearVector(globalDensityProfileBins);
 	vector<double> com = GetCenterOfMass(R);
 
-	//if (this->time > 1e-6)
-	//{
-	//	e = 21.0;
-	//	rm = 2.35;
-	//}
 	for (int n = 0; n < N; n++)
 	{
+		pt = this->particleTypes[n];
+		ParticleProperties& pp = this->particleProperties[pt];
+		OneParticleData& opd = this->oneParticleData[n];
+
 		//external potential energy
 		potentialExtern += 0;
-		//potentialExtern += pow(sin(10000.0 * this->time), 2) * (pow(R[n][0], 2) + pow(R[n][1], 2) + pow(R[n][2], 2));
 
 		for (int i = 0; i < N; i++)
 		{
+			ct = this->correlationTypes[n][i];
+			CorrelationFunctionData& cfd = this->corrFuncData[ct];
+			ParticlePairProperties& ppp = this->particlePairProperties[ct];
+
 			rni = VectorDisplacement(R[n], R[i], vecrni);
 			//if (rni < maxDistance)
 			{
 				//internal potential energy
-				//if (i < n && rni < r_V) //TODO: combine kinetic and potential energy if-statements
-				//{
-				//	double LJ;
-				//	double sigma_r_6 = pow(sigma / rni, 6);
-				//	LJ = 4.0 * eps * sigma_r_6 * (sigma_r_6 - 1.0);
-				//	if (rni > r_L)
-				//	{
-				//		double S;
-				//		S = 1.0 - pow(rni - r_L, 2) * (3.0 * r_V - r_L - 2.0 * rni) / pow(r_V - r_L, 3);
-				//		LJ = LJ * S;
-				//	}
-				//	//LJ = min(LJ, 50.0);
-				//	potentialIntern += LJ;
-				//}
 				if (i < n)
 				{
-					//double rmFactor = 0.0;
-					//double eFactor = 0.0;
-					//double x = rni / (rm * (1.0 + rmFactor * pow(sin(6000.0 * this->time), 2)));
-					//double x2 = pow(x, 2);
-					//double xminus2 = 1.0 / x2;
-					//double xminus6 = pow(xminus2, 3);
-					//double F = 1;
-					//if (x < d)
-					//{
-					//	F = exp(-pow(d / x - 1, 2));
-					//}
-					//potentialIntern += (1.0 + eFactor * pow(sin(6000.0 * this->time), 2)) * e * (a * exp(-alpha * x + beta * x2) - F * xminus6 * (c6 + xminus2 * (c8 + xminus2 * c10)));
-
-					double sigma = 4.0;
-					double eps = 3.56;
-					double LJ;
-					double sigma_r_6 = pow(sigma / rni, 6);
-					LJ = 4.0 * eps * sigma_r_6 * (sigma_r_6 - 1.0);
-					potentialIntern += LJ;
+					potentialIntern += ppp.potential->GetPotential(rni);
 				}
 
 				//kinetic energy
@@ -361,16 +359,16 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 				//		otherwise values are calculated multiple times
 				if (i != n) //TODO: also include in (i < n) branch -> then only loop over i < n
 				{
-					if (rni < rijSplit)
+					if (rni < cfd.rijSplit)
 					{
-						double rniMinusD = pow(rni, mcMillanFactor - 2.0);
+						double rniMinusD = pow(rni, cfd.mcMillanFactor - 2.0);
 						for (int a = 0; a < DIM; a++)
 						{
-							mcMillanSumD[n][a] += mcMillanFactor * rniMinusD * vecrni[a];
+							cfd.mcMillanSumD[n][a] += cfd.mcMillanFactor * rniMinusD * vecrni[a];
 						}
-						mcMillanSumD2[n] += mcMillanFactor * (mcMillanFactor + 1.0) * rniMinusD;
+						cfd.mcMillanSumD2[n] += cfd.mcMillanFactor * (cfd.mcMillanFactor + 1.0) * rniMinusD;
 					}
-					else if (rni >= rijTail)
+					else if (rni >= cfd.rijTail)
 					{
 						for (int a = 0; a < DIM; a++)
 						{
@@ -378,24 +376,24 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 						}
 						for (int a = 0; a < DIM; a++)
 						{
-							constSumD[n][a] += 0.0;
-							linearSumD[n][a] += evecrni[a];
+							cfd.constSumD[n][a] += 0.0;
+							cfd.linearSumD[n][a] += evecrni[a];
 						}
-						constSumD2[n] += 0.0;
-						linearSumD2[n] += 2.0 / rni;
+						cfd.constSumD2[n] += 0.0;
+						cfd.linearSumD2[n] += 2.0 / rni;
 					}
 					else
 					{
-						auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
-						bin = interval - nodes.begin() - 1;
+						auto interval = lower_bound(cfd.nodes.begin(), cfd.nodes.end(), rni);
+						bin = interval - cfd.nodes.begin() - 1;
 						rni2 = rni * rni;
 
 						for (int p = 0; p < s; p++)
 						{
 							//first derivative
-							tmp1[3 - p] = splineWeights[bin - p][p][1] + 2.0 * splineWeights[bin - p][p][2] * rni + 3.0 * splineWeights[bin - p][p][3] * rni2;
+							tmp1[3 - p] = cfd.splineWeights[bin - p][p][1] + 2.0 * cfd.splineWeights[bin - p][p][2] * rni + 3.0 * cfd.splineWeights[bin - p][p][3] * rni2;
 							//second derivative
-							tmp2[3 - p] = 2.0 * splineWeights[bin - p][p][2] + 6.0 * splineWeights[bin - p][p][3] * rni;
+							tmp2[3 - p] = 2.0 * cfd.splineWeights[bin - p][p][2] + 6.0 * cfd.splineWeights[bin - p][p][3] * rni;
 						}
 
 						for (int a = 0; a < DIM; a++)
@@ -406,29 +404,21 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 						{
 							for (int b = 0; b < s; b++)
 							{
-								splineSumsD[bin - b][n][a] += tmp1[3 - b] * evecrni[a];
+								cfd.splineSumsD[bin - b][n][a] += tmp1[3 - b] * evecrni[a];
 							}
 						}
 						for (int b = 0; b < s; b++)
 						{
 							double secondDerivativeFactor = DIM - 1.0; //INFO: at least correct for 2D and 3D (and 1D?)
-							splineSumsD2[bin - b][n] += tmp2[3 - b] + secondDerivativeFactor / rni * tmp1[3 - b];
+							cfd.splineSumsD2[bin - b][n] += tmp2[3 - b] + secondDerivativeFactor / rni * tmp1[3 - b];
 						}
 					}
 					for (int a = 0; a < DIM; a++)
 					{
-						logSumD[n][a] += 1.0 / rni * evecrni[a];
+						cfd.logSumD[n][a] += 1.0 / rni * evecrni[a];
 					}
-					logSumD2[n] += pow(rni, -2);
+					cfd.logSumD2[n] += pow(rni, -2);
 				}
-			}
-			//binning for g(r)
-			if (i < n && rni < grMaxDistance)
-			{
-				grBinInterval = rni / grNodePointSpacing;
-				grBin = floor(grBinInterval);
-				//grBins[grBin] += 1.0 / (double)pow(grBin + 1, 2);
-				grBins[grBin] += 1.0 / grBinVolumes[grBin];
 			}
 		}
 
@@ -436,82 +426,96 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 		double r;
 		vector<double> diff = R[n] - com;
 		r = VectorNorm(diff);
-		if (r < densityProfileMaxDistance)
+		if (r < globalDensityProfileMaxDistance)
 		{
-			densityProfileBinInterval = r / densityProfileNodePointSpacing;
-			densityProfileBin = floor(densityProfileBinInterval);
-			densityProfileBins[densityProfileBin] += 1.0 / grBinVolumes[densityProfileBin];
+			globalDensityProfileBinInterval = r / globalDensityProfileNodePointSpacing;
+			globalDensityProfileBin = floor(globalDensityProfileBinInterval);
+			globalDensityProfileBins[globalDensityProfileBin] += 1.0 / globalDensityProfileBinVolumes[globalDensityProfileBin];
 		}
 
 		//kinetic energy
 		for (int a = 0; a < DIM; a++)
 		{
-			vecKineticSumR1[a] = 0.0;
-			vecKineticSumI1[a] = 0.0;
+			opd.vecKineticSumR1[a] = 0.0;
+			opd.vecKineticSumI1[a] = 0.0;
 		}
 
-		for (int a = 0; a < DIM; a++)
+		int nCFD = 0;
+		int paramOffset = 26;
+		int offset = 0;
+		for (auto& cfd : this->corrFuncData)
 		{
-			temp = (mcMillanSumD[n][a] + bcFactors[0][0] * splineSumsD[0][n][a] + bcFactors[0][1] * splineSumsD[1][n][a]);
-			vecKineticSumR1[a] += uR[0] * temp;
-			vecKineticSumI1[a] += uI[0] * temp;
-			temp = (splineSumsD[2][n][a] + bcFactors[1][0] * splineSumsD[0][n][a] + bcFactors[1][1] * splineSumsD[1][n][a]);
-			vecKineticSumR1[a] += uR[1] * temp;
-			vecKineticSumI1[a] += uI[1] * temp;
-		}
-		temp = (mcMillanSumD2[n] + bcFactors[0][0] * splineSumsD2[0][n] + bcFactors[0][1] * splineSumsD2[1][n]);
-		kineticSumR2 += uR[0] * temp;
-		kineticSumI2 += uI[0] * temp;
-		temp = (splineSumsD2[2][n] + bcFactors[1][0] * splineSumsD2[0][n] + bcFactors[1][1] * splineSumsD2[1][n]);
-		kineticSumR2 += uR[1] * temp;
-		kineticSumI2 += uI[1] * temp;
-
-		for (int k = 2; k < N_PARAM - 3; k++)
-		{
-			for (int a = 0; a < DIM; a++)
+			offset = nCFD * paramOffset;
+			if (cfd.isUsed)
 			{
-				vecKineticSumR1[a] += uR[k] * splineSumsD[k + 1][n][a];
-				vecKineticSumI1[a] += uI[k] * splineSumsD[k + 1][n][a];
+				for (int a = 0; a < DIM; a++)
+				{
+					temp = (cfd.mcMillanSumD[n][a] + cfd.bcFactors[0][0] * cfd.splineSumsD[0][n][a] + cfd.bcFactors[0][1] * cfd.splineSumsD[1][n][a]);
+					opd.vecKineticSumR1[a] += uR[0 + offset] * temp;
+					opd.vecKineticSumI1[a] += uI[0 + offset] * temp;
+					temp = (cfd.splineSumsD[2][n][a] + cfd.bcFactors[1][0] * cfd.splineSumsD[0][n][a] + cfd.bcFactors[1][1] * cfd.splineSumsD[1][n][a]);
+					opd.vecKineticSumR1[a] += uR[1 + offset] * temp;
+					opd.vecKineticSumI1[a] += uI[1 + offset] * temp;
+				}
+				temp = (cfd.mcMillanSumD2[n] + cfd.bcFactors[0][0] * cfd.splineSumsD2[0][n] + cfd.bcFactors[0][1] * cfd.splineSumsD2[1][n]);
+				opd.kineticSumR2 += uR[0 + offset] * temp;
+				opd.kineticSumI2 += uI[0 + offset] * temp;
+				temp = (cfd.splineSumsD2[2][n] + cfd.bcFactors[1][0] * cfd.splineSumsD2[0][n] + cfd.bcFactors[1][1] * cfd.splineSumsD2[1][n]);
+				opd.kineticSumR2 += uR[1 + offset] * temp;
+				opd.kineticSumI2 += uI[1 + offset] * temp;
+
+				for (int k = 2; k < paramOffset - 4; k++)
+				{
+					for (int a = 0; a < DIM; a++)
+					{
+						opd.vecKineticSumR1[a] += uR[k + offset] * cfd.splineSumsD[k + 1][n][a];
+						opd.vecKineticSumI1[a] += uI[k + offset] * cfd.splineSumsD[k + 1][n][a];
+					}
+					opd.kineticSumR2 += uR[k + offset] * cfd.splineSumsD2[k + 1][n];
+					opd.kineticSumI2 += uI[k + offset] * cfd.splineSumsD2[k + 1][n];
+				}
+
+				for (int a = 0; a < DIM; a++)
+				{
+					temp = (cfd.splineSumsD[cfd.numberOfSplines - 3][n][a] + cfd.bcFactors[2][0] * cfd.splineSumsD[cfd.numberOfSplines - 2][n][a] + cfd.bcFactors[2][1] * cfd.splineSumsD[cfd.numberOfSplines - 1][n][a]);
+					opd.vecKineticSumR1[a] += uR[paramOffset - 4 + offset] * temp;
+					opd.vecKineticSumI1[a] += uI[paramOffset - 4 + offset] * temp;
+					temp = (cfd.constSumD[n][a] + cfd.bcFactors[3][0] * cfd.splineSumsD[cfd.numberOfSplines - 2][n][a] + cfd.bcFactors[3][1] * cfd.splineSumsD[cfd.numberOfSplines - 1][n][a]);
+					opd.vecKineticSumR1[a] += uR[paramOffset - 3 + offset] * temp;
+					opd.vecKineticSumI1[a] += uI[paramOffset - 3 + offset] * temp;
+					temp = (cfd.linearSumD[n][a] + cfd.bcFactors[4][0] * cfd.splineSumsD[cfd.numberOfSplines - 2][n][a] + cfd.bcFactors[4][1] * cfd.splineSumsD[cfd.numberOfSplines - 1][n][a]);
+					opd.vecKineticSumR1[a] += uR[paramOffset - 2 + offset] * temp;
+					opd.vecKineticSumI1[a] += uI[paramOffset - 2 + offset] * temp;
+				}
+				temp = (cfd.splineSumsD2[cfd.numberOfSplines - 3][n] + cfd.bcFactors[2][0] * cfd.splineSumsD2[cfd.numberOfSplines - 2][n] + cfd.bcFactors[2][1] * cfd.splineSumsD2[cfd.numberOfSplines - 1][n]);
+				opd.kineticSumR2 += uR[paramOffset - 4 + offset] * temp;
+				opd.kineticSumI2 += uI[paramOffset - 4 + offset] * temp;
+				temp = (cfd.constSumD2[n] + cfd.bcFactors[3][0] * cfd.splineSumsD2[cfd.numberOfSplines - 2][n] + cfd.bcFactors[3][1] * cfd.splineSumsD2[cfd.numberOfSplines - 1][n]);
+				opd.kineticSumR2 += uR[paramOffset - 3 + offset] * temp;
+				opd.kineticSumI2 += uI[paramOffset - 3 + offset] * temp;
+				temp = (cfd.linearSumD2[n] + cfd.bcFactors[4][0] * cfd.splineSumsD2[cfd.numberOfSplines - 2][n] + cfd.bcFactors[4][1] * cfd.splineSumsD2[cfd.numberOfSplines - 1][n]);
+				opd.kineticSumR2 += uR[paramOffset - 2 + offset] * temp;
+				opd.kineticSumI2 += uI[paramOffset - 2 + offset] * temp;
+
+				for (int a = 0; a < DIM; a++)
+				{
+					opd.vecKineticSumR1[a] += uR[paramOffset - 1 + offset] * cfd.logSumD[n][a];
+					opd.vecKineticSumI1[a] += uI[paramOffset - 1 + offset] * cfd.logSumD[n][a];
+				}
+				opd.kineticSumR2 += uR[paramOffset - 1 + offset] * cfd.logSumD2[n];
+				opd.kineticSumI2 += uI[paramOffset - 1 + offset] * cfd.logSumD2[n];
+
+				nCFD++;
 			}
-			kineticSumR2 += uR[k] * splineSumsD2[k + 1][n];
-			kineticSumI2 += uI[k] * splineSumsD2[k + 1][n];
 		}
 
-		for (int a = 0; a < DIM; a++)
-		{
-			temp = (splineSumsD[numberOfSplines - 3][n][a] + bcFactors[2][0] * splineSumsD[numberOfSplines - 2][n][a] + bcFactors[2][1] * splineSumsD[numberOfSplines - 1][n][a]);
-			vecKineticSumR1[a] += uR[N_PARAM - 3] * temp;
-			vecKineticSumI1[a] += uI[N_PARAM - 3] * temp;
-			temp = (constSumD[n][a] + bcFactors[3][0] * splineSumsD[numberOfSplines - 2][n][a] + bcFactors[3][1] * splineSumsD[numberOfSplines - 1][n][a]);
-			vecKineticSumR1[a] += uR[N_PARAM - 2] * temp;
-			vecKineticSumI1[a] += uI[N_PARAM - 2] * temp;
-			temp = (linearSumD[n][a] + bcFactors[4][0] * splineSumsD[numberOfSplines - 2][n][a] + bcFactors[4][1] * splineSumsD[numberOfSplines - 1][n][a]);
-			vecKineticSumR1[a] += uR[N_PARAM - 1] * temp;
-			vecKineticSumI1[a] += uI[N_PARAM - 1] * temp;
-		}
-		temp = (splineSumsD2[numberOfSplines - 3][n] + bcFactors[2][0] * splineSumsD2[numberOfSplines - 2][n] + bcFactors[2][1] * splineSumsD2[numberOfSplines - 1][n]);
-		kineticSumR2 += uR[N_PARAM - 3] * temp;
-		kineticSumI2 += uI[N_PARAM - 3] * temp;
-		temp = (constSumD2[n] + bcFactors[3][0] * splineSumsD2[numberOfSplines - 2][n] + bcFactors[3][1] * splineSumsD2[numberOfSplines - 1][n]);
-		kineticSumR2 += uR[N_PARAM - 2] * temp;
-		kineticSumI2 += uI[N_PARAM - 2] * temp;
-		temp = (linearSumD2[n] + bcFactors[4][0] * splineSumsD2[numberOfSplines - 2][n] + bcFactors[4][1] * splineSumsD2[numberOfSplines - 1][n]);
-		kineticSumR2 += uR[N_PARAM - 1] * temp;
-		kineticSumI2 += uI[N_PARAM - 1] * temp;
+		opd.kineticSumR1I1 = 2.0 * VectorDotProduct(opd.vecKineticSumR1, opd.vecKineticSumI1);
+		opd.kineticSumR1 = VectorNorm2(opd.vecKineticSumR1);
+		opd.kineticSumI1 = VectorNorm2(opd.vecKineticSumI1);
 
-		for (int a = 0; a < DIM; a++)
-		{
-			vecKineticSumR1[a] += logPrefactor * logSumD[n][a];
-		}
-		kineticSumR2 += logPrefactor * logSumD2[n];
-
-		kineticSumR1I1 += 2.0 * VectorDotProduct(vecKineticSumR1, vecKineticSumI1);
-		kineticSumR1 += VectorNorm2(vecKineticSumR1);
-		kineticSumI1 += VectorNorm2(vecKineticSumI1);
+		kineticR += -pp.hbarOver2m * (opd.kineticSumR1 - opd.kineticSumI1 + opd.kineticSumR2);
+		kineticI += -pp.hbarOver2m * (opd.kineticSumR1I1 + opd.kineticSumI2);
 	}
-
-	kineticR = -HBAR2_2M * (kineticSumR1 - kineticSumI1 + kineticSumR2);
-	kineticI = -HBAR2_2M * (kineticSumR1I1 + kineticSumI2);
 
 	localEnergyR = kineticR + potentialIntern + potentialExtern;
 	localEnergyI = kineticI;
@@ -524,16 +528,29 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 	//cout << "kineticSumI2=" << kineticSumI2 << endl;
 	//cout << "kineticSumR1I1=" << kineticSumR1I1 << endl;
 
-	localOperators[0] = mcMillanSum + bcFactors[0][0] * splineSums[0] + bcFactors[0][1] * splineSums[1];
-	localOperators[1] = splineSums[2] + bcFactors[1][0] * splineSums[0] + bcFactors[1][1] * splineSums[1];
-	for (int i = 2; i < N_PARAM - 3; i++)
+	int nCFD = 0;
+	int paramOffset = 26;
+	int offset = 0;
+	for (auto& cfd : this->corrFuncData)
 	{
-		localOperators[i] = splineSums[i + 1];
+		offset = nCFD * paramOffset;
+		if (cfd.isUsed)
+		{
+			localOperators[0 + offset] = cfd.mcMillanSum + cfd.bcFactors[0][0] * cfd.splineSums[0] + cfd.bcFactors[0][1] * cfd.splineSums[1];
+			localOperators[1 + offset] = cfd.splineSums[2] + cfd.bcFactors[1][0] * cfd.splineSums[0] + cfd.bcFactors[1][1] * cfd.splineSums[1];
+			for (int i = 2; i < paramOffset - 4; i++)
+			{
+				localOperators[i + offset] = cfd.splineSums[i + 1];
+			}
+			localOperators[paramOffset - 4 + offset] = cfd.splineSums[cfd.numberOfSplines - 3] + cfd.bcFactors[2][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[2][1] * cfd.splineSums[cfd.numberOfSplines - 1];
+			localOperators[paramOffset - 3 + offset] = cfd.constSum + cfd.bcFactors[3][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[3][1] * cfd.splineSums[cfd.numberOfSplines - 1];
+			localOperators[paramOffset - 2 + offset] = cfd.linearSum + cfd.bcFactors[4][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[4][1] * cfd.splineSums[cfd.numberOfSplines - 1];
+			localOperators[paramOffset - 1 + offset] = cfd.logSum;
+
+			nCFD++;
+		}
 	}
-	localOperators[N_PARAM - 3] = splineSums[numberOfSplines - 3] + bcFactors[2][0] * splineSums[numberOfSplines - 2] + bcFactors[2][1] * splineSums[numberOfSplines - 1];
-	localOperators[N_PARAM - 2] = constSum + bcFactors[3][0] * splineSums[numberOfSplines - 2] + bcFactors[3][1] * splineSums[numberOfSplines - 1];
-	//localOperators[N_PARAM - 2] = (logSum + factorSecondLastSplineLog * splineSums[numberOfSplines - 2] + factorLastSplineLog * splineSums[numberOfSplines - 1]);
-	localOperators[N_PARAM - 1] = linearSum + bcFactors[4][0] * splineSums[numberOfSplines - 2] + bcFactors[4][1] * splineSums[numberOfSplines - 1];
+
 	for (int k = 0; k < N_PARAM; k++)
 	{
 		for (int j = 0; j < N_PARAM; j++)
@@ -547,72 +564,71 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 	otherExpectationValues[0] = kineticR;
 	otherExpectationValues[1] = potentialIntern;
 	otherExpectationValues[2] = wf;
-	for (int i = 0; i < grBinCount; i++)
+	for (int i = 0; i < globalNumOfDensityProfileValues; i++)
 	{
-		otherExpectationValues[i + grBinStartIndex] = grBins[i];
-	}
-	for (int i = 0; i < numOfDensityProfileValues; i++)
-	{
-		otherExpectationValues[i + grBinStartIndex + grBinCount] = densityProfileBins[i];
+		otherExpectationValues[3 + i] = globalDensityProfileBins[i];
 	}
 }
 
 void BosonMixtureCluster::CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
-	//TODO: implement
+//TODO: implement
 }
 
 void BosonMixtureCluster::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
-{
-	ClearVector(additionalSystemProperties);
-	CalculateExpectationValues(R, uR, uI, phiR, phiI);
-	for (int i = 0; i < numOfOtherExpectationValues; i++)
-	{
-		additionalSystemProperties[i] = otherExpectationValues[i];
-	}
+{/*
+ ClearVector(additionalSystemProperties);
+ CalculateExpectationValues(R, uR, uI, phiR, phiI);
+ for (int i = 0; i < numOfOtherExpectationValues; i++)
+ {
+ additionalSystemProperties[i] = otherExpectationValues[i];
+ }
 
-	vector<double> vecrij(DIM);
-	vector<double> sumSCos;
-	vector<double> sumSSin;
-	vector<double> sk;
-	sumSCos.resize(numOfkValues);
-	ClearVector(sumSCos);
-	sumSSin.resize(numOfkValues);
-	ClearVector(sumSSin);
-	sk.resize(numOfkValues);
-	ClearVector(sk);
-	for (int i = 0; i < N; i++)
-	{
-		for (int k = 0; k < numOfkValues; k++)
-		{
-			for (unsigned int kn = 0; kn < kValues[k].size(); kn++)
-			{
-				sumSCos[k] += cos(kValues[k][kn][0] * R[i][0] + kValues[k][kn][1] * R[i][1] + kValues[k][kn][2] * R[i][2]);
-				sumSSin[k] += sin(kValues[k][kn][0] * R[i][0] + kValues[k][kn][1] * R[i][1] + kValues[k][kn][2] * R[i][2]);
-			}
-		}
-	}
-	for (int k = 0; k < numOfkValues; k++)
-	{
-		sk[k] = (sumSCos[k] * sumSCos[k] + sumSSin[k] * sumSSin[k]) / ((double) (N * kValues[k].size()));
-		additionalSystemProperties[numOfOtherExpectationValues + k] = sk[k];
-	}
+ vector<double> vecrij(DIM);
+ vector<double> sumSCos;
+ vector<double> sumSSin;
+ vector<double> sk;
+ sumSCos.resize(numOfkValues);
+ ClearVector(sumSCos);
+ sumSSin.resize(numOfkValues);
+ ClearVector(sumSSin);
+ sk.resize(numOfkValues);
+ ClearVector(sk);
+ for (int i = 0; i < N; i++)
+ {
+ for (int k = 0; k < numOfkValues; k++)
+ {
+ for (unsigned int kn = 0; kn < kValues[k].size(); kn++)
+ {
+ sumSCos[k] += cos(kValues[k][kn][0] * R[i][0] + kValues[k][kn][1] * R[i][1] + kValues[k][kn][2] * R[i][2]);
+ sumSSin[k] += sin(kValues[k][kn][0] * R[i][0] + kValues[k][kn][1] * R[i][1] + kValues[k][kn][2] * R[i][2]);
+ }
+ }
+ }
+ for (int k = 0; k < numOfkValues; k++)
+ {
+ sk[k] = (sumSCos[k] * sumSCos[k] + sumSSin[k] * sumSSin[k]) / ((double) (N * kValues[k].size()));
+ additionalSystemProperties[numOfOtherExpectationValues + k] = sk[k];
+ }
 
-	double r;
-	double r2Sum = 0.0;
-	vector<double> com;
-	com = GetCenterOfMass(R);
-	for (int i = 0; i < N; i++)
-	{
-		vector<double> diff = R[i] - com;
-		r = VectorNorm(diff);
-		r2Sum += r * r;
-	}
-	additionalSystemProperties[numOfAdditionalSystemProperties - 1] = r2Sum / (double) N;
+ double r;
+ double r2Sum = 0.0;
+ vector<double> com;
+ com = GetCenterOfMass(R);
+ for (int i = 0; i < N; i++)
+ {
+ vector<double> diff = R[i] - com;
+ r = VectorNorm(diff);
+ r2Sum += r * r;
+ }
+ additionalSystemProperties[numOfAdditionalSystemProperties - 1] = r2Sum / (double) N;
+ */
 }
 
 void BosonMixtureCluster::CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
+	int ct;
+
 	double sum = 0;
 	int bin;
 	double rni;
@@ -620,176 +636,206 @@ void BosonMixtureCluster::CalculateWavefunction(vector<vector<double> >& R, vect
 	double rni3;
 	vector<double> vecrni(DIM);
 
-	ClearVector(splineSums);
-	mcMillanSum = 0;
-	constSum = 0;
-	logSum = 0;
-	linearSum = 0;
+	for (auto& cfd : this->corrFuncData)
+	{
+		ClearVector(cfd.splineSums);
+		cfd.mcMillanSum = 0;
+		cfd.constSum = 0;
+		cfd.logSum = 0;
+		cfd.linearSum = 0;
+	}
 
 	for (int n = 0; n < N; n++)
 	{
 		for (int i = 0; i < n; i++)
 		{
+			ct = this->correlationTypes[n][i];
+			CorrelationFunctionData& cfd = this->corrFuncData[ct];
 			rni = VectorDisplacement(R[n], R[i], vecrni);
-			if (rni < rijSplit)
+			if (rni < cfd.rijSplit)
 			{
-				mcMillanSum += pow(rni, mcMillanFactor);
+				cfd.mcMillanSum += pow(rni, cfd.mcMillanFactor);
 			}
-			else if (rni >= rijTail)
+			else if (rni >= cfd.rijTail)
 			{
-				constSum += 1.0;
-				linearSum += rni;
+				cfd.constSum += 1.0;
+				cfd.linearSum += rni;
 			}
 			else
 			{
-				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
-				bin = interval - nodes.begin() - 1;
+				auto interval = lower_bound(cfd.nodes.begin(), cfd.nodes.end(), rni);
+				bin = interval - cfd.nodes.begin() - 1;
 				rni2 = rni * rni;
 				rni3 = rni2 * rni;
 
 				for (int p = 0; p < 4; p++)
 				{
-					splineSums[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rni + splineWeights[bin - p][p][2] * rni2 + splineWeights[bin - p][p][3] * rni3;
+					cfd.splineSums[bin - p] += cfd.splineWeights[bin - p][p][0] + cfd.splineWeights[bin - p][p][1] * rni + cfd.splineWeights[bin - p][p][2] * rni2 + cfd.splineWeights[bin - p][p][3] * rni3;
 				}
 			}
-			logSum += log(rni);
+			cfd.logSum += log(rni);
 		}
 	}
 
-	//am
-	sum += uR[0] * (mcMillanSum + bcFactors[0][0] * splineSums[0] + bcFactors[0][1] * splineSums[1]);
-	//a2
-	sum += uR[1] * (splineSums[2] + bcFactors[1][0] * splineSums[0] + bcFactors[1][1] * splineSums[1]);
-	for (int i = 2; i < N_PARAM - 3; i++)
+	int n = 0;
+	int paramOffset = 26;
+	int offset = 0;
+	for (auto& cfd : this->corrFuncData)
 	{
-		sum += uR[i] * splineSums[i + 1];//TODO: check if *new variables are not used here!
-	}
-	//a(n-2)
-	sum += uR[N_PARAM - 3] * (splineSums[numberOfSplines - 3] + bcFactors[2][0] * splineSums[numberOfSplines - 2] + bcFactors[2][1] * splineSums[numberOfSplines - 1]);
-	//ac
-	sum += uR[N_PARAM - 2] * (constSum + bcFactors[3][0] * splineSums[numberOfSplines - 2] + bcFactors[3][1] * splineSums[numberOfSplines - 1]);
-	//alin
-	sum += uR[N_PARAM - 1] * (linearSum + bcFactors[4][0] * splineSums[numberOfSplines - 2] + bcFactors[4][1] * splineSums[numberOfSplines - 1]);
+		offset = n * paramOffset;
+		if (cfd.isUsed)
+		{
+			//am
+			sum += uR[0 + offset] * (cfd.mcMillanSum + cfd.bcFactors[0][0] * cfd.splineSums[0] + cfd.bcFactors[0][1] * cfd.splineSums[1]);
+			//a2
+			sum += uR[1 + offset] * (cfd.splineSums[2] + cfd.bcFactors[1][0] * cfd.splineSums[0] + cfd.bcFactors[1][1] * cfd.splineSums[1]);
+			for (int i = 2; i < paramOffset - 4; i++)
+			{
+				sum += uR[i + offset] * cfd.splineSums[i + 1];
+			}
+			//a(n-2)
+			sum += uR[paramOffset - 4 + offset] * (cfd.splineSums[cfd.numberOfSplines - 3] + cfd.bcFactors[2][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[2][1] * cfd.splineSums[cfd.numberOfSplines - 1]);
+			//ac
+			sum += uR[paramOffset - 3 + offset] * (cfd.constSum + cfd.bcFactors[3][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[3][1] * cfd.splineSums[cfd.numberOfSplines - 1]);
+			//alin
+			sum += uR[paramOffset - 2 + offset] * (cfd.linearSum + cfd.bcFactors[4][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[4][1] * cfd.splineSums[cfd.numberOfSplines - 1]);
 
-	sum += logPrefactor * logSum;
+			sum += uR[paramOffset - 1 + offset] * cfd.logSum;
+			n++;
+		}
+	}
 
 	wf = exp(sum + phiR);
 	exponent = sum;
 
-	//cout << "sum=" << sum << "\t\tsumTmp=" << sumTmp << "\t\twf=" << value << endl;
-	//cout << "sum=" << sum << "\t\twf=" << wf << "\t\tlogSum=" << logSum << "\t\tlinearSum=" << linearSum << "\t\tphiR=" << phiR << endl;
+//cout << "sum=" << sum << "\t\tsumTmp=" << sumTmp << "\t\twf=" << value << endl;
+//cout << "sum=" << sum << "\t\twf=" << wf << "\t\tlogSum=" << logSum << "\t\tlinearSum=" << linearSum << "\t\tphiR=" << phiR << endl;
 }
 
 void BosonMixtureCluster::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
-	//TODO: implement
+//TODO: implement
 }
 
 void BosonMixtureCluster::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
+	int ct;
+
 	double sum = 0;
-
-	double mcMillanOld = 0;
-	double mcMillanNew = 0;
-
 	int bin;
 	double rni;
 	double rni2;
 	double rni3;
 	vector<double> vecrni(DIM);
 
-	double constOld = 0;
-	double constNew = 0;
-	double logOld = 0;
-	double logNew = 0;
-	double linearOld = 0;
-	double linearNew = 0;
+	for (auto& cfd : this->corrFuncData)
+	{
+		ClearVector(cfd.sumOldPerBin);
+		ClearVector(cfd.sumNewPerBin);
+		cfd.mcMillanOld = 0;
+		cfd.mcMillanNew = 0;
+		cfd.constOld = 0;
+		cfd.constNew = 0;
+		cfd.logOld = 0;
+		cfd.logNew = 0;
+		cfd.linearOld = 0;
+		cfd.linearNew = 0;
+	}
 
-	ClearVector(sumOldPerBin);
-	ClearVector(sumNewPerBin);
 	for (int i = 0; i < N; i++)
 	{
 		if (i != changedParticleIndex)
 		{
+			ct = this->correlationTypes[i][changedParticleIndex];
+			CorrelationFunctionData& cfd = this->corrFuncData[ct];
 			rni = VectorDisplacement(R[i], oldPosition, vecrni);
-
-			if (rni < rijSplit)
+			if (rni < cfd.rijSplit)
 			{
-				mcMillanOld += pow(rni, mcMillanFactor);
+				cfd.mcMillanOld += pow(rni, cfd.mcMillanFactor);
 			}
-			else if (rni >= rijTail)
+			else if (rni >= cfd.rijTail)
 			{
-				constOld += 1.0;
-				linearOld += rni;
+				cfd.constOld += 1.0;
+				cfd.linearOld += rni;
 			}
 			else
 			{
-				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
-				bin = interval - nodes.begin() - 1;
+				auto interval = lower_bound(cfd.nodes.begin(), cfd.nodes.end(), rni);
+				bin = interval - cfd.nodes.begin() - 1;
 				rni2 = rni * rni;
 				rni3 = rni2 * rni;
 
 				for (int p = 0; p < 4; p++)
 				{
-					sumOldPerBin[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rni + splineWeights[bin - p][p][2] * rni2 + splineWeights[bin - p][p][3] * rni3;
+					cfd.sumOldPerBin[bin - p] += cfd.splineWeights[bin - p][p][0] + cfd.splineWeights[bin - p][p][1] * rni + cfd.splineWeights[bin - p][p][2] * rni2 + cfd.splineWeights[bin - p][p][3] * rni3;
 				}
 			}
-			logOld += log(rni);
+			cfd.logOld += log(rni);
 
 			rni = VectorDisplacement(R[i], R[changedParticleIndex], vecrni);
-			if (rni < rijSplit)
+			if (rni < cfd.rijSplit)
 			{
-				mcMillanNew += pow(rni, mcMillanFactor);
+				cfd.mcMillanNew += pow(rni, cfd.mcMillanFactor);
 			}
-			else if (rni >= rijTail)
+			else if (rni >= cfd.rijTail)
 			{
-				constNew += 1.0;
-				linearNew += rni;
+				cfd.constNew += 1.0;
+				cfd.linearNew += rni;
 			}
 			else
 			{
-				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
-				bin = interval - nodes.begin() - 1;
+				auto interval = lower_bound(cfd.nodes.begin(), cfd.nodes.end(), rni);
+				bin = interval - cfd.nodes.begin() - 1;
 				rni2 = rni * rni;
 				rni3 = rni2 * rni;
 
 				for (int p = 0; p < 4; p++)
 				{
-					sumNewPerBin[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rni + splineWeights[bin - p][p][2] * rni2 + splineWeights[bin - p][p][3] * rni3;
+					cfd.sumNewPerBin[bin - p] += cfd.splineWeights[bin - p][p][0] + cfd.splineWeights[bin - p][p][1] * rni + cfd.splineWeights[bin - p][p][2] * rni2 + cfd.splineWeights[bin - p][p][3] * rni3;
 				}
 			}
-			logNew += log(rni);
+			cfd.logNew += log(rni);
 		}
 	}
 
-	//TODO: scaling factors? as in NUBosonsBulk?
-
-	mcMillanSumNew = max(0.0, mcMillanSum - mcMillanOld + mcMillanNew);
-	for (int i = 0; i < numberOfSplines; i++)
+	for (auto& cfd : this->corrFuncData)
 	{
-		splineSumsNew[i] = max(0.0, splineSums[i] - sumOldPerBin[i] + sumNewPerBin[i]);
+		cfd.mcMillanSumNew = max(0.0, cfd.mcMillanSum - cfd.mcMillanOld + cfd.mcMillanNew);
+		for (int i = 0; i < cfd.numberOfSplines; i++)
+		{
+			cfd.splineSumsNew[i] = max(0.0, cfd.splineSums[i] - cfd.sumOldPerBin[i] + cfd.sumNewPerBin[i]);
+		}
+		cfd.constSumNew = cfd.constSum - cfd.constOld + cfd.constNew;
+		cfd.logSumNew = cfd.logSum - cfd.logOld + cfd.logNew;
+		cfd.linearSumNew = max(0.0, cfd.linearSum - cfd.linearOld + cfd.linearNew);
 	}
-	constSumNew = constSum - constOld + constNew;
-	logSumNew = logSum - logOld + logNew;
-	linearSumNew = max(0.0, linearSum - linearOld + linearNew);
-
-	//am
-	sum += uR[0] * (mcMillanSumNew + bcFactors[0][0] * splineSumsNew[0] + bcFactors[0][1] * splineSumsNew[1]);
-	//a2
-	sum += uR[1] * (splineSumsNew[2] + bcFactors[1][0] * splineSumsNew[0] + bcFactors[1][1] * splineSumsNew[1]);
-	for (int i = 2; i < N_PARAM - 3; i++)
+	int n = 0;
+	int paramOffset = 26;
+	int offset = 0;
+	for (auto& cfd : this->corrFuncData)
 	{
-		sum += uR[i] * splineSumsNew[i + 1];
+		offset = n * paramOffset;
+		if (cfd.isUsed)
+		{
+			//am
+			sum += uR[0 + offset] * (cfd.mcMillanSumNew + cfd.bcFactors[0][0] * cfd.splineSumsNew[0] + cfd.bcFactors[0][1] * cfd.splineSumsNew[1]);
+			//a2
+			sum += uR[1 + offset] * (cfd.splineSumsNew[2] + cfd.bcFactors[1][0] * cfd.splineSumsNew[0] + cfd.bcFactors[1][1] * cfd.splineSumsNew[1]);
+			for (int i = 2; i < paramOffset - 4; i++)
+			{
+				sum += uR[i + offset] * cfd.splineSumsNew[i + 1];
+			}
+			//a(n-2)
+			sum += uR[paramOffset - 4 + offset] * (cfd.splineSumsNew[cfd.numberOfSplines - 3] + cfd.bcFactors[2][0] * cfd.splineSumsNew[cfd.numberOfSplines - 2] + cfd.bcFactors[2][1] * cfd.splineSumsNew[cfd.numberOfSplines - 1]);
+			//ac
+			sum += uR[paramOffset - 3 + offset] * (cfd.constSumNew + cfd.bcFactors[3][0] * cfd.splineSumsNew[cfd.numberOfSplines - 2] + cfd.bcFactors[3][1] * cfd.splineSumsNew[cfd.numberOfSplines - 1]);
+			//alin
+			sum += uR[paramOffset - 2 + offset] * (cfd.linearSumNew + cfd.bcFactors[4][0] * cfd.splineSumsNew[cfd.numberOfSplines - 2] + cfd.bcFactors[4][1] * cfd.splineSumsNew[cfd.numberOfSplines - 1]);
+
+			sum += uR[paramOffset - 1 + offset] * cfd.logSumNew;
+			n++;
+		}
 	}
-	//a(n-2)
-	sum += uR[N_PARAM - 3] * (splineSumsNew[numberOfSplines - 3] + bcFactors[2][0] * splineSumsNew[numberOfSplines - 2] + bcFactors[2][1] * splineSumsNew[numberOfSplines - 1]);
-	//ac
-	sum += uR[N_PARAM - 2] * (constSumNew + bcFactors[3][0] * splineSumsNew[numberOfSplines - 2] + bcFactors[3][1] * splineSumsNew[numberOfSplines - 1]);
-	//alin
-	sum += uR[N_PARAM - 1] * (linearSumNew + bcFactors[4][0] * splineSumsNew[numberOfSplines - 2] + bcFactors[4][1] * splineSumsNew[numberOfSplines - 1]);
-
-	sum += logPrefactor * logSumNew;
-
 	wfNew = exp(sum + phiR);
 	exponentNew = sum;
 }
@@ -799,7 +845,7 @@ double BosonMixtureCluster::CalculateWFQuotient(vector<vector<double> >& R, vect
 	CalculateWFChange(R, uR, uI, phiR, phiI, changedParticleIndex, oldPosition);
 	double wfQuotient = exp(2.0 * (exponentNew - exponent));
 
-	//cout << "qu=" << wfQuotient << endl;
+//cout << "qu=" << wfQuotient << endl;
 
 	return wfQuotient;
 }
@@ -808,15 +854,18 @@ void BosonMixtureCluster::AcceptMove()
 {
 	wf = wfNew;
 	exponent = exponentNew;
-	mcMillanSum = mcMillanSumNew;
-	splineSums = splineSumsNew;
-	constSum = constSumNew;
-	logSum = logSumNew;
-	linearSum = linearSumNew;
+	for (auto& cfd : this->corrFuncData)
+	{
+		cfd.mcMillanSum = cfd.mcMillanSumNew;
+		cfd.splineSums = cfd.splineSumsNew;
+		cfd.constSum = cfd.constSumNew;
+		cfd.logSum = cfd.logSumNew;
+		cfd.linearSum = cfd.linearSumNew;
+	}
 }
 
 void BosonMixtureCluster::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
 {
-	//TODO: implement
+//TODO: implement
 }
 

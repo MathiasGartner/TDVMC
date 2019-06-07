@@ -32,6 +32,11 @@ void BroadcastValue(int* data)
 	MPI_Bcast(data, 1, MPI_INT, rootRank, MPI_COMM_WORLD);
 }
 
+void BroadcastValues(vector<int>& data)
+{
+	MPI_Bcast(data.data(), data.size(), MPI_INT, rootRank, MPI_COMM_WORLD);
+}
+
 void BroadcastValue(double* data)
 {
 	MPI_Bcast(data, 1, MPI_DOUBLE, rootRank, MPI_COMM_WORLD);

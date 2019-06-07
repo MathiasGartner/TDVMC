@@ -6,6 +6,7 @@ ConfigItem::ConfigItem(string name, ConfigItemType type, bool allowChangeAtRunti
 	this->variableString = 0;
 	this->variableInt = 0;
 	this->variableDouble = 0;
+	this->variableArrInt = 0;
 	this->variableArrDouble = 0;
 	this->type = type;
 	this->allowChangeAtRuntime = allowChangeAtRuntime;
@@ -29,6 +30,12 @@ ConfigItem::ConfigItem(string name, double* variable, ConfigItemType type, bool 
 	this->variableDouble = variable;
 }
 
+ConfigItem::ConfigItem(string name, vector<int>& variable, ConfigItemType type, bool allowChangeAtRuntime) :
+		ConfigItem(name, type, allowChangeAtRuntime)
+{
+	this->variableArrInt = &variable;
+}
+
 ConfigItem::ConfigItem(string name, vector<double>& variable, ConfigItemType type, bool allowChangeAtRuntime) :
 		ConfigItem(name, type, allowChangeAtRuntime)
 {
@@ -50,6 +57,15 @@ void ConfigItem::setValue(Json::Value value)
 		else if (this->type == DOUBLE)
 		{
 			*variableDouble = value.asDouble();
+		}
+		else if (this->type == ARR_INT)
+		{
+			variableArrInt->clear();
+			for (unsigned int i = 0; i < value.size(); i++)
+			{
+				int v = value[i].asInt();
+				variableArrInt->push_back(v);
+			}
 		}
 		else if (this->type == ARR_DOUBLE)
 		{
@@ -77,6 +93,10 @@ string ConfigItem::getJsonString()
 	else if (this->type == DOUBLE)
 	{
 		s = to_string(*variableDouble);
+	}
+	else if (this->type == ARR_INT)
+	{
+		s = "\n\t[\n\t\t " + JoinVector(*variableArrInt) + "\n\t]";
 	}
 	else if (this->type == ARR_DOUBLE)
 	{
