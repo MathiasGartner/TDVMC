@@ -5,6 +5,9 @@
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
 ../src/BosonCluster.cpp \
+../src/BosonClusterWithLog.cpp \
+../src/BosonClusterWithLogParam.cpp \
+../src/BosonMixtureCluster.cpp \
 ../src/BosonsBulk.cpp \
 ../src/BosonsBulkDamped.cpp \
 ../src/BulkOnlySplines.cpp \
@@ -16,6 +19,7 @@ CPP_SRCS += \
 ../src/BulkSplinesScaled.cpp \
 ../src/CSDataBulkSplines.cpp \
 ../src/ConfigItem.cpp \
+../src/CorrelationFunctionData.cpp \
 ../src/GaussianWavepacket.cpp \
 ../src/HardSphereBosons.cpp \
 ../src/HardSphereBosonsExp.cpp \
@@ -23,7 +27,10 @@ CPP_SRCS += \
 ../src/HeDrop.cpp \
 ../src/MathOperators.cpp \
 ../src/NUBosonsBulk.cpp \
+../src/OneParticleData.cpp \
 ../src/PBosonsBulk.cpp \
+../src/ParticlePairProperties.cpp \
+../src/ParticleProperties.cpp \
 ../src/SimulationStepData.cpp \
 ../src/SplineFactory.cpp \
 ../src/TDVMC.cpp \
@@ -31,6 +38,9 @@ CPP_SRCS += \
 
 OBJS += \
 ./src/BosonCluster.o \
+./src/BosonClusterWithLog.o \
+./src/BosonClusterWithLogParam.o \
+./src/BosonMixtureCluster.o \
 ./src/BosonsBulk.o \
 ./src/BosonsBulkDamped.o \
 ./src/BulkOnlySplines.o \
@@ -42,6 +52,7 @@ OBJS += \
 ./src/BulkSplinesScaled.o \
 ./src/CSDataBulkSplines.o \
 ./src/ConfigItem.o \
+./src/CorrelationFunctionData.o \
 ./src/GaussianWavepacket.o \
 ./src/HardSphereBosons.o \
 ./src/HardSphereBosonsExp.o \
@@ -49,7 +60,10 @@ OBJS += \
 ./src/HeDrop.o \
 ./src/MathOperators.o \
 ./src/NUBosonsBulk.o \
+./src/OneParticleData.o \
 ./src/PBosonsBulk.o \
+./src/ParticlePairProperties.o \
+./src/ParticleProperties.o \
 ./src/SimulationStepData.o \
 ./src/SplineFactory.o \
 ./src/TDVMC.o \
@@ -57,6 +71,9 @@ OBJS += \
 
 CPP_DEPS += \
 ./src/BosonCluster.d \
+./src/BosonClusterWithLog.d \
+./src/BosonClusterWithLogParam.d \
+./src/BosonMixtureCluster.d \
 ./src/BosonsBulk.d \
 ./src/BosonsBulkDamped.d \
 ./src/BulkOnlySplines.d \
@@ -68,6 +85,7 @@ CPP_DEPS += \
 ./src/BulkSplinesScaled.d \
 ./src/CSDataBulkSplines.d \
 ./src/ConfigItem.d \
+./src/CorrelationFunctionData.d \
 ./src/GaussianWavepacket.d \
 ./src/HardSphereBosons.d \
 ./src/HardSphereBosonsExp.d \
@@ -75,7 +93,10 @@ CPP_DEPS += \
 ./src/HeDrop.d \
 ./src/MathOperators.d \
 ./src/NUBosonsBulk.d \
+./src/OneParticleData.d \
 ./src/PBosonsBulk.d \
+./src/ParticlePairProperties.d \
+./src/ParticleProperties.d \
 ./src/SimulationStepData.d \
 ./src/SplineFactory.d \
 ./src/TDVMC.d \

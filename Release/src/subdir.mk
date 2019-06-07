@@ -19,6 +19,7 @@ CPP_SRCS += \
 ../src/BulkSplinesScaled.cpp \
 ../src/CSDataBulkSplines.cpp \
 ../src/ConfigItem.cpp \
+../src/CorrelationFunctionData.cpp \
 ../src/GaussianWavepacket.cpp \
 ../src/HardSphereBosons.cpp \
 ../src/HardSphereBosonsExp.cpp \
@@ -26,7 +27,10 @@ CPP_SRCS += \
 ../src/HeDrop.cpp \
 ../src/MathOperators.cpp \
 ../src/NUBosonsBulk.cpp \
+../src/OneParticleData.cpp \
 ../src/PBosonsBulk.cpp \
+../src/ParticlePairProperties.cpp \
+../src/ParticleProperties.cpp \
 ../src/SimulationStepData.cpp \
 ../src/SplineFactory.cpp \
 ../src/TDVMC.cpp \
@@ -48,6 +52,7 @@ OBJS += \
 ./src/BulkSplinesScaled.o \
 ./src/CSDataBulkSplines.o \
 ./src/ConfigItem.o \
+./src/CorrelationFunctionData.o \
 ./src/GaussianWavepacket.o \
 ./src/HardSphereBosons.o \
 ./src/HardSphereBosonsExp.o \
@@ -55,7 +60,10 @@ OBJS += \
 ./src/HeDrop.o \
 ./src/MathOperators.o \
 ./src/NUBosonsBulk.o \
+./src/OneParticleData.o \
 ./src/PBosonsBulk.o \
+./src/ParticlePairProperties.o \
+./src/ParticleProperties.o \
 ./src/SimulationStepData.o \
 ./src/SplineFactory.o \
 ./src/TDVMC.o \
@@ -77,6 +85,7 @@ CPP_DEPS += \
 ./src/BulkSplinesScaled.d \
 ./src/CSDataBulkSplines.d \
 ./src/ConfigItem.d \
+./src/CorrelationFunctionData.d \
 ./src/GaussianWavepacket.d \
 ./src/HardSphereBosons.d \
 ./src/HardSphereBosonsExp.d \
@@ -84,7 +93,10 @@ CPP_DEPS += \
 ./src/HeDrop.d \
 ./src/MathOperators.d \
 ./src/NUBosonsBulk.d \
+./src/OneParticleData.d \
 ./src/PBosonsBulk.d \
+./src/ParticlePairProperties.d \
+./src/ParticleProperties.d \
 ./src/SimulationStepData.d \
 ./src/SplineFactory.d \
 ./src/TDVMC.d \
