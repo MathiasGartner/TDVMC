@@ -7,6 +7,8 @@ namespace Potentials
 
 KTTY_He_Na::KTTY_He_Na()
 {
+	description = "KTTY_He_Na";
+
 	epsil = 3.1577504e8;
 	d = 2.218564;
 	b1 = 1.00872;
@@ -80,7 +82,7 @@ double KTTY_He_Na::GetPotential(double r)
 	double fpot = vrep - vatr;
 	double fpotHeA = epsil * fpot;
 
-	return fpotHeA; //TODO: check if in mK or K!
+	return fpotHeA / 1000; //TODO: check if in mK or K!
 }
 
 }

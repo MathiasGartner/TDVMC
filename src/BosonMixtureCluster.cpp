@@ -75,7 +75,7 @@ void BosonMixtureCluster::SetParticleType(vector<ParticleType> p)
 	for (int i = 0; i < N; i++)
 	{
 		int pt1 = this->originalParticleTypes[i];
-		for (int j = 0; j <= i; j++)
+		for (int j = 0; j < i; j++)
 		{
 			int pt2 = this->originalParticleTypes[j];
 			if (correlationIndexMapping[pt1][pt2] == -1)
@@ -100,38 +100,37 @@ void BosonMixtureCluster::InitSystem()
 {
 	int index;
 
-	//TODO: set mass and hbarOver2m
 	index = this->particleTypeIndexMapping[ParticleType::He3];
 	if (index > -1)
 	{
 		ParticleProperties& pp = this->particleProperties[index];
-		pp.mass = 1.0;
-		pp.hbarOver2m = 6.06359;
+		pp.mass = 3.0160293191;
+		pp.hbarOver2m = pow(Constants::Split::hbar, 2.0) / (2.0 * pp.mass * Constants::Split::u) / (pow(Constants::Split::A2m, 2.0) * Constants::Split::kb);
 	}
 	index = this->particleTypeIndexMapping[ParticleType::He4];
 	if (index > -1)
 	{
 		ParticleProperties& pp = this->particleProperties[index];
-		pp.mass = 1.0;
-		pp.hbarOver2m = 6.06359;
+		pp.mass = 4.00260325415;
+		pp.hbarOver2m = pow(Constants::Split::hbar, 2.0) / (2.0 * pp.mass * Constants::Split::u) / (pow(Constants::Split::A2m, 2.0) * Constants::Split::kb);
 	}
 	index = this->particleTypeIndexMapping[ParticleType::Na];
 	if (index > -1)
 	{
 		ParticleProperties& pp = this->particleProperties[index];
-		pp.mass = 1.0;
-		pp.hbarOver2m = 6.06359;
+		pp.mass = 22.9897692809;
+		pp.hbarOver2m = pow(Constants::Split::hbar, 2.0) / (2.0 * pp.mass * Constants::Split::u) / (pow(Constants::Split::A2m, 2.0) * Constants::Split::kb);
 	}
 
 	index = this->correlationIndexMapping[He4][He4];
 	if (index > -1)
 	{
 		CorrelationFunctionData& cfd = this->corrFuncData[index];
-		cfd.isUsed = true;
 		cfd.mcMillanFactor = -4.7;
-		cfd.rijSplit = 3.0;
 		cfd.numberOfSplines = 26; //as in calculations performed for Split X_4 Cluster (BosonClusterWithLogParam)
 		cfd.nodes = this->globalNodes; //TODO: allow different nodes
+		cfd.nodes -= 0.7;
+		cfd.rijSplit = cfd.nodes[3];
 		cfd.rijTail = cfd.nodes[cfd.nodes.size() - 4];
 		cfd.splineWeights = SplineFactory::GetWeights(cfd.nodes);
 		SplineFactory::SetBoundaryConditions1_MM_1(cfd.nodes, cfd.bcFactors, cfd.rijSplit, cfd.mcMillanFactor);
@@ -164,14 +163,26 @@ void BosonMixtureCluster::InitSystem()
 	index = this->correlationIndexMapping[He4][Na];
 	if (index > -1)
 	{
-		this->corrFuncData[index] = this->corrFuncData[he4he4Index];
+		CorrelationFunctionData& cfd = this->corrFuncData[index];
+		cfd.mcMillanFactor = -4.7;
+		cfd.numberOfSplines = 26; //as in calculations performed for Split X_4 Cluster (BosonClusterWithLogParam)
+		cfd.nodes = this->globalNodes; //TODO: allow different nodes
+		cfd.nodes += 1.3;
+		cfd.rijSplit = cfd.nodes[3];
+		cfd.rijTail = cfd.nodes[cfd.nodes.size() - 4];
+		cfd.splineWeights = SplineFactory::GetWeights(cfd.nodes);
+		SplineFactory::SetBoundaryConditions1_MM_1(cfd.nodes, cfd.bcFactors, cfd.rijSplit, cfd.mcMillanFactor);
+		SplineFactory::SetBoundaryConditions1_EXP_2(cfd.nodes, cfd.bcFactors, cfd.rijTail);
+		cfd.Init();
 	}
 
+	//INFO: Pair potentials
 	index = this->correlationIndexMapping[He4][He4];
 	if (index > -1)
 	{
 		ParticlePairProperties& ppp = this->particlePairProperties[index];
-		ppp.potential = new Potentials::LJ_He_He();
+		ppp.potential = new Potentials::HFDB_He_He();
+		//ppp.potential = new Potentials::LJ_He_He();
 	}
 	index = this->correlationIndexMapping[He3][He3];
 	if (index > -1)
@@ -254,17 +265,22 @@ void BosonMixtureCluster::InitSystem()
 
 vector<double> BosonMixtureCluster::GetCenterOfMass(vector<vector<double> >& R)
 {
+	int pt; //mapped ParticleType
+	double massSum = 0.0;
 	vector<double> com = { 0, 0, 0 };
 	for (int i = 0; i < N; i++)
 	{
+		pt = this->particleTypes[i];
+		ParticleProperties& pp = this->particleProperties[pt];
+		massSum += pp.mass;
 		for (int a = 0; a < DIM; a++)
 		{
-			com[a] += R[i][a];
+			com[a] += pp.mass * R[i][a];
 		}
 	}
 	for (int a = 0; a < DIM; a++)
 	{
-		com[a] /= (double) N;
+		com[a] /= massSum;
 	}
 	return com;
 }
@@ -446,67 +462,64 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 		for (auto& cfd : this->corrFuncData)
 		{
 			offset = nCFD * paramOffset;
-			if (cfd.isUsed)
+			for (int a = 0; a < DIM; a++)
+			{
+				temp = (cfd.mcMillanSumD[n][a] + cfd.bcFactors[0][0] * cfd.splineSumsD[0][n][a] + cfd.bcFactors[0][1] * cfd.splineSumsD[1][n][a]);
+				opd.vecKineticSumR1[a] += uR[0 + offset] * temp;
+				opd.vecKineticSumI1[a] += uI[0 + offset] * temp;
+				temp = (cfd.splineSumsD[2][n][a] + cfd.bcFactors[1][0] * cfd.splineSumsD[0][n][a] + cfd.bcFactors[1][1] * cfd.splineSumsD[1][n][a]);
+				opd.vecKineticSumR1[a] += uR[1 + offset] * temp;
+				opd.vecKineticSumI1[a] += uI[1 + offset] * temp;
+			}
+			temp = (cfd.mcMillanSumD2[n] + cfd.bcFactors[0][0] * cfd.splineSumsD2[0][n] + cfd.bcFactors[0][1] * cfd.splineSumsD2[1][n]);
+			opd.kineticSumR2 += uR[0 + offset] * temp;
+			opd.kineticSumI2 += uI[0 + offset] * temp;
+			temp = (cfd.splineSumsD2[2][n] + cfd.bcFactors[1][0] * cfd.splineSumsD2[0][n] + cfd.bcFactors[1][1] * cfd.splineSumsD2[1][n]);
+			opd.kineticSumR2 += uR[1 + offset] * temp;
+			opd.kineticSumI2 += uI[1 + offset] * temp;
+
+			for (int k = 2; k < paramOffset - 4; k++)
 			{
 				for (int a = 0; a < DIM; a++)
 				{
-					temp = (cfd.mcMillanSumD[n][a] + cfd.bcFactors[0][0] * cfd.splineSumsD[0][n][a] + cfd.bcFactors[0][1] * cfd.splineSumsD[1][n][a]);
-					opd.vecKineticSumR1[a] += uR[0 + offset] * temp;
-					opd.vecKineticSumI1[a] += uI[0 + offset] * temp;
-					temp = (cfd.splineSumsD[2][n][a] + cfd.bcFactors[1][0] * cfd.splineSumsD[0][n][a] + cfd.bcFactors[1][1] * cfd.splineSumsD[1][n][a]);
-					opd.vecKineticSumR1[a] += uR[1 + offset] * temp;
-					opd.vecKineticSumI1[a] += uI[1 + offset] * temp;
+					opd.vecKineticSumR1[a] += uR[k + offset] * cfd.splineSumsD[k + 1][n][a];
+					opd.vecKineticSumI1[a] += uI[k + offset] * cfd.splineSumsD[k + 1][n][a];
 				}
-				temp = (cfd.mcMillanSumD2[n] + cfd.bcFactors[0][0] * cfd.splineSumsD2[0][n] + cfd.bcFactors[0][1] * cfd.splineSumsD2[1][n]);
-				opd.kineticSumR2 += uR[0 + offset] * temp;
-				opd.kineticSumI2 += uI[0 + offset] * temp;
-				temp = (cfd.splineSumsD2[2][n] + cfd.bcFactors[1][0] * cfd.splineSumsD2[0][n] + cfd.bcFactors[1][1] * cfd.splineSumsD2[1][n]);
-				opd.kineticSumR2 += uR[1 + offset] * temp;
-				opd.kineticSumI2 += uI[1 + offset] * temp;
-
-				for (int k = 2; k < paramOffset - 4; k++)
-				{
-					for (int a = 0; a < DIM; a++)
-					{
-						opd.vecKineticSumR1[a] += uR[k + offset] * cfd.splineSumsD[k + 1][n][a];
-						opd.vecKineticSumI1[a] += uI[k + offset] * cfd.splineSumsD[k + 1][n][a];
-					}
-					opd.kineticSumR2 += uR[k + offset] * cfd.splineSumsD2[k + 1][n];
-					opd.kineticSumI2 += uI[k + offset] * cfd.splineSumsD2[k + 1][n];
-				}
-
-				for (int a = 0; a < DIM; a++)
-				{
-					temp = (cfd.splineSumsD[cfd.numberOfSplines - 3][n][a] + cfd.bcFactors[2][0] * cfd.splineSumsD[cfd.numberOfSplines - 2][n][a] + cfd.bcFactors[2][1] * cfd.splineSumsD[cfd.numberOfSplines - 1][n][a]);
-					opd.vecKineticSumR1[a] += uR[paramOffset - 4 + offset] * temp;
-					opd.vecKineticSumI1[a] += uI[paramOffset - 4 + offset] * temp;
-					temp = (cfd.constSumD[n][a] + cfd.bcFactors[3][0] * cfd.splineSumsD[cfd.numberOfSplines - 2][n][a] + cfd.bcFactors[3][1] * cfd.splineSumsD[cfd.numberOfSplines - 1][n][a]);
-					opd.vecKineticSumR1[a] += uR[paramOffset - 3 + offset] * temp;
-					opd.vecKineticSumI1[a] += uI[paramOffset - 3 + offset] * temp;
-					temp = (cfd.linearSumD[n][a] + cfd.bcFactors[4][0] * cfd.splineSumsD[cfd.numberOfSplines - 2][n][a] + cfd.bcFactors[4][1] * cfd.splineSumsD[cfd.numberOfSplines - 1][n][a]);
-					opd.vecKineticSumR1[a] += uR[paramOffset - 2 + offset] * temp;
-					opd.vecKineticSumI1[a] += uI[paramOffset - 2 + offset] * temp;
-				}
-				temp = (cfd.splineSumsD2[cfd.numberOfSplines - 3][n] + cfd.bcFactors[2][0] * cfd.splineSumsD2[cfd.numberOfSplines - 2][n] + cfd.bcFactors[2][1] * cfd.splineSumsD2[cfd.numberOfSplines - 1][n]);
-				opd.kineticSumR2 += uR[paramOffset - 4 + offset] * temp;
-				opd.kineticSumI2 += uI[paramOffset - 4 + offset] * temp;
-				temp = (cfd.constSumD2[n] + cfd.bcFactors[3][0] * cfd.splineSumsD2[cfd.numberOfSplines - 2][n] + cfd.bcFactors[3][1] * cfd.splineSumsD2[cfd.numberOfSplines - 1][n]);
-				opd.kineticSumR2 += uR[paramOffset - 3 + offset] * temp;
-				opd.kineticSumI2 += uI[paramOffset - 3 + offset] * temp;
-				temp = (cfd.linearSumD2[n] + cfd.bcFactors[4][0] * cfd.splineSumsD2[cfd.numberOfSplines - 2][n] + cfd.bcFactors[4][1] * cfd.splineSumsD2[cfd.numberOfSplines - 1][n]);
-				opd.kineticSumR2 += uR[paramOffset - 2 + offset] * temp;
-				opd.kineticSumI2 += uI[paramOffset - 2 + offset] * temp;
-
-				for (int a = 0; a < DIM; a++)
-				{
-					opd.vecKineticSumR1[a] += uR[paramOffset - 1 + offset] * cfd.logSumD[n][a];
-					opd.vecKineticSumI1[a] += uI[paramOffset - 1 + offset] * cfd.logSumD[n][a];
-				}
-				opd.kineticSumR2 += uR[paramOffset - 1 + offset] * cfd.logSumD2[n];
-				opd.kineticSumI2 += uI[paramOffset - 1 + offset] * cfd.logSumD2[n];
-
-				nCFD++;
+				opd.kineticSumR2 += uR[k + offset] * cfd.splineSumsD2[k + 1][n];
+				opd.kineticSumI2 += uI[k + offset] * cfd.splineSumsD2[k + 1][n];
 			}
+
+			for (int a = 0; a < DIM; a++)
+			{
+				temp = (cfd.splineSumsD[cfd.numberOfSplines - 3][n][a] + cfd.bcFactors[2][0] * cfd.splineSumsD[cfd.numberOfSplines - 2][n][a] + cfd.bcFactors[2][1] * cfd.splineSumsD[cfd.numberOfSplines - 1][n][a]);
+				opd.vecKineticSumR1[a] += uR[paramOffset - 4 + offset] * temp;
+				opd.vecKineticSumI1[a] += uI[paramOffset - 4 + offset] * temp;
+				temp = (cfd.constSumD[n][a] + cfd.bcFactors[3][0] * cfd.splineSumsD[cfd.numberOfSplines - 2][n][a] + cfd.bcFactors[3][1] * cfd.splineSumsD[cfd.numberOfSplines - 1][n][a]);
+				opd.vecKineticSumR1[a] += uR[paramOffset - 3 + offset] * temp;
+				opd.vecKineticSumI1[a] += uI[paramOffset - 3 + offset] * temp;
+				temp = (cfd.linearSumD[n][a] + cfd.bcFactors[4][0] * cfd.splineSumsD[cfd.numberOfSplines - 2][n][a] + cfd.bcFactors[4][1] * cfd.splineSumsD[cfd.numberOfSplines - 1][n][a]);
+				opd.vecKineticSumR1[a] += uR[paramOffset - 2 + offset] * temp;
+				opd.vecKineticSumI1[a] += uI[paramOffset - 2 + offset] * temp;
+			}
+			temp = (cfd.splineSumsD2[cfd.numberOfSplines - 3][n] + cfd.bcFactors[2][0] * cfd.splineSumsD2[cfd.numberOfSplines - 2][n] + cfd.bcFactors[2][1] * cfd.splineSumsD2[cfd.numberOfSplines - 1][n]);
+			opd.kineticSumR2 += uR[paramOffset - 4 + offset] * temp;
+			opd.kineticSumI2 += uI[paramOffset - 4 + offset] * temp;
+			temp = (cfd.constSumD2[n] + cfd.bcFactors[3][0] * cfd.splineSumsD2[cfd.numberOfSplines - 2][n] + cfd.bcFactors[3][1] * cfd.splineSumsD2[cfd.numberOfSplines - 1][n]);
+			opd.kineticSumR2 += uR[paramOffset - 3 + offset] * temp;
+			opd.kineticSumI2 += uI[paramOffset - 3 + offset] * temp;
+			temp = (cfd.linearSumD2[n] + cfd.bcFactors[4][0] * cfd.splineSumsD2[cfd.numberOfSplines - 2][n] + cfd.bcFactors[4][1] * cfd.splineSumsD2[cfd.numberOfSplines - 1][n]);
+			opd.kineticSumR2 += uR[paramOffset - 2 + offset] * temp;
+			opd.kineticSumI2 += uI[paramOffset - 2 + offset] * temp;
+
+			for (int a = 0; a < DIM; a++)
+			{
+				opd.vecKineticSumR1[a] += uR[paramOffset - 1 + offset] * cfd.logSumD[n][a];
+				opd.vecKineticSumI1[a] += uI[paramOffset - 1 + offset] * cfd.logSumD[n][a];
+			}
+			opd.kineticSumR2 += uR[paramOffset - 1 + offset] * cfd.logSumD2[n];
+			opd.kineticSumI2 += uI[paramOffset - 1 + offset] * cfd.logSumD2[n];
+
+			nCFD++;
 		}
 
 		opd.kineticSumR1I1 = 2.0 * VectorDotProduct(opd.vecKineticSumR1, opd.vecKineticSumI1);
@@ -534,21 +547,18 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 	for (auto& cfd : this->corrFuncData)
 	{
 		offset = nCFD * paramOffset;
-		if (cfd.isUsed)
+		localOperators[0 + offset] = cfd.mcMillanSum + cfd.bcFactors[0][0] * cfd.splineSums[0] + cfd.bcFactors[0][1] * cfd.splineSums[1];
+		localOperators[1 + offset] = cfd.splineSums[2] + cfd.bcFactors[1][0] * cfd.splineSums[0] + cfd.bcFactors[1][1] * cfd.splineSums[1];
+		for (int i = 2; i < paramOffset - 4; i++)
 		{
-			localOperators[0 + offset] = cfd.mcMillanSum + cfd.bcFactors[0][0] * cfd.splineSums[0] + cfd.bcFactors[0][1] * cfd.splineSums[1];
-			localOperators[1 + offset] = cfd.splineSums[2] + cfd.bcFactors[1][0] * cfd.splineSums[0] + cfd.bcFactors[1][1] * cfd.splineSums[1];
-			for (int i = 2; i < paramOffset - 4; i++)
-			{
-				localOperators[i + offset] = cfd.splineSums[i + 1];
-			}
-			localOperators[paramOffset - 4 + offset] = cfd.splineSums[cfd.numberOfSplines - 3] + cfd.bcFactors[2][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[2][1] * cfd.splineSums[cfd.numberOfSplines - 1];
-			localOperators[paramOffset - 3 + offset] = cfd.constSum + cfd.bcFactors[3][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[3][1] * cfd.splineSums[cfd.numberOfSplines - 1];
-			localOperators[paramOffset - 2 + offset] = cfd.linearSum + cfd.bcFactors[4][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[4][1] * cfd.splineSums[cfd.numberOfSplines - 1];
-			localOperators[paramOffset - 1 + offset] = cfd.logSum;
-
-			nCFD++;
+			localOperators[i + offset] = cfd.splineSums[i + 1];
 		}
+		localOperators[paramOffset - 4 + offset] = cfd.splineSums[cfd.numberOfSplines - 3] + cfd.bcFactors[2][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[2][1] * cfd.splineSums[cfd.numberOfSplines - 1];
+		localOperators[paramOffset - 3 + offset] = cfd.constSum + cfd.bcFactors[3][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[3][1] * cfd.splineSums[cfd.numberOfSplines - 1];
+		localOperators[paramOffset - 2 + offset] = cfd.linearSum + cfd.bcFactors[4][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[4][1] * cfd.splineSums[cfd.numberOfSplines - 1];
+		localOperators[paramOffset - 1 + offset] = cfd.logSum;
+
+		nCFD++;
 	}
 
 	for (int k = 0; k < N_PARAM; k++)
@@ -677,32 +687,29 @@ void BosonMixtureCluster::CalculateWavefunction(vector<vector<double> >& R, vect
 		}
 	}
 
-	int n = 0;
+	int nCFD = 0;
 	int paramOffset = 26;
 	int offset = 0;
 	for (auto& cfd : this->corrFuncData)
 	{
-		offset = n * paramOffset;
-		if (cfd.isUsed)
+		offset = nCFD * paramOffset;
+		//am
+		sum += uR[0 + offset] * (cfd.mcMillanSum + cfd.bcFactors[0][0] * cfd.splineSums[0] + cfd.bcFactors[0][1] * cfd.splineSums[1]);
+		//a2
+		sum += uR[1 + offset] * (cfd.splineSums[2] + cfd.bcFactors[1][0] * cfd.splineSums[0] + cfd.bcFactors[1][1] * cfd.splineSums[1]);
+		for (int i = 2; i < paramOffset - 4; i++)
 		{
-			//am
-			sum += uR[0 + offset] * (cfd.mcMillanSum + cfd.bcFactors[0][0] * cfd.splineSums[0] + cfd.bcFactors[0][1] * cfd.splineSums[1]);
-			//a2
-			sum += uR[1 + offset] * (cfd.splineSums[2] + cfd.bcFactors[1][0] * cfd.splineSums[0] + cfd.bcFactors[1][1] * cfd.splineSums[1]);
-			for (int i = 2; i < paramOffset - 4; i++)
-			{
-				sum += uR[i + offset] * cfd.splineSums[i + 1];
-			}
-			//a(n-2)
-			sum += uR[paramOffset - 4 + offset] * (cfd.splineSums[cfd.numberOfSplines - 3] + cfd.bcFactors[2][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[2][1] * cfd.splineSums[cfd.numberOfSplines - 1]);
-			//ac
-			sum += uR[paramOffset - 3 + offset] * (cfd.constSum + cfd.bcFactors[3][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[3][1] * cfd.splineSums[cfd.numberOfSplines - 1]);
-			//alin
-			sum += uR[paramOffset - 2 + offset] * (cfd.linearSum + cfd.bcFactors[4][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[4][1] * cfd.splineSums[cfd.numberOfSplines - 1]);
-
-			sum += uR[paramOffset - 1 + offset] * cfd.logSum;
-			n++;
+			sum += uR[i + offset] * cfd.splineSums[i + 1];
 		}
+		//a(n-2)
+		sum += uR[paramOffset - 4 + offset] * (cfd.splineSums[cfd.numberOfSplines - 3] + cfd.bcFactors[2][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[2][1] * cfd.splineSums[cfd.numberOfSplines - 1]);
+		//ac
+		sum += uR[paramOffset - 3 + offset] * (cfd.constSum + cfd.bcFactors[3][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[3][1] * cfd.splineSums[cfd.numberOfSplines - 1]);
+		//alin
+		sum += uR[paramOffset - 2 + offset] * (cfd.linearSum + cfd.bcFactors[4][0] * cfd.splineSums[cfd.numberOfSplines - 2] + cfd.bcFactors[4][1] * cfd.splineSums[cfd.numberOfSplines - 1]);
+
+		sum += uR[paramOffset - 1 + offset] * cfd.logSum;
+		nCFD++;
 	}
 
 	wf = exp(sum + phiR);
@@ -809,32 +816,29 @@ void BosonMixtureCluster::CalculateWFChange(vector<vector<double> >& R, vector<d
 		cfd.logSumNew = cfd.logSum - cfd.logOld + cfd.logNew;
 		cfd.linearSumNew = max(0.0, cfd.linearSum - cfd.linearOld + cfd.linearNew);
 	}
-	int n = 0;
+	int nCFD = 0;
 	int paramOffset = 26;
 	int offset = 0;
 	for (auto& cfd : this->corrFuncData)
 	{
-		offset = n * paramOffset;
-		if (cfd.isUsed)
+		offset = nCFD * paramOffset;
+		//am
+		sum += uR[0 + offset] * (cfd.mcMillanSumNew + cfd.bcFactors[0][0] * cfd.splineSumsNew[0] + cfd.bcFactors[0][1] * cfd.splineSumsNew[1]);
+		//a2
+		sum += uR[1 + offset] * (cfd.splineSumsNew[2] + cfd.bcFactors[1][0] * cfd.splineSumsNew[0] + cfd.bcFactors[1][1] * cfd.splineSumsNew[1]);
+		for (int i = 2; i < paramOffset - 4; i++)
 		{
-			//am
-			sum += uR[0 + offset] * (cfd.mcMillanSumNew + cfd.bcFactors[0][0] * cfd.splineSumsNew[0] + cfd.bcFactors[0][1] * cfd.splineSumsNew[1]);
-			//a2
-			sum += uR[1 + offset] * (cfd.splineSumsNew[2] + cfd.bcFactors[1][0] * cfd.splineSumsNew[0] + cfd.bcFactors[1][1] * cfd.splineSumsNew[1]);
-			for (int i = 2; i < paramOffset - 4; i++)
-			{
-				sum += uR[i + offset] * cfd.splineSumsNew[i + 1];
-			}
-			//a(n-2)
-			sum += uR[paramOffset - 4 + offset] * (cfd.splineSumsNew[cfd.numberOfSplines - 3] + cfd.bcFactors[2][0] * cfd.splineSumsNew[cfd.numberOfSplines - 2] + cfd.bcFactors[2][1] * cfd.splineSumsNew[cfd.numberOfSplines - 1]);
-			//ac
-			sum += uR[paramOffset - 3 + offset] * (cfd.constSumNew + cfd.bcFactors[3][0] * cfd.splineSumsNew[cfd.numberOfSplines - 2] + cfd.bcFactors[3][1] * cfd.splineSumsNew[cfd.numberOfSplines - 1]);
-			//alin
-			sum += uR[paramOffset - 2 + offset] * (cfd.linearSumNew + cfd.bcFactors[4][0] * cfd.splineSumsNew[cfd.numberOfSplines - 2] + cfd.bcFactors[4][1] * cfd.splineSumsNew[cfd.numberOfSplines - 1]);
-
-			sum += uR[paramOffset - 1 + offset] * cfd.logSumNew;
-			n++;
+			sum += uR[i + offset] * cfd.splineSumsNew[i + 1];
 		}
+		//a(n-2)
+		sum += uR[paramOffset - 4 + offset] * (cfd.splineSumsNew[cfd.numberOfSplines - 3] + cfd.bcFactors[2][0] * cfd.splineSumsNew[cfd.numberOfSplines - 2] + cfd.bcFactors[2][1] * cfd.splineSumsNew[cfd.numberOfSplines - 1]);
+		//ac
+		sum += uR[paramOffset - 3 + offset] * (cfd.constSumNew + cfd.bcFactors[3][0] * cfd.splineSumsNew[cfd.numberOfSplines - 2] + cfd.bcFactors[3][1] * cfd.splineSumsNew[cfd.numberOfSplines - 1]);
+		//alin
+		sum += uR[paramOffset - 2 + offset] * (cfd.linearSumNew + cfd.bcFactors[4][0] * cfd.splineSumsNew[cfd.numberOfSplines - 2] + cfd.bcFactors[4][1] * cfd.splineSumsNew[cfd.numberOfSplines - 1]);
+
+		sum += uR[paramOffset - 1 + offset] * cfd.logSumNew;
+		nCFD++;
 	}
 	wfNew = exp(sum + phiR);
 	exponentNew = sum;

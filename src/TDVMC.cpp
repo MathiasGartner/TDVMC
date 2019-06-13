@@ -29,6 +29,8 @@
 #include "Utils.h"
 #include "VMCSampler.h"
 
+#include "Potentials/PotentialManager.h"
+
 #include "test/MPITest.h"
 #include "test/PiCalculator.h"
 #include "test/Tests.h"
@@ -543,7 +545,7 @@ void Init()
 	{
 		generator = mt19937_64(processRank + 1);
 		//generator = default_random_engine(processRank + 1);
-		distParticleIndex = uniform_int_distribution<int>(0, N-1);
+		distParticleIndex = uniform_int_distribution<int>(0, N - 1);
 		srand(processRank + 1);
 	}
 	LBOX = pow((N / RHO), 1.0 / DIM); //box with dimensions [-L/2, L/2]
@@ -1492,7 +1494,7 @@ void SolveEquationSystemArmadillo(vector<vector<double> >& matrix, vector<double
 	//arma::mat m(N_PARAM, N_PARAM);
 	//arma::vec b(N_PARAM);
 	//arma::vec x(N_PARAM);
-    //
+	//
 	//for (int i = 0; i < N_PARAM; i++)
 	//{
 	//	for (int j = 0; j < N_PARAM; j++)
@@ -1501,9 +1503,9 @@ void SolveEquationSystemArmadillo(vector<vector<double> >& matrix, vector<double
 	//	}
 	//	b[i] = rhs[i];
 	//}
-    //
+	//
 	//x = arma::solve(m, b);
-    //
+	//
 	//for (int i = 0; i < N_PARAM; i++)
 	//{
 	//	solution[i] = x[i];
@@ -1536,6 +1538,34 @@ void CalculatePhiDot(vector<double>& uDotR, vector<double>& uDotI, double *phiDo
 	}
 }
 
+void PreconditionEquationSystemByScaling(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag, vector<double>& preconditionScalings)
+{
+	//INFO: for square matrices only!
+	preconditionScalings.resize(matrix.size());
+	for (unsigned int i = 0; i < matrix.size(); i++)
+	{
+		preconditionScalings[i] = sqrt(matrix[i][i]);
+	}
+	for (unsigned int i = 0; i < matrix.size(); i++)
+	{
+		for (unsigned int j = 0; j < matrix.size(); j++)
+		{
+			matrix[i][j] /= preconditionScalings[i] * preconditionScalings[j];
+		}
+		energiesReal[i] /= preconditionScalings[i];
+		energiesImag[i] /= preconditionScalings[i];
+	}
+}
+
+void RegularizeEquationSystem(vector<vector<double> >& matrix, double eps)
+{
+	//INFO: for square matrices only!
+	for (unsigned int i = 0; i < matrix.size(); i++)
+	{
+		matrix[i][i] += eps;
+	}
+}
+
 void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double *phiDotR, double *phiDotI)
 {
 	vector<double> energiesReal; //rhs of the equation that corresponds to uDotR;
@@ -1544,7 +1574,13 @@ void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double 
 
 	BuildSystemOfEquationsForParameters(matrix, energiesReal, energiesImag);
 
-	//WriteDataToFile(matrix, "BBmatrix", "BBmatrix");
+	//WriteDataToFile(matrix, "Omatrix", "Omatrix");
+
+	vector<double> preconditionScalings;
+	PreconditionEquationSystemByScaling(matrix, energiesReal, energiesImag, preconditionScalings);
+	RegularizeEquationSystem(matrix, 0.001);
+
+	//WriteDataToFile(matrix, "PCmatrix", "PCmatrix");
 	//WriteDataToFile(energiesReal, "BBenergiesReal", "BBenergiesReal");
 	//WriteDataToFile(energiesImag, "BBenergiesImag", "BBenergiesImag");
 
@@ -1552,6 +1588,12 @@ void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double 
 	SolveCholeskyDecomposedEquationSystem(matrix, energiesReal, uDotR);
 	SolveCholeskyDecomposedEquationSystem(matrix, energiesImag, uDotI);
 	CalculatePhiDot(uDotR, uDotI, phiDotR, phiDotI);
+
+	for (unsigned int i = 0; i < uDotR.size(); i++)
+	{
+		uDotR[i] /= preconditionScalings[i];
+		uDotI[i] /= preconditionScalings[i];
+	}
 
 	//WriteDataToFile(matrix, "BBcholesky", "BBcholesky");
 	//WriteDataToFile(uDotR, "BBuDotR", "BBuDotR");
@@ -2741,7 +2783,7 @@ int mainMPI(int argc, char** argv)
 	int step = 0;
 	int acceptNewParams;
 	int nrOfAcceptParameterTrials;
-	int maxNrOfAcceptParameterTrials = 4;
+	int maxNrOfAcceptParameterTrials = 2;
 
 	double nrOfSamplesToUpdate;
 	double percentForExtraSampleToUpdate;
@@ -3052,7 +3094,17 @@ int mainMPI(int argc, char** argv)
 		}
 		if (setBack != 0)
 		{
+			if (processRank == rootRank)
+			{
+				Log("SetBackNSteps", ERROR);
+			}
 			SetBackNSteps(setBack, R, uR, uI, phiR, phiI, step, dynTimestep);
+			sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
+			for (int i = 0; i < MC_VERY_FIRST_NINITIALIZATIONSTEPS; i++)
+			{
+				DoMetropolisStep(R, uR, uI, phiR, phiI);
+			}
+			sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
 			setBack = 0;
 		}
 
@@ -3541,6 +3593,8 @@ int main(int argc, char **argv)
 
 	//startVMCSampler();
 	//return 0;
+
+	//Potentials::SaveAllPotentialValues("/itpstore/gartner/Output/TDVMC/asterix/");
 
 	if (argc == 0) //INFO: started with pbs on mach
 	{

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <string>
 #include <vector>
 
 using namespace std;
@@ -11,6 +12,7 @@ namespace Potentials
 class IPairPotential
 {
 public:
+	string description;
 
 public:
 	IPairPotential()

@@ -2,8 +2,6 @@
 
 CorrelationFunctionData::CorrelationFunctionData()
 {
-	isUsed = false;
-
 	numberOfSplines = 0;
 
 	mcMillanSum = 0;

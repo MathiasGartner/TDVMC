@@ -7,11 +7,15 @@ using namespace std;
 vector<double> operator*(vector<int> v, double x);
 
 vector<double>& operator+=(vector<double>& v1, const vector<double>& v2);
+vector<double>& operator+=(vector<double>& v1, double d);
 vector<double>& operator-=(vector<double>& v1, const vector<double>& v2);
+vector<double>& operator-=(vector<double>& v1, double d);
 vector<double>& operator*=(vector<double>& v, double x);
 vector<double>& operator/=(vector<double>& v, double x);
 vector<double> operator+(vector<double> v1, const vector<double>& v2);
+vector<double> operator+(vector<double> v1, double d);
 vector<double> operator-(vector<double> v1, const vector<double>& v2);
+vector<double> operator-(vector<double> v1, double d);
 vector<double> operator*(vector<double> v, double x);
 vector<double> operator/(vector<double> v, double x);
 

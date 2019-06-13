@@ -16,3 +16,15 @@ extern int N_PARAM;	        	  	//number of parameters of trial function
 
 extern double LBOX;				    //length of box
 extern double LBOX_R;				//reciprocal length of box
+
+namespace Constants
+{
+	namespace Split
+	{
+		const double hbar = 1.054571628e-34;
+		const double u = 1.660538782e-27;
+		const double mK2K = 0.001;
+		const double A2m = 1e-10;
+		const double kb = 1.3806504e-23;
+	}
+}

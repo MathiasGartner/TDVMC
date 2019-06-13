@@ -7,6 +7,8 @@ namespace Potentials
 
 HFDB_He_He::HFDB_He_He()
 {
+	description = "HFDB_He_He";
+
 	epsil = 10.948;
 	rm = 2.9630;
 	av = 184431.01;
