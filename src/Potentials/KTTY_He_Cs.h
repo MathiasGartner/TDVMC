@@ -5,12 +5,12 @@
 namespace Potentials
 {
 
-class KTTY_He_Na: public KTTY
+class KTTY_He_Cs: public KTTY
 {
 public:
 
 public:
-	KTTY_He_Na();
+	KTTY_He_Cs();
 };
 
 }

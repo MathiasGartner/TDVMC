@@ -1,6 +1,8 @@
 Debug/TDVMC
 Debug/src/*.d
 Debug/src/*.o
+Debug/src/PhysicalSystems/*.d
+Debug/src/PhysicalSystems/*.o
 Debug/src/Potentials/*.d
 Debug/src/Potentials/*.o
 Debug/resources/*.d
@@ -8,6 +10,8 @@ Debug/resources/*.o
 Release/TDVMC
 Release/src/*.d
 Release/src/*.o
+Release/src/PhysicalSystems/*.d
+Release/src/PhysicalSystems/*.o
 Release/src/Potentials/*.d
 Release/src/Potentials/*.o
 Release/resources/*.d

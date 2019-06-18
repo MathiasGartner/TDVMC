@@ -3,6 +3,7 @@
 #include "../Utils.h"
 
 #include "HFDB_He_He.h"
+#include "KTTY_He_Cs.h"
 #include "KTTY_He_Na.h"
 #include "LJ_He_He.h"
 
@@ -28,6 +29,9 @@ void SaveAllPotentialValues(string path)
 {
 	HFDB_He_He hfdb_he_he;
 	SavePotentialValues(hfdb_he_he, 0.1, 20.0, 0.1, path + "HFDB_He_He");
+
+	KTTY_He_Cs ktty_he_cs;
+	SavePotentialValues(ktty_he_cs, 0.1, 20.0, 0.1, path + "KTTY_He_Cs");
 
 	KTTY_He_Na ktty_he_na;
 	SavePotentialValues(ktty_he_na, 0.1, 20.0, 0.1, path + "KTTY_He_Na");

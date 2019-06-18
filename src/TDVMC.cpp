@@ -1,33 +1,34 @@
 #include "mpi.h"
 
-#include "BosonsBulk.h"
-#include "BosonsBulkDamped.h"
-#include "BosonCluster.h"
-#include "BosonClusterWithLog.h"
-#include "BosonClusterWithLogParam.h"
-#include "BosonMixtureCluster.h"
-#include "BulkSplines.h"
-#include "BulkSplinesPhi.h"
-#include "BulkSplinesScaled.h"
-#include "BulkQT.h"
-#include "BulkQTPhi.h"
 #include "ConfigItem.h"
 #include "Constants.h"
-#include "GaussianWavepacket.h"
-#include "HardSphereBosons.h"
-#include "HardSphereBosonsExp.h"
-#include "HeBulk.h"
-#include "HeDrop.h"
 #include "ICorrelatedSamplingData.h"
-#include "IPhysicalSystem.h"
 #include "MathOperators.h"
 #include "MPIMethods.h"
-#include "NUBosonsBulk.h"
-#include "PBosonsBulk.h"
 #include "SimulationStepData.h"
 #include "Timer.h"
 #include "Utils.h"
 #include "VMCSampler.h"
+
+#include "PhysicalSystems/IPhysicalSystem.h"
+#include "PhysicalSystems/BosonsBulk.h"
+#include "PhysicalSystems/BosonsBulkDamped.h"
+#include "PhysicalSystems/BosonCluster.h"
+#include "PhysicalSystems/BosonClusterWithLog.h"
+#include "PhysicalSystems/BosonClusterWithLogParam.h"
+#include "PhysicalSystems/BosonMixtureCluster.h"
+#include "PhysicalSystems/BulkSplines.h"
+#include "PhysicalSystems/BulkSplinesPhi.h"
+#include "PhysicalSystems/BulkSplinesScaled.h"
+#include "PhysicalSystems/BulkQT.h"
+#include "PhysicalSystems/BulkQTPhi.h"
+#include "PhysicalSystems/GaussianWavepacket.h"
+#include "PhysicalSystems/HardSphereBosons.h"
+#include "PhysicalSystems/HardSphereBosonsExp.h"
+#include "PhysicalSystems/HeBulk.h"
+#include "PhysicalSystems/HeDrop.h"
+#include "PhysicalSystems/NUBosonsBulk.h"
+#include "PhysicalSystems/PBosonsBulk.h"
 
 #include "Potentials/PotentialManager.h"
 
@@ -58,7 +59,7 @@
 
 using namespace std;
 
-IPhysicalSystem* sys;
+PhysicalSystems::IPhysicalSystem* sys;
 
 vector<ConfigItem> configItems;
 
@@ -86,6 +87,7 @@ double TIMESTEP;
 double TOTALTIME;
 int IMAGINARY_TIME;
 int ODE_SOLVER_TYPE;
+int USE_PRECONDITIONING;
 double LBOX;
 double LBOX_R;
 vector<double> PARAMS_REAL;
@@ -108,7 +110,7 @@ vector<double> NURBS_GRID;
 vector<int> PARTICLE_TYPES;
 vector<double> SYSTEM_PARAMS;
 
-string requiredConfigVersion = "0.17";
+string requiredConfigVersion = "0.18";
 int numOfProcesses = 1;
 int rootRank = 0;
 int processRank = 0;
@@ -362,6 +364,7 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("TOTALTIME", &TOTALTIME, ConfigItemType::DOUBLE, true));
 	configItems.push_back(ConfigItem("IMAGINARY_TIME", &IMAGINARY_TIME, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("ODE_SOLVER_TYPE", &ODE_SOLVER_TYPE, ConfigItemType::INT, true));
+	configItems.push_back(ConfigItem("USE_PRECONDITIONING", &USE_PRECONDITIONING, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("USE_PARAMETER_ACCEPTANCE_CHECK", &USE_PARAMETER_ACCEPTANCE_CHECK, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("PARAMETER_ACCEPTANCE_CHECK_TYPE", &PARAMETER_ACCEPTANCE_CHECK_TYPE, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("WRITE_EVERY_NTH_STEP_TO_FILE", &WRITE_EVERY_NTH_STEP_TO_FILE, ConfigItemType::INT, true));
@@ -1577,8 +1580,11 @@ void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double 
 	//WriteDataToFile(matrix, "Omatrix", "Omatrix");
 
 	vector<double> preconditionScalings;
-	PreconditionEquationSystemByScaling(matrix, energiesReal, energiesImag, preconditionScalings);
-	RegularizeEquationSystem(matrix, 0.001);
+	if (USE_PRECONDITIONING == 1)
+	{
+		PreconditionEquationSystemByScaling(matrix, energiesReal, energiesImag, preconditionScalings);
+		RegularizeEquationSystem(matrix, 0.001);
+	}
 
 	//WriteDataToFile(matrix, "PCmatrix", "PCmatrix");
 	//WriteDataToFile(energiesReal, "BBenergiesReal", "BBenergiesReal");
@@ -1589,10 +1595,13 @@ void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double 
 	SolveCholeskyDecomposedEquationSystem(matrix, energiesImag, uDotI);
 	CalculatePhiDot(uDotR, uDotI, phiDotR, phiDotI);
 
-	for (unsigned int i = 0; i < uDotR.size(); i++)
+	if (USE_PRECONDITIONING)
 	{
-		uDotR[i] /= preconditionScalings[i];
-		uDotI[i] /= preconditionScalings[i];
+		for (unsigned int i = 0; i < uDotR.size(); i++)
+		{
+			uDotR[i] /= preconditionScalings[i];
+			uDotI[i] /= preconditionScalings[i];
+		}
 	}
 
 	//WriteDataToFile(matrix, "BBcholesky", "BBcholesky");
@@ -2547,6 +2556,116 @@ void SetBackNSteps(int n, vector<vector<double> >& R, vector<double>& uR, vector
 	sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
 }
 
+bool InitializePhysicalSystem()
+{
+	bool successful = true;
+	if (SYSTEM_TYPE == "HeDrop")
+	{
+		sys = new PhysicalSystems::HeDrop(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "HeBulk")
+	{
+		sys = new PhysicalSystems::HeBulk(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BulkSplines")
+	{
+		//sys = new BulkSplines(SYSTEM_PARAMS, configDirectory);
+		sys = new PhysicalSystems::BulkSplinesPhi(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BulkSplinesScaled")
+	{
+		sys = new PhysicalSystems::BulkSplinesScaled(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BulkQT")
+	{
+		//sys = new BulkQT(SYSTEM_PARAMS, configDirectory);
+		sys = new PhysicalSystems::BulkQTPhi(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "GaussianWavepacket")
+	{
+		sys = new PhysicalSystems::GaussianWavepacket(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BosonsBulk")
+	{
+		sys = new PhysicalSystems::BosonsBulk(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BosonsBulkDamped")
+	{
+		sys = new PhysicalSystems::BosonsBulkDamped(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "BosonCluster")
+	{
+		sys = new PhysicalSystems::BosonCluster(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PhysicalSystems::BosonCluster*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<PhysicalSystems::BosonCluster*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
+	}
+	else if (SYSTEM_TYPE == "BosonClusterWithLog")
+	{
+		sys = new PhysicalSystems::BosonClusterWithLog(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PhysicalSystems::BosonClusterWithLog*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<PhysicalSystems::BosonClusterWithLog*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
+	}
+	else if (SYSTEM_TYPE == "BosonClusterWithLogParam")
+	{
+		sys = new PhysicalSystems::BosonClusterWithLogParam(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PhysicalSystems::BosonClusterWithLogParam*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<PhysicalSystems::BosonClusterWithLogParam*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
+	}
+	else if (SYSTEM_TYPE == "BosonMixtureCluster")
+	{
+		sys = new PhysicalSystems::BosonMixtureCluster(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PhysicalSystems::BosonMixtureCluster*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<PhysicalSystems::BosonMixtureCluster*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
+		dynamic_cast<PhysicalSystems::BosonMixtureCluster*>(sys)->SetParticleType(PARTICLE_TYPES);
+	}
+	else if (SYSTEM_TYPE == "HardSphereBosons")
+	{
+		sys = new PhysicalSystems::HardSphereBosons(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "HardSphereBosonsExp")
+	{
+		sys = new PhysicalSystems::HardSphereBosonsExp(SYSTEM_PARAMS, configDirectory);
+	}
+	else if (SYSTEM_TYPE == "NUBosonsBulk")
+	{
+		sys = new PhysicalSystems::NUBosonsBulk(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PhysicalSystems::NUBosonsBulk*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<PhysicalSystems::NUBosonsBulk*>(sys)->SetGrBinCount(GR_BIN_COUNT);
+	}
+	else if (SYSTEM_TYPE == "PBosonsBulk")
+	{
+		sys = new PhysicalSystems::PBosonsBulk(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PhysicalSystems::PBosonsBulk*>(sys)->SetNodes(NURBS_GRID);
+		}
+	}
+	else
+	{
+		if (processRank == rootRank)
+		{
+			Log("System type \"" + SYSTEM_TYPE + "\" not available.", ERROR);
+		}
+		successful = false;
+	}
+	return successful;
+}
+
 ////////////
 /// main ///
 ////////////
@@ -2609,108 +2728,8 @@ int mainMPI(int argc, char** argv)
 	/// Initialize Physical System ///
 	//////////////////////////////////
 
-	if (SYSTEM_TYPE == "HeDrop")
+	if (!InitializePhysicalSystem())
 	{
-		sys = new HeDrop(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "HeBulk")
-	{
-		sys = new HeBulk(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BulkSplines")
-	{
-		//sys = new BulkSplines(SYSTEM_PARAMS, configDirectory);
-		sys = new BulkSplinesPhi(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BulkSplinesScaled")
-	{
-		sys = new BulkSplinesScaled(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BulkQT")
-	{
-		//sys = new BulkQT(SYSTEM_PARAMS, configDirectory);
-		sys = new BulkQTPhi(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "GaussianWavepacket")
-	{
-		sys = new GaussianWavepacket(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BosonsBulk")
-	{
-		sys = new BosonsBulk(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BosonsBulkDamped")
-	{
-		sys = new BosonsBulkDamped(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BosonCluster")
-	{
-		sys = new BosonCluster(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<BosonCluster*>(sys)->SetNodes(NURBS_GRID);
-		}
-		dynamic_cast<BosonCluster*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
-	}
-	else if (SYSTEM_TYPE == "BosonClusterWithLog")
-	{
-		sys = new BosonClusterWithLog(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<BosonClusterWithLog*>(sys)->SetNodes(NURBS_GRID);
-		}
-		dynamic_cast<BosonClusterWithLog*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
-	}
-	else if (SYSTEM_TYPE == "BosonClusterWithLogParam")
-	{
-		sys = new BosonClusterWithLogParam(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<BosonClusterWithLogParam*>(sys)->SetNodes(NURBS_GRID);
-		}
-		dynamic_cast<BosonClusterWithLogParam*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
-	}
-	else if (SYSTEM_TYPE == "BosonMixtureCluster")
-	{
-		sys = new BosonMixtureCluster(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<BosonMixtureCluster*>(sys)->SetNodes(NURBS_GRID);
-		}
-		dynamic_cast<BosonMixtureCluster*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
-		dynamic_cast<BosonMixtureCluster*>(sys)->SetParticleType(PARTICLE_TYPES);
-	}
-	else if (SYSTEM_TYPE == "HardSphereBosons")
-	{
-		sys = new HardSphereBosons(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "HardSphereBosonsExp")
-	{
-		sys = new HardSphereBosonsExp(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "NUBosonsBulk")
-	{
-		sys = new NUBosonsBulk(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<NUBosonsBulk*>(sys)->SetNodes(NURBS_GRID);
-		}
-		dynamic_cast<NUBosonsBulk*>(sys)->SetGrBinCount(GR_BIN_COUNT);
-	}
-	else if (SYSTEM_TYPE == "PBosonsBulk")
-	{
-		sys = new PBosonsBulk(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<PBosonsBulk*>(sys)->SetNodes(NURBS_GRID);
-		}
-	}
-	else
-	{
-		if (processRank == rootRank)
-		{
-			Log("System type \"" + SYSTEM_TYPE + "\" not available.", ERROR);
-		}
 		return 1;
 	}
 
@@ -3298,108 +3317,8 @@ int startVMCSamplerMPI(int argc, char** argv)
 	/// Initialize Physical System ///
 	//////////////////////////////////
 
-	if (SYSTEM_TYPE == "HeDrop")
+	if (!InitializePhysicalSystem())
 	{
-		sys = new HeDrop(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "HeBulk")
-	{
-		sys = new HeBulk(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BulkSplines")
-	{
-		//sys = new BulkSplines(SYSTEM_PARAMS, configDirectory);
-		sys = new BulkSplinesPhi(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BulkSplinesScaled")
-	{
-		sys = new BulkSplinesScaled(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BulkQT")
-	{
-		//sys = new BulkQT(SYSTEM_PARAMS, configDirectory);
-		sys = new BulkQTPhi(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "GaussianWavepacket")
-	{
-		sys = new GaussianWavepacket(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BosonsBulk")
-	{
-		sys = new BosonsBulk(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BosonsBulkDamped")
-	{
-		sys = new BosonsBulkDamped(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BosonCluster")
-	{
-		sys = new BosonCluster(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<BosonCluster*>(sys)->SetNodes(NURBS_GRID);
-		}
-		dynamic_cast<BosonCluster*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
-	}
-	else if (SYSTEM_TYPE == "BosonClusterWithLog")
-	{
-		sys = new BosonClusterWithLog(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<BosonClusterWithLog*>(sys)->SetNodes(NURBS_GRID);
-		}
-		dynamic_cast<BosonClusterWithLog*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
-	}
-	else if (SYSTEM_TYPE == "BosonClusterWithLogParam")
-	{
-		sys = new BosonClusterWithLogParam(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<BosonClusterWithLogParam*>(sys)->SetNodes(NURBS_GRID);
-		}
-		dynamic_cast<BosonClusterWithLogParam*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
-	}
-	else if (SYSTEM_TYPE == "BosonMixtureCluster")
-	{
-		sys = new BosonMixtureCluster(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<BosonMixtureCluster*>(sys)->SetNodes(NURBS_GRID);
-		}
-		dynamic_cast<BosonMixtureCluster*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
-		dynamic_cast<BosonMixtureCluster*>(sys)->SetParticleType(PARTICLE_TYPES);
-	}
-	else if (SYSTEM_TYPE == "HardSphereBosons")
-	{
-		sys = new HardSphereBosons(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "HardSphereBosonsExp")
-	{
-		sys = new HardSphereBosonsExp(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "NUBosonsBulk")
-	{
-		sys = new NUBosonsBulk(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<NUBosonsBulk*>(sys)->SetNodes(NURBS_GRID);
-		}
-		dynamic_cast<NUBosonsBulk*>(sys)->SetGrBinCount(GR_BIN_COUNT);
-	}
-	else if (SYSTEM_TYPE == "PBosonsBulk")
-	{
-		sys = new PBosonsBulk(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<PBosonsBulk*>(sys)->SetNodes(NURBS_GRID);
-		}
-	}
-	else
-	{
-		if (processRank == rootRank)
-		{
-			Log("System type \"" + SYSTEM_TYPE + "\" not available.", ERROR);
-		}
 		return 1;
 	}
 
@@ -3594,7 +3513,7 @@ int main(int argc, char **argv)
 	//startVMCSampler();
 	//return 0;
 
-	//Potentials::SaveAllPotentialValues("/itpstore/gartner/Output/TDVMC/asterix/");
+	Potentials::SaveAllPotentialValues("/itpstore/gartner/Output/TDVMC/asterix/");
 
 	if (argc == 0) //INFO: started with pbs on mach
 	{

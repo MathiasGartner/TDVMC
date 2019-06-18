@@ -25,5 +25,6 @@ C_DEPS :=
 SUBDIRS := \
 resources \
 src \
+src/PhysicalSystems \
 src/Potentials \
 
