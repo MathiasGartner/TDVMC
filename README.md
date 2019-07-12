@@ -6,14 +6,14 @@ use json parser from https://github.com/open-source-parsers/jsoncpp
 
 ## Makefile for zusie server
 CXX      := mpicxx
-CXXFLAGS := -Ofast -std=c++11
-LDFLAGS  := -lmpi
+CXXFLAGS := -O3 -std=c++11
+LDFLAGS  := -lmpi -L./libs -llapack -lrefblas -lgfortran -lpthread
 BUILD    := ./build
 OBJ_DIR  := $(BUILD)/objects
 APP_DIR  := $(BUILD)
 TARGET   := TDVMC
-INCLUDE  := 
-SRC      := $(wildcard src/*.cpp) $(wildcard resources/*.cpp)
+INCLUDE  :=
+SRC      := $(wildcard src/*.cpp) $(wildcard src/*/*.cpp) $(wildcard resources/*.cpp)
 
 OBJECTS := $(SRC:%.cpp=$(OBJ_DIR)/%.o)
 
