@@ -19,11 +19,11 @@ public:
 	{
 	}
 
-	virtual double GetPotential(double r) = 0;
-
 	virtual ~IPairPotential()
 	{
 	}
+
+	virtual double GetPotential(double r) = 0;
 };
 
 }

@@ -146,3 +146,32 @@ vector<vector<double> > operator/(vector<vector<double> > v, double x)
 	v /= x;
 	return v;
 }
+
+
+Observables::ObservableCollection operator+(Observables::ObservableCollection lhs, const Observables::ObservableCollection& rhs)
+{
+	auto result = lhs.Clone();
+	result += rhs;
+	return result;
+}
+
+Observables::ObservableCollection operator-(Observables::ObservableCollection lhs, const Observables::ObservableCollection& rhs)
+{
+	auto result = lhs.Clone();
+	result -= rhs;
+	return result;
+}
+
+Observables::ObservableCollection operator*(Observables::ObservableCollection lhs, double rhs)
+{
+	auto result = lhs.Clone();
+	result *= rhs;
+	return result;
+}
+
+Observables::ObservableCollection operator/(Observables::ObservableCollection lhs, double rhs)
+{
+	auto result = lhs.Clone();
+	result /= rhs;
+	return result;
+}

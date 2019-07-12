@@ -295,15 +295,15 @@ void HeDrop::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 	//double r_L = sigma * 2.0;
 
 	//Aziz potential
-	double e = 10.948;
-	double rm = 2.963;
-	double a = 184431.01;
-	double alpha = 10.43329537;
-	double beta = -2.27965105;
-	double d = 1.4826;
-	double c6 = 1.36745214;
-	double c8 = 0.42123807;
-	double c10 = 0.17473318;
+	//double e = 10.948;
+	//double rm = 2.963;
+	//double a = 184431.01;
+	//double alpha = 10.43329537;
+	//double beta = -2.27965105;
+	//double d = 1.4826;
+	//double c6 = 1.36745214;
+	//double c8 = 0.42123807;
+	//double c10 = 0.17473318;
 
 	double kineticR = 0;
 	double kineticI = 0;
@@ -342,8 +342,8 @@ void HeDrop::CalculateExpectationValues(vector<vector<double> >& R, vector<doubl
 
 	if (this->time > 1e-6)
 	{
-		e = 21.0;
-		rm = 2.35;
+		//e = 21.0;
+		//rm = 2.35;
 	}
 	for (int n = 0; n < N; n++)
 	{

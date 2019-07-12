@@ -39,7 +39,7 @@ public:
 public:
 	KTTY();
 
-	double GetPotential(double r);
+	double GetPotential(double r) override;
 };
 
 }

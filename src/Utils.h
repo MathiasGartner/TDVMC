@@ -3,9 +3,14 @@
 #include "Constants.h"
 #include "MathOperators.h"
 
+#include "Observables/Observable.h"
+#include "Observables/ObservableV.h"
+#include "Observables/ObservableVsOnGrid.h"
+
 #include <cmath>
 #include <cstring>
 #include <fstream>
+#include <iomanip>
 #include <random>
 #include <string>
 #include <sstream>
@@ -16,7 +21,9 @@
 using namespace std;
 
 const int exportPrecision = 10;
-
+const int exportPrecisionSc = 8;
+const int colWidth = 20;
+const string fileExtension = ".dat";
 
 template<typename T> string JoinVector(const vector<T>& v, int everyNth = 1, bool fixedForm = false)
 {
@@ -86,6 +93,8 @@ double VectorDisplacementNIC_2D(vector<double>& ri, vector<double>& rj, vector<d
 double VectorDisplacementNIC_3D(vector<double>& ri, vector<double>& rj, vector<double>& result);
 double VectorDisplacementNIC(vector<double>& ri, vector<double>& rj, vector<double>& result);
 
+double GetCornerAngle(vector<double>& r1, vector<double>& r2, vector<double>& r3);
+
 vector<double> AllVectorDisplacements(vector<double>& ri, vector<double>& rj, double maxDistance);
 vector<double> AllVectorDisplacements(vector<double>& ri, vector<double>& rj, double maxDistance, vector<vector<double> >& eVecs);
 
@@ -125,13 +134,18 @@ void InitVector(vector<int>& v, int size, int initialValue);
 void InitVector(vector<vector<int> >& v, int size1, int size2, int initialValue);
 void InitVector(vector<double>& v, int size, double initialValue);
 void InitVector(vector<vector<double> >& v, int size1, int size2, double initialValue);
+void InitVector(vector<vector<vector<double> > >& v, int size1, int size2, int size3, double initialValue);
 
-void WriteDataToFile(double* data, int n, string filename, string header);
-void WriteDataToFile(double** data, int n1, int n2, string filename, string header);
+void SetFileFormat(ofstream& f);
+void WriteLineToFile(ofstream& f, double data);
+void WriteLineToFile(ofstream& f, vector<double>& data);
+
 void WriteDataToFile(double data, string filename, string header);
 void WriteDataToFile(vector<double>& data, string filename, string header, int everyNth = 1);
 void WriteDataToFile(vector<vector<double> >& data, string filename, string header, int everyNth = 1, bool writeHeader = true);
 void WriteDataToFile(vector<vector<vector<double> > >& data, string filename, string header);
+
+void WriteDataToFile(Observables::ObservableCollection& data, string filename);
 
 void AppendDataToFile(double data, string filename);
 void AppendDataToFile(vector<double>& data, string filename);

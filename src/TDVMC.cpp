@@ -10,6 +10,8 @@
 #include "Utils.h"
 #include "VMCSampler.h"
 
+#include "Observables/IObservable.h"
+
 #include "PhysicalSystems/IPhysicalSystem.h"
 #include "PhysicalSystems/BosonsBulk.h"
 #include "PhysicalSystems/BosonsBulkDamped.h"
@@ -20,15 +22,10 @@
 #include "PhysicalSystems/BulkSplines.h"
 #include "PhysicalSystems/BulkSplinesPhi.h"
 #include "PhysicalSystems/BulkSplinesScaled.h"
-#include "PhysicalSystems/BulkQT.h"
-#include "PhysicalSystems/BulkQTPhi.h"
 #include "PhysicalSystems/GaussianWavepacket.h"
-#include "PhysicalSystems/HardSphereBosons.h"
-#include "PhysicalSystems/HardSphereBosonsExp.h"
 #include "PhysicalSystems/HeBulk.h"
 #include "PhysicalSystems/HeDrop.h"
 #include "PhysicalSystems/NUBosonsBulk.h"
-#include "PhysicalSystems/PBosonsBulk.h"
 
 #include "Potentials/PotentialManager.h"
 
@@ -129,6 +126,7 @@ vector<double> localOperatorlocalEnergyR; // for <O_k E^R>
 vector<double> localOperatorlocalEnergyI; // for <O_k E^I>
 vector<double> otherExpectationValues; // eg. for potential and kinetic energy
 vector<double> additionalSystemProperties; // for properties at the end of the simulation
+Observables::ObservableCollection additionalObservablesMean; //for properties at the end of the simulation; replacement for vector<double> additionalSystemProperties;
 
 bool doNotAcceptStep = false;
 vector<vector<double> > uRList;
@@ -631,6 +629,10 @@ void PostSystemInit()
 	otherExpectationValues.resize(sys->GetNumOfOtherExpectationValues());
 	additionalSystemProperties.resize(sys->GetNumOfAdditionalSystemProperties());
 	AllAdditionalSystemProperties.resize(0);
+
+	additionalObservablesMean = sys->GetAdditionalObservablesClone();
+	//additionalObservablesMean.observables[0]->name = "test";
+	//additionalObservablesMean.observables[0]->name = "test2";
 }
 
 void WriteParticlesToFile(vector<vector<double> >& R, string ending)
@@ -1258,8 +1260,8 @@ void ParallelUpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingDa
 void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	int percent = 0;
-	ClearVector(additionalSystemProperties);
-	ClearVector(AllAdditionalSystemProperties);
+	additionalObservablesMean.ClearValues();
+
 	sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
 	for (int i = 0; i < MC_NADDITIONALINITIALIZATIONSTEPS; i++)
 	{
@@ -1276,7 +1278,16 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
 
 		//INFO: calculate contribution to average value
 		additionalSystemProperties += sys->GetAdditionalSystemProperties() / mc_nadditionalsteps;
-		AllAdditionalSystemProperties.push_back(sys->GetAdditionalSystemProperties());
+		//INFO: is too much data when calculating distance matrices
+		//AllAdditionalSystemProperties.push_back(sys->GetAdditionalSystemProperties());
+
+		//additionalObservablesMean = additionalObservablesMean + (sys->GetAdditionalObservables() - additionalObservablesMean) / (i + 1.0);
+		//additionalObservablesMean += (sys->GetAdditionalObservables() - additionalObservablesMean) / (i + 1.0);
+		auto tmp = sys->GetAdditionalObservablesClone();
+		tmp -= additionalObservablesMean;
+		tmp /= (i + 1.0);
+		additionalObservablesMean += tmp;
+		tmp.Destroy();
 
 		if ((100 * i) % MC_NADDITIONALSTEPS == 0)
 		{
@@ -1299,11 +1310,60 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
 	}
 }
 
+/*void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+	int percent = 0;
+	ClearVector(additionalSystemProperties);
+	ClearVector(AllAdditionalSystemProperties);
+	sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
+	for (int i = 0; i < MC_NADDITIONALINITIALIZATIONSTEPS; i++)
+	{
+		DoMetropolisStep(R, uR, uI, phiR, phiI);
+	}
+	for (int i = 0; i < MC_NADDITIONALSTEPS; i++)
+	{
+		for (int nTherm = 0; nTherm < MC_NADDITIONALTHERMSTEPS; nTherm++)
+		{
+			DoMetropolisStep(R, uR, uI, phiR, phiI);
+		}
+
+		sys->CalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
+
+		//INFO: calculate contribution to average value
+		additionalSystemProperties += sys->GetAdditionalSystemProperties() / mc_nadditionalsteps;
+		//INFO: is too much data when calculating distance matrices
+		//AllAdditionalSystemProperties.push_back(sys->GetAdditionalSystemProperties());
+
+		//additionalObservablesMean = additionalObservablesMean + (sys->GetAdditionalObservables() - additionalObservablesMean) / (i + 1.0);
+
+
+		if ((100 * i) % MC_NADDITIONALSTEPS == 0)
+		{
+			//cout << (i / (double)MC_NSTEPS * 100.0) << "%" << endl;
+			if (processRank == rootRank)
+			{
+				//cout << "." << flush;
+				percent++;
+				cout << percent << "%" << endl;
+			}
+		}
+	}
+	if (processRank == rootRank)
+	{
+		cout << endl;
+	}
+	if (processRank == rootRank)
+	{
+		cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
+	}
+}*/
+
 void ParallelCalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	CalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
 
-	MPIMethods::ReduceToAverage(additionalSystemProperties);
+	//MPIMethods::ReduceToAverage(additionalSystemProperties);
+	MPIMethods::ReduceToAverage(additionalObservablesMean);
 }
 
 /////////////////////////////////
@@ -2544,8 +2604,13 @@ void SetBackNSteps(int n, vector<vector<double> >& R, vector<double>& uR, vector
 			uI = uIList.back();
 			phiR = phiRList.back();
 			phiI = phiIList.back();
+			uRList.pop_back();
+			uIList.pop_back();
+			phiRList.pop_back();
+			phiIList.pop_back();
 		}
 	}
+	InitCoordinateConfiguration(R);
 	AlignCoordinates(R);
 	BroadcastNewParameters(uR, uI, &phiR, &phiI);
 	sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
@@ -2575,11 +2640,6 @@ bool InitializePhysicalSystem()
 	else if (SYSTEM_TYPE == "BulkSplinesScaled")
 	{
 		sys = new PhysicalSystems::BulkSplinesScaled(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BulkQT")
-	{
-		//sys = new BulkQT(SYSTEM_PARAMS, configDirectory);
-		sys = new PhysicalSystems::BulkQTPhi(SYSTEM_PARAMS, configDirectory);
 	}
 	else if (SYSTEM_TYPE == "GaussianWavepacket")
 	{
@@ -2630,14 +2690,6 @@ bool InitializePhysicalSystem()
 		dynamic_cast<PhysicalSystems::BosonMixtureCluster*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
 		dynamic_cast<PhysicalSystems::BosonMixtureCluster*>(sys)->SetParticleType(PARTICLE_TYPES);
 	}
-	else if (SYSTEM_TYPE == "HardSphereBosons")
-	{
-		sys = new PhysicalSystems::HardSphereBosons(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "HardSphereBosonsExp")
-	{
-		sys = new PhysicalSystems::HardSphereBosonsExp(SYSTEM_PARAMS, configDirectory);
-	}
 	else if (SYSTEM_TYPE == "NUBosonsBulk")
 	{
 		sys = new PhysicalSystems::NUBosonsBulk(SYSTEM_PARAMS, configDirectory);
@@ -2646,14 +2698,6 @@ bool InitializePhysicalSystem()
 			dynamic_cast<PhysicalSystems::NUBosonsBulk*>(sys)->SetNodes(NURBS_GRID);
 		}
 		dynamic_cast<PhysicalSystems::NUBosonsBulk*>(sys)->SetGrBinCount(GR_BIN_COUNT);
-	}
-	else if (SYSTEM_TYPE == "PBosonsBulk")
-	{
-		sys = new PhysicalSystems::PBosonsBulk(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<PhysicalSystems::PBosonsBulk*>(sys)->SetNodes(NURBS_GRID);
-		}
 	}
 	else
 	{
@@ -2793,6 +2837,21 @@ int mainMPI(int argc, char** argv)
 
 	sys->InitSystem();
 	PostSystemInit();
+
+	//vector<vector<double> > tmpR;
+	//vector<double> wfValues;
+	//int tmpN = N;
+	//N = 2;
+	//InitVector(tmpR, 2, DIM, 0.0);
+	//for (int i = 0; i < 1000; i++)
+	//{
+	//	tmpR[1][0] += 0.05;
+	//	sys->CalculateWavefunction(tmpR, uR, uI, phiR, phiI);
+	//	wfValues.push_back(sys->GetWf());
+	//}
+	//N = tmpN;
+	////WriteDataToFile(wfValues, "wfValuesHeHe", "wfValuesHeHe");
+	//WriteDataToFile(wfValues, "wfValuesHeNa", "wfValuesHeNa");
 
 	////////////////////////
 	/// start simulation ///
@@ -3077,6 +3136,13 @@ int mainMPI(int argc, char** argv)
 			{
 				Log("Energy not finite", ERROR);
 				cancel = 2;
+				//setBack = 3;
+			}
+			else if (!std::isfinite(sys->GetExponent()) || std::isnan(sys->GetExponent()) || !std::isfinite(sys->GetWf()) || std::isnan(sys->GetWf()))
+			{
+				Log("Energy not finite", ERROR);
+				//cancel = 2;
+				setBack = 3;
 			}
 			else if (nrOfAcceptParameterTrials == maxNrOfAcceptParameterTrials)
 			{
@@ -3118,12 +3184,6 @@ int mainMPI(int argc, char** argv)
 				Log("SetBackNSteps", ERROR);
 			}
 			SetBackNSteps(setBack, R, uR, uI, phiR, phiI, step, dynTimestep);
-			sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
-			for (int i = 0; i < MC_VERY_FIRST_NINITIALIZATIONSTEPS; i++)
-			{
-				DoMetropolisStep(R, uR, uI, phiR, phiI);
-			}
-			sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
 			setBack = 0;
 		}
 
@@ -3205,8 +3265,9 @@ int mainMPI(int argc, char** argv)
 	ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
 	if (processRank == rootRank)
 	{
-		WriteDataToFile(additionalSystemProperties, "AdditionalSystemProperties", "g(r), ...");
-		WriteDataToFile(AllAdditionalSystemProperties, "AllAdditionalSystemProperties", "g(r), ...");
+		//WriteDataToFile(additionalSystemProperties, "AdditionalSystemProperties", "g(r), ...");
+		//WriteDataToFile(AllAdditionalSystemProperties, "AllAdditionalSystemProperties", "g(r), ...");
+		WriteDataToFile(additionalObservablesMean, "AdditionalObservables");
 	}
 
 	// Write config file for successive simulations
@@ -3250,6 +3311,7 @@ int mainMPI(int argc, char** argv)
 	{
 		delete correlatedSamplingData[i];
 	}
+	additionalObservablesMean.Destroy();
 
 	//Log("finalize ...");
 	MPIMethods::Barrier();
@@ -3513,7 +3575,7 @@ int main(int argc, char **argv)
 	//startVMCSampler();
 	//return 0;
 
-	Potentials::SaveAllPotentialValues("/itpstore/gartner/Output/TDVMC/asterix/");
+	//Potentials::SaveAllPotentialValues("/itpstore/gartner/Output/TDVMC/asterix/");
 
 	if (argc == 0) //INFO: started with pbs on mach
 	{
@@ -3527,15 +3589,12 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BulkQT";
 		//SYSTEM_TYPE = "BulkSplines";
 		//SYSTEM_TYPE = "BulkSplinesScaled";
-		//SYSTEM_TYPE = "HardSphereBosons";
-		//SYSTEM_TYPE = "HardSphereBosonsExp";
 		//SYSTEM_TYPE = "HeDrop";
 		//SYSTEM_TYPE = "BosonCluster";
 		//SYSTEM_TYPE = "BosonClusterWithLog";
 		SYSTEM_TYPE = "BosonClusterWithLogParam";
 		SYSTEM_TYPE = "BosonMixtureCluster";
 		//SYSTEM_TYPE = "NUBosonsBulk";
-		//SYSTEM_TYPE = "PBosonsBulk";
 		//SYSTEM_TYPE = "BosonsBulkDamped";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
@@ -3553,11 +3612,6 @@ int main(int argc, char **argv)
 		else if (SYSTEM_TYPE == "BulkSplinesScaled")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/bulkSplinesScaled.config";
-		}
-		else if (SYSTEM_TYPE == "BulkQT")
-		{
-			//configFilePath = "/home/gartner/Sources/TDVMC/config/bulkQT.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/test64.config";
 		}
 		else if (SYSTEM_TYPE == "GaussianWavepacket")
 		{
@@ -3585,24 +3639,15 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "BosonMixtureCluster")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonMixtureCluster.config";
-		}
-		else if (SYSTEM_TYPE == "HardSphereBosons")
-		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/HardSphereBosons.config";
-		}
-		else if (SYSTEM_TYPE == "HardSphereBosonsExp")
-		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/HardSphereBosonsExp.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/BosonMixtureCluster.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/He4He4Na.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/He4He4Cs.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/He3He4Cs.config";
 		}
 		else if (SYSTEM_TYPE == "NUBosonsBulk")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulk1D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulk2D.config";
-		}
-		else if (SYSTEM_TYPE == "PBosonsBulk")
-		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/PBosonsBulk2D.config";
 		}
 		//if (processRank == rootRank) //INFO: no processRank assigned so far. this is done in mainMPI or startVMCSamplerMPI
 		//{

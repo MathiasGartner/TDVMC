@@ -1,28 +1,15 @@
 //!HFD-B(He) Aziz et al: Mol. Phys. 61, 1487 (1987)
 #pragma once
 
-#include "IPairPotential.h"
+#include "HFDB.h"
 
 namespace Potentials
 {
 
-class HFDB_He_He: public IPairPotential
+class HFDB_He_He: public HFDB
 {
 public:
-	double epsil;
-	double rm;
-	double av;
-	double alf;
-	double bet;
-	double dv;
-	double c6;
-	double c8;
-	double c10;
-
-public:
 	HFDB_He_He();
-
-	double GetPotential(double r);
 };
 
 }

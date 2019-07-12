@@ -279,6 +279,20 @@ double VectorDisplacementNIC(vector<double>& ri, vector<double>& rj, vector<doub
 	return norm;
 }
 
+double GetCornerAngle(vector<double>& r1, vector<double>& r2, vector<double>& r3)
+{
+	double angle = 0;
+	vector<double> tmp(DIM);
+	double r12 = VectorDisplacement(r1, r2, tmp);
+	double r13 = VectorDisplacement(r1, r3, tmp);
+	double r23 = VectorDisplacement(r2, r3, tmp);
+
+	//arccos(a^2 + b^2 - c^2 / 2 a b)
+	angle = acos((r12 * r12 + r23 * r23 - r13 * r13) / (2 * r12 * r23));
+	angle = angle / M_PI * 180.0; //INFO: in degree
+	return angle;
+}
+
 vector<double> AllVectorDisplacements(vector<double>& ri, vector<double>& rj, double maxDistance)
 {
 	//TODO: if i==j the distances are simply L, sqrt(2 L), 2L, ... for 2D
@@ -632,67 +646,58 @@ void InitVector(vector<vector<double> >& v, int size1, int size2, double initial
 	}
 }
 
-
-void WriteDataToFile(double* data, int n, string filename, string header)
+void InitVector(vector<vector<vector<double> > >& v, int size1, int size2, int size3, double initialValue)
 {
-	ofstream file;
-	//cout << OUT_DIR << filename << ".csv" << endl;
-	file.open(OUT_DIR + filename + ".csv", ios::out);
-	file.precision(exportPrecision);
-	file << header << endl;
-	for (int i = 0; i < n; i++)
+	v.resize(size1);
+	for (auto& i : v)
 	{
-		file << std::fixed << data[i] << endl;
+		InitVector(i, size2, size3, initialValue);
 	}
-	file.close();
 }
 
-void WriteDataToFile(double** data, int n1, int n2, string filename, string header)
+void SetFileFormat(ofstream& f)
 {
-	ofstream file;
-	//cout << OUT_DIR << filename << ".csv" << endl;
-	file.open(OUT_DIR + filename + ".csv", ios::out);
-	file.precision(exportPrecision);
-	file << header << endl;
-	for (int i = 0; i < n1; i++)
+	f.precision(exportPrecisionSc);
+	f << std::scientific;
+	f << left;
+}
+
+void WriteLineToFile(ofstream& f, double data)
+{
+	f << setw(colWidth) << data;
+	f << endl;
+}
+
+void WriteLineToFile(ofstream& f, vector<double>& data)
+{
+	for (auto& value : data)
 	{
-		for (int j = 0; j < n2; j++)
-		{
-			file << std::fixed << data[i][j];
-			if (j < n2 - 1)
-			{
-				file << ", ";
-			}
-		}
-		if (i < n1 - 1)
-		{
-			file << endl;
-		}
+		f << setw(colWidth) << value;
 	}
-	file.close();
+	f << endl;
 }
 
 void WriteDataToFile(double data, string filename, string header)
 {
 	ofstream file;
-	//cout << OUT_DIR << filename << ".csv" << endl;
-	file.open(OUT_DIR + filename + ".csv", ios::out);
-	file.precision(exportPrecision);
+	//cout << OUT_DIR << filename << fileExtension << endl;
+	file.open(OUT_DIR + filename + fileExtension, ios::out);
+	SetFileFormat(file);
 	file << header << endl;
-	file << std::fixed << data << endl;
+	WriteLineToFile(file, data);
 	file.close();
 }
 
 void WriteDataToFile(vector<double>& data, string filename, string header, int everyNth)
 {
 	ofstream file;
-	//cout << OUT_DIR << filename << ".csv" << endl;
-	file.open(OUT_DIR + filename + ".csv", ios::out);
-	file.precision(exportPrecision);
+	//cout << OUT_DIR << filename << fileExtension << endl;
+	file.open(OUT_DIR + filename + fileExtension, ios::out);
+	SetFileFormat(file);
 	file << header << endl;
 	for (unsigned int i = everyNth - 1; i < data.size(); i += everyNth)
 	{
-		file << std::fixed << data[i] << endl;
+		WriteLineToFile(file, data[i]);
 	}
 	file.close();
 }
@@ -700,24 +705,25 @@ void WriteDataToFile(vector<double>& data, string filename, string header, int e
 void WriteDataToFile(vector<vector<double> >& data, string filename, string header, int everyNth, bool writeHeader)
 {
 	ofstream file;
-	//cout << OUT_DIR << filename << ".csv" << endl;
-	file.open(OUT_DIR + filename + ".csv", ios::out);
-	file.precision(exportPrecision);
+	//cout << OUT_DIR << filename << fileExtension << endl;
+	file.open(OUT_DIR + filename + fileExtension, ios::out);
+	SetFileFormat(file);
 	if (writeHeader)
 	{
 		file << header << endl;
 	}
 	for (unsigned int i = everyNth - 1; i < data.size(); i += everyNth)
 	{
-		file << std::fixed << JoinVector(data[i]) << endl;
+		WriteLineToFile(file, data[i]);
 	}
 	file.close();
 }
 
 void WriteDataToFile(vector<vector<vector<double> > >& data, string filename, string header)
 {
+	//TODO: also use scientific notation
 	ofstream file;
-	//cout << OUT_DIR << filename << ".csv" << endl;
+	//cout << OUT_DIR << filename << ".m" << endl;
 	file.open(OUT_DIR + filename + ".m", ios::out);
 	file.precision(exportPrecision);
 	//file << header << endl;
@@ -737,23 +743,71 @@ void WriteDataToFile(vector<vector<vector<double> > >& data, string filename, st
 	file.close();
 }
 
+void WriteDataToFile(Observables::ObservableCollection& data, string filename)
+{
+	for (auto& obs : data.observables)
+	{
+		ofstream file;
+		file.open(OUT_DIR + filename + "_" + obs->name + ".dat", ios::out);
+		SetFileFormat(file);
+
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(obs))
+		{
+			file << setw(colWidth) << o->gridName;
+			for (auto& j : o->observablesV)
+			{
+				file << setw(colWidth) << j.name;
+			}
+			file << endl;
+			for (unsigned int i = 0; i < o->grid.size(); i++)
+			{
+				file << setw(colWidth) << o->grid[i];
+				for (auto& j : o->observablesV)
+				{
+					file << setw(colWidth) << j.values[i];
+				}
+				file << endl;
+			}
+		}
+		else if (auto o = dynamic_cast<Observables::ObservableV*>(obs))
+		{
+			string header = o->name;
+			file << header << endl;
+			for (unsigned int i = 0; i < o->values.size(); i++)
+			{
+				file << o->values[i] << endl;
+			}
+		}
+		else if (auto o = dynamic_cast<Observables::Observable*>(obs))
+		{
+			file << o->value << endl;
+		}
+		else
+		{
+			throw std::invalid_argument("ReduceToAverage of IObservable* not implemented for given type.");
+		}
+
+		file.close();
+	}
+}
+
 void AppendDataToFile(double data, string filename)
 {
 	ofstream file;
-	//cout << OUT_DIR << filename << ".csv" << endl;
-	file.open(OUT_DIR + filename + ".csv", ios::app);
-	file.precision(exportPrecision);
-	file << std::fixed << data << endl;
+	//cout << OUT_DIR << filename << fileExtension << endl;
+	file.open(OUT_DIR + filename + fileExtension, ios::app);
+	SetFileFormat(file);
+	WriteLineToFile(file, data);
 	file.close();
 }
 
 void AppendDataToFile(vector<double>& data, string filename)
 {
 	ofstream file;
-	//cout << OUT_DIR << filename << ".csv" << endl;
-	file.open(OUT_DIR + filename + ".csv", ios::app);
-	file.precision(exportPrecision);
-	file << std::fixed << JoinVector(data) << endl;
+	//cout << OUT_DIR << filename << fileExtension << endl;
+	file.open(OUT_DIR + filename + fileExtension, ios::app);
+	SetFileFormat(file);
+	WriteLineToFile(file, data);
 	file.close();
 }
 

@@ -212,7 +212,7 @@ void BosonsBulkDamped::CalculateOtherLocalOperators(vector<vector<double> >& R)
 	double res2;
 	double res3;
 	double rniOverSigma;
-	double muOverSigma;
+	//double muOverSigma;
 	double rniPlusMuOverSigma;
 	double expRniOverSigma;
 	double expMuOverSigma;
@@ -221,7 +221,7 @@ void BosonsBulkDamped::CalculateOtherLocalOperators(vector<vector<double> >& R)
 	double expRniOverSigmaPlusExpMuOverSigma2;
 	double expRniOverSigmaPlusExpMuOverSigma3;
 	double sigma2;
-	double damping;
+	double damping = 1.0;
 	double dampingD;
 	double dampingD2;
 
@@ -282,7 +282,7 @@ void BosonsBulkDamped::CalculateOtherLocalOperators(vector<vector<double> >& R)
 					res2 = res * res;
 					res3 = res2 * res;
 					rniOverSigma = rni / sigma;
-					muOverSigma = mu / sigma;
+					//muOverSigma = mu / sigma;
 					rniPlusMuOverSigma = (rni + mu) / sigma;
 					expRniOverSigma = exp(rniOverSigma);
 					expMuOverSigma = exp(rniPlusMuOverSigma);

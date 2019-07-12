@@ -134,6 +134,7 @@ void BosonMixtureCluster::InitSystem()
 		pp.hbarOver2m = pow(Constants::Split::hbar, 2.0) / (2.0 * pp.mass * Constants::Split::u) / (pow(Constants::Split::A2m, 2.0) * Constants::Split::kb);
 	}
 
+	//TODO!!!
 	index = this->correlationIndexMapping[He4][He4];
 	if (index > -1)
 	{
@@ -151,26 +152,36 @@ void BosonMixtureCluster::InitSystem()
 	}
 
 	//INFO: copy
-	int he4he4Index = this->correlationIndexMapping[He4][He4];
+	int copyIndex = this->correlationIndexMapping[He3][He4];
 	index = this->correlationIndexMapping[He3][He3];
 	if (index > -1)
 	{
-		this->corrFuncData[index] = this->corrFuncData[he4he4Index];
+		this->corrFuncData[index] = this->corrFuncData[copyIndex];
 	}
 	index = this->correlationIndexMapping[Na][Na];
 	if (index > -1)
 	{
-		this->corrFuncData[index] = this->corrFuncData[he4he4Index];
+		this->corrFuncData[index] = this->corrFuncData[copyIndex];
 	}
 	index = this->correlationIndexMapping[He3][He4];
 	if (index > -1)
 	{
-		this->corrFuncData[index] = this->corrFuncData[he4he4Index];
+		CorrelationFunctionData& cfd = this->corrFuncData[index];
+		cfd.mcMillanFactor = -4.7;
+		cfd.numberOfSplines = 26; //as in calculations performed for Split X_4 Cluster (BosonClusterWithLogParam)
+		cfd.nodes = this->globalNodes; //TODO: allow different nodes
+		cfd.nodes -= 0.7;
+		cfd.rijSplit = cfd.nodes[3];
+		cfd.rijTail = cfd.nodes[cfd.nodes.size() - 4];
+		cfd.splineWeights = SplineFactory::GetWeights(cfd.nodes);
+		SplineFactory::SetBoundaryConditions1_MM_1(cfd.nodes, cfd.bcFactors, cfd.rijSplit, cfd.mcMillanFactor);
+		SplineFactory::SetBoundaryConditions1_EXP_2(cfd.nodes, cfd.bcFactors, cfd.rijTail);
+		cfd.Init();
 	}
 	index = this->correlationIndexMapping[He3][Na];
 	if (index > -1)
 	{
-		this->corrFuncData[index] = this->corrFuncData[he4he4Index];
+		this->corrFuncData[index] = this->corrFuncData[copyIndex];
 	}
 	index = this->correlationIndexMapping[He4][Na];
 	if (index > -1)
@@ -194,7 +205,22 @@ void BosonMixtureCluster::InitSystem()
 		cfd.mcMillanFactor = -4.7;
 		cfd.numberOfSplines = 26; //as in calculations performed for Split X_4 Cluster (BosonClusterWithLogParam)
 		cfd.nodes = this->globalNodes; //TODO: allow different nodes
-		cfd.nodes += 2.0;
+		cfd.nodes += 2.1;
+		cfd.rijSplit = cfd.nodes[3];
+		cfd.rijTail = cfd.nodes[cfd.nodes.size() - 4];
+		cfd.splineWeights = SplineFactory::GetWeights(cfd.nodes);
+		SplineFactory::SetBoundaryConditions1_MM_1(cfd.nodes, cfd.bcFactors, cfd.rijSplit, cfd.mcMillanFactor);
+		SplineFactory::SetBoundaryConditions1_EXP_2(cfd.nodes, cfd.bcFactors, cfd.rijTail);
+		cfd.Init();
+	}
+	index = this->correlationIndexMapping[He3][Cs];
+	if (index > -1)
+	{
+		CorrelationFunctionData& cfd = this->corrFuncData[index];
+		cfd.mcMillanFactor = -4.7;
+		cfd.numberOfSplines = 26; //as in calculations performed for Split X_4 Cluster (BosonClusterWithLogParam)
+		cfd.nodes = this->globalNodes; //TODO: allow different nodes
+		cfd.nodes += 2.1;
 		cfd.rijSplit = cfd.nodes[3];
 		cfd.rijTail = cfd.nodes[cfd.nodes.size() - 4];
 		cfd.splineWeights = SplineFactory::GetWeights(cfd.nodes);
@@ -248,10 +274,15 @@ void BosonMixtureCluster::InitSystem()
 		ParticlePairProperties& ppp = this->particlePairProperties[index];
 		ppp.potential = new Potentials::KTTY_He_Cs();
 	}
+	index = this->correlationIndexMapping[He3][Cs];
+	if (index > -1)
+	{
+		ParticlePairProperties& ppp = this->particlePairProperties[index];
+		ppp.potential = new Potentials::KTTY_He_Cs();
+	}
 
 	//numOfDensityProfileValues = 200;
 	numOfOtherExpectationValues = 3 + globalNumOfDensityProfileValues;
-	numOfAdditionalSystemProperties = numOfOtherExpectationValues + 1; //+1: <r^2>
 
 	wf = 0.0;
 	exponent = 0.0;
@@ -259,21 +290,19 @@ void BosonMixtureCluster::InitSystem()
 	localEnergyR = 0;
 	localEnergyI = 0;
 	localOperators.resize(N_PARAM);
-	ClearVector(localOperators);
+	ClearVector (localOperators);
 	localOperatorsMatrix.resize(N_PARAM);
 	for (auto &row : localOperatorsMatrix)
 	{
 		row.resize(N_PARAM);
 	}
-	ClearVector(localOperatorsMatrix);
+	ClearVector (localOperatorsMatrix);
 	localOperatorlocalEnergyR.resize(N_PARAM);
-	ClearVector(localOperatorlocalEnergyR);
+	ClearVector (localOperatorlocalEnergyR);
 	localOperatorlocalEnergyI.resize(N_PARAM);
-	ClearVector(localOperatorlocalEnergyI);
+	ClearVector (localOperatorlocalEnergyI);
 	otherExpectationValues.resize(numOfOtherExpectationValues);
-	ClearVector(otherExpectationValues);
-	additionalSystemProperties.resize(numOfAdditionalSystemProperties);
-	ClearVector(additionalSystemProperties);
+	ClearVector (otherExpectationValues);
 
 	wfNew = 0.0;
 	exponentNew = 0.0;
@@ -294,6 +323,26 @@ void BosonMixtureCluster::InitSystem()
 	}
 
 	//cout << "nodePointSpacingShort=" << nodePointSpacingShort << ", nodePointSpacingLarge=" << nodePointSpacingLarge << ", rijSplit=" << rijSplit << ", rijSplineSplit=" << rijSplineSplit << ", rijTail=" << rijTail << endl;
+
+	r2.name = "r2";
+
+	angularDistribution.name = "angularDistribution";
+	angularDistribution.InitGrid(0.0, 180.0, 1.0);
+	angularDistribution.InitObservables({"1-2-3", "1-3-2", "2-1-3"}); //TODO: do not hardcode
+
+	densityFromCOM.name = "densityFromCOM";
+	densityFromCOM.InitGrid(0.0, 80.0, 0.1);
+	densityFromCOM.InitScaling();
+	densityFromCOM.InitObservables({"1", "2", "3"}); //TODO: do not hardcode
+
+	particleDistances.name = "particleDistances";
+	particleDistances.InitGrid(0.0, 80, 0.5);
+	particleDistances.InitObservables({"1-2", "1-3", "2-3"}); //TODO: do not hardcode
+
+	additionalObservables.Add(&r2);
+	additionalObservables.Add(&angularDistribution);
+	additionalObservables.Add(&densityFromCOM);
+	additionalObservables.Add(&particleDistances);
 }
 
 vector<double> BosonMixtureCluster::GetCenterOfMass(vector<vector<double> >& R)
@@ -371,11 +420,11 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 
 	localEnergyR = 0;
 	localEnergyI = 0;
-	ClearVector(localOperators);
-	ClearVector(localOperatorsMatrix);
-	ClearVector(localOperatorlocalEnergyR);
-	ClearVector(localOperatorlocalEnergyI);
-	ClearVector(otherExpectationValues);
+	ClearVector (localOperators);
+	ClearVector (localOperatorsMatrix);
+	ClearVector (localOperatorlocalEnergyR);
+	ClearVector (localOperatorlocalEnergyI);
+	ClearVector (otherExpectationValues);
 	ClearVector(globalDensityProfileBins);
 	vector<double> com = GetCenterOfMass(R);
 
@@ -619,54 +668,166 @@ void BosonMixtureCluster::CalculateExpectationValues(ICorrelatedSamplingData* sa
 }
 
 void BosonMixtureCluster::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
-{/*
- ClearVector(additionalSystemProperties);
- CalculateExpectationValues(R, uR, uI, phiR, phiI);
- for (int i = 0; i < numOfOtherExpectationValues; i++)
- {
- additionalSystemProperties[i] = otherExpectationValues[i];
- }
+{
+	additionalObservables.ClearValues();
+	vector<double> com;
+	double rni;
+	vector<double> vecrni(DIM);
+	com = GetCenterOfMass(R);
 
- vector<double> vecrij(DIM);
- vector<double> sumSCos;
- vector<double> sumSSin;
- vector<double> sk;
- sumSCos.resize(numOfkValues);
- ClearVector(sumSCos);
- sumSSin.resize(numOfkValues);
- ClearVector(sumSSin);
- sk.resize(numOfkValues);
- ClearVector(sk);
- for (int i = 0; i < N; i++)
- {
- for (int k = 0; k < numOfkValues; k++)
- {
- for (unsigned int kn = 0; kn < kValues[k].size(); kn++)
- {
- sumSCos[k] += cos(kValues[k][kn][0] * R[i][0] + kValues[k][kn][1] * R[i][1] + kValues[k][kn][2] * R[i][2]);
- sumSSin[k] += sin(kValues[k][kn][0] * R[i][0] + kValues[k][kn][1] * R[i][1] + kValues[k][kn][2] * R[i][2]);
- }
- }
- }
- for (int k = 0; k < numOfkValues; k++)
- {
- sk[k] = (sumSCos[k] * sumSCos[k] + sumSSin[k] * sumSSin[k]) / ((double) (N * kValues[k].size()));
- additionalSystemProperties[numOfOtherExpectationValues + k] = sk[k];
- }
 
- double r;
- double r2Sum = 0.0;
- vector<double> com;
- com = GetCenterOfMass(R);
- for (int i = 0; i < N; i++)
- {
- vector<double> diff = R[i] - com;
- r = VectorNorm(diff);
- r2Sum += r * r;
- }
- additionalSystemProperties[numOfAdditionalSystemProperties - 1] = r2Sum / (double) N;
- */
+	//r2
+	double r;
+	double r2Sum = 0.0;
+	for (int i = 0; i < N; i++)
+	{
+		vector<double> diff = R[i] - com;
+		r = VectorNorm(diff);
+		r2Sum += r * r;
+	}
+	r2.value = r2Sum / (double) N;
+
+
+	//angularDistribution
+	double angle;
+
+	//angle between particles 1-2-3
+	angle = GetCornerAngle(R[0], R[1], R[2]);
+	angularDistribution.AddToHistogram(0, angle, 1.0);
+
+	//angle between particles 1-3-2
+	angle = GetCornerAngle(R[0], R[2], R[1]);
+	angularDistribution.AddToHistogram(1, angle, 1.0);
+
+	//angle between particles 2-1-3
+	angle = GetCornerAngle(R[1], R[0], R[2]);
+	angularDistribution.AddToHistogram(2, angle, 1.0);
+
+
+	//density from COM
+	for (int i = 0; i < N; i++)
+	{
+		rni = VectorDisplacement(R[i], com, vecrni);
+		if (rni < densityFromCOM.gridMax)
+		{
+			densityFromCOM.AddToHistogram(i, rni, 1.0);
+		}
+	}
+
+
+	//distance matrix
+	int index = 0;
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < i; j++)
+		{
+			rni = VectorDisplacement(R[i], R[j], vecrni);
+			if (rni < particleDistances.gridMax)
+			{
+				particleDistances.AddToHistogram(index, rni, 1.0);
+			}
+			index++;
+		}
+	}
 }
+
+//void BosonMixtureCluster::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+//{
+//	ClearVector (additionalSystemProperties);
+//	int index;
+//
+//	double r;
+//	double r2Sum = 0.0;
+//	vector<double> com;
+//	com = GetCenterOfMass(R);
+//	for (int i = 0; i < N; i++)
+//	{
+//		vector<double> diff = R[i] - com;
+//		r = VectorNorm(diff);
+//		r2Sum += r * r;
+//	}
+//	additionalSystemProperties[0] = r2Sum / (double) N;
+//
+//	double angle;
+//	int anglebin;
+//
+//	//angle between particles 1-2-3
+//	angle = GetCornerAngle(R[0], R[1], R[2]) / M_PI * 180.0;
+//	anglebin = angle;
+//	additionalSystemProperties[1 + anglebin] += 1;
+//
+//	//angle between particles 1-3-2
+//	angle = GetCornerAngle(R[0], R[2], R[1]) / M_PI * 180.0;
+//	anglebin = angle;
+//	additionalSystemProperties[1 + 180 + anglebin] += 1;
+//
+//	//angle between particles 2-1-3
+//	angle = GetCornerAngle(R[1], R[0], R[2]) / M_PI * 180.0;
+//	anglebin = angle;
+//	additionalSystemProperties[1 + 180 + 180 + anglebin] += 1;
+//
+//	double interval;
+//	int bin;
+//	double rni;
+//	vector<double> vecrni(DIM);
+//
+//	//density from COM
+//	vector<vector<double> > densityCOM;
+//	InitVector(densityCOM, N, globalNumOfDensityProfileValues, 0.0);
+//	for (int i = 0; i < N; i++)
+//	{
+//		rni = VectorDisplacement(R[i], com, vecrni);
+//		if (rni < globalDensityProfileMaxDistance)
+//		{
+//			interval = rni / globalDensityProfileNodePointSpacing;
+//			bin = floor(interval);
+//			densityCOM[i][bin] += 1.0 / globalDensityProfileBinVolumes[bin];
+//		}
+//	}
+//	index = 1 + 180 + 180 + 180;
+//	for (int i = 0; i < N; i++)
+//	{
+//		for (int d = 0; d < globalNumOfDensityProfileValues; d++)
+//		{
+//			additionalSystemProperties[index] = densityCOM[i][d];
+//			index++;
+//		}
+//	}
+//
+//	//distance matrix
+//	vector<vector<vector<double> > > densityProfileMatrix;
+//	InitVector(densityProfileMatrix, N, N, globalNumOfDensityProfileValues, 0.0);
+//	for (int i = 0; i < N; i++)
+//	{
+//		for (int j = 0; j < i; j++)
+//		{
+//			rni = VectorDisplacement(R[i], R[j], vecrni);
+//			if (rni < globalDensityProfileMaxDistance)
+//			{
+//				interval = rni / globalDensityProfileNodePointSpacing;
+//				bin = floor(interval);
+//				//densityProfileMatrix[i][j][bin] += 1.0 / globalDensityProfileBinVolumes[bin];
+//				densityProfileMatrix[i][j][bin] += 1.0;
+//			}
+//		}
+//	}
+//	for (int i = 0; i < N; i++)
+//	{
+//		for (int j = 0; j < i; j++)
+//		{
+//			for (int d = 0; d < globalNumOfDensityProfileValues; d++)
+//			{
+//				additionalSystemProperties[index] = densityProfileMatrix[i][j][d];
+//				index++;
+//			}
+//		}
+//	}
+//}
+
+//void BosonMixtureCluster::GetCorrelationFunctionValues(vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+//{
+//
+//}
 
 void BosonMixtureCluster::CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
@@ -695,7 +856,7 @@ void BosonMixtureCluster::CalculateWavefunction(vector<vector<double> >& R, vect
 			ct = this->correlationTypes[n][i];
 			CorrelationFunctionData& cfd = this->corrFuncData[ct];
 			rni = VectorDisplacement(R[n], R[i], vecrni);
-			if (rni < cfd.rijSplit)
+			if (rni <= cfd.rijSplit)
 			{
 				cfd.mcMillanSum += pow(rni, cfd.mcMillanFactor);
 			}
@@ -723,6 +884,10 @@ void BosonMixtureCluster::CalculateWavefunction(vector<vector<double> >& R, vect
 	int nCFD = 0;
 	int paramOffset = 26;
 	int offset = 0;
+	//for (auto& cfd : this->corrFuncData)
+	//{
+	//	WriteDataToFile(cfd.bcFactors, "bcFactors", "bcFactors");
+	//}
 	for (auto& cfd : this->corrFuncData)
 	{
 		offset = nCFD * paramOffset;

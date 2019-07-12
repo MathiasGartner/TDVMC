@@ -2,6 +2,8 @@
 
 #include "../ICorrelatedSamplingData.h"
 
+#include "../Observables/ObservableCollection.h"
+
 #include <string>
 #include <vector>
 
@@ -34,6 +36,7 @@ protected:
 	int numOfOtherExpectationValues;
 	vector<double> additionalSystemProperties; // for properties at the end of the simulation
 	int numOfAdditionalSystemProperties;
+	Observables::ObservableCollection additionalObservables;
 
 public:
 	bool USE_NORMALIZATION_AND_PHASE; //INFO: parameters phiR and phiI
@@ -64,6 +67,7 @@ public:
 
 	virtual ~IPhysicalSystem()
 	{
+		this->additionalObservables.Destroy();
 	}
 
 	double GetTime() { return time; }
@@ -85,7 +89,7 @@ public:
 	vector<double> GetAdditionalSystemProperties() { return additionalSystemProperties; }
 	int GetNumOfOtherExpectationValues() { return numOfOtherExpectationValues; }
 	int GetNumOfAdditionalSystemProperties() { return numOfAdditionalSystemProperties; }
-
+	Observables::ObservableCollection GetAdditionalObservablesClone() { return additionalObservables.Clone(); }
 
 	virtual void InitSystem() = 0;
 

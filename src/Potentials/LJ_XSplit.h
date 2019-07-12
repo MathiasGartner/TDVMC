@@ -5,10 +5,10 @@
 namespace Potentials
 {
 
-class LJ_He_He: public LJ
+class LJ_XSplit: public LJ
 {
 public:
-	LJ_He_He();
+	LJ_XSplit();
 };
 
 }

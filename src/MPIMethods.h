@@ -2,6 +2,11 @@
 
 #include "mpi.h"
 
+#include "Observables/Observable.h"
+#include "Observables/ObservableCollection.h"
+#include "Observables/ObservableV.h"
+#include "Observables/ObservableVsOnGrid.h"
+
 #include <cstring>
 #include <vector>
 
@@ -197,6 +202,83 @@ void ReduceToAverage(vector<double>& data)
 	}
 
 	delete[] reducedValues;
+}
+
+void ReduceToAverage(Observables::Observable& data)
+{
+	double ownValues;
+	double reducedValues;
+
+	ownValues = data.value;
+	MPI_Reduce(&ownValues, &reducedValues, 1, MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
+	if (processRank == rootRank)
+	{
+		data.value = reducedValues / (double) numOfProcesses;
+	}
+}
+
+void ReduceToAverage(Observables::ObservableV& data)
+{
+	double* reducedValues = new double[data.values.size()]; //TODO: check on zusie what method is faster
+
+	MPI_Reduce(data.values.data(), reducedValues, data.values.size(), MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
+	//INFO: only root process holds the average values from all processes.
+	if (processRank == rootRank)
+	{
+		for (unsigned int i = 0; i < data.values.size(); i++)
+		{
+			data.values[i] = reducedValues[i] / (double) numOfProcesses;
+		}
+	}
+
+	delete[] reducedValues;
+}
+
+void ReduceToAverage(Observables::ObservableVsOnGrid& data)
+{
+	if (data.observablesV.size() > 0)
+	{
+		double* reducedValues = new double[data.grid.size()]; //TODO: check on zusie what method is faster
+
+		for (unsigned int j = 0; j < data.observablesV.size(); j++)
+		{
+			//TODO: just use ReduceToAverage(data.observablesV[j]); ??
+			MPI_Reduce(data.observablesV[j].values.data(), reducedValues, data.observablesV[j].values.size(), MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
+			//INFO: only root process holds the average values from all processes.
+			if (processRank == rootRank)
+			{
+				for (unsigned int i = 0; i < data.grid.size(); i++)
+				{
+					data.observablesV[j].values[i] = reducedValues[i] / (double) numOfProcesses;
+				}
+			}
+		}
+
+		delete[] reducedValues;
+	}
+}
+
+void ReduceToAverage(Observables::ObservableCollection& data)
+{
+	for (auto& obs : data.observables)
+	{
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(obs))
+		{
+			ReduceToAverage(*o);
+		}
+		else if (auto o = dynamic_cast<Observables::ObservableV*>(obs))
+		{
+			ReduceToAverage(*o);
+		}
+		else if (auto o = dynamic_cast<Observables::Observable*>(obs))
+		{
+			ReduceToAverage(*o);
+		}
+		else
+		{
+			 throw std::invalid_argument("ReduceToAverage of IObservable* not implemented for given type.");
+		}
+	}
 }
 
 //INFO: is a little bit slower than ReduceToAverage with double* reducedValues
