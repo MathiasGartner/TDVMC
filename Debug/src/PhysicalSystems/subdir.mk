@@ -12,18 +12,13 @@ CPP_SRCS += \
 ../src/PhysicalSystems/BosonsBulkDamped.cpp \
 ../src/PhysicalSystems/BulkOnlySplines.cpp \
 ../src/PhysicalSystems/BulkOnlySplinesOriginal.cpp \
-../src/PhysicalSystems/BulkQT.cpp \
-../src/PhysicalSystems/BulkQTPhi.cpp \
 ../src/PhysicalSystems/BulkSplines.cpp \
 ../src/PhysicalSystems/BulkSplinesPhi.cpp \
 ../src/PhysicalSystems/BulkSplinesScaled.cpp \
 ../src/PhysicalSystems/GaussianWavepacket.cpp \
-../src/PhysicalSystems/HardSphereBosons.cpp \
-../src/PhysicalSystems/HardSphereBosonsExp.cpp \
 ../src/PhysicalSystems/HeBulk.cpp \
 ../src/PhysicalSystems/HeDrop.cpp \
-../src/PhysicalSystems/NUBosonsBulk.cpp \
-../src/PhysicalSystems/PBosonsBulk.cpp 
+../src/PhysicalSystems/NUBosonsBulk.cpp 
 
 OBJS += \
 ./src/PhysicalSystems/BosonCluster.o \
@@ -34,18 +29,13 @@ OBJS += \
 ./src/PhysicalSystems/BosonsBulkDamped.o \
 ./src/PhysicalSystems/BulkOnlySplines.o \
 ./src/PhysicalSystems/BulkOnlySplinesOriginal.o \
-./src/PhysicalSystems/BulkQT.o \
-./src/PhysicalSystems/BulkQTPhi.o \
 ./src/PhysicalSystems/BulkSplines.o \
 ./src/PhysicalSystems/BulkSplinesPhi.o \
 ./src/PhysicalSystems/BulkSplinesScaled.o \
 ./src/PhysicalSystems/GaussianWavepacket.o \
-./src/PhysicalSystems/HardSphereBosons.o \
-./src/PhysicalSystems/HardSphereBosonsExp.o \
 ./src/PhysicalSystems/HeBulk.o \
 ./src/PhysicalSystems/HeDrop.o \
-./src/PhysicalSystems/NUBosonsBulk.o \
-./src/PhysicalSystems/PBosonsBulk.o 
+./src/PhysicalSystems/NUBosonsBulk.o 
 
 CPP_DEPS += \
 ./src/PhysicalSystems/BosonCluster.d \
@@ -56,18 +46,13 @@ CPP_DEPS += \
 ./src/PhysicalSystems/BosonsBulkDamped.d \
 ./src/PhysicalSystems/BulkOnlySplines.d \
 ./src/PhysicalSystems/BulkOnlySplinesOriginal.d \
-./src/PhysicalSystems/BulkQT.d \
-./src/PhysicalSystems/BulkQTPhi.d \
 ./src/PhysicalSystems/BulkSplines.d \
 ./src/PhysicalSystems/BulkSplinesPhi.d \
 ./src/PhysicalSystems/BulkSplinesScaled.d \
 ./src/PhysicalSystems/GaussianWavepacket.d \
-./src/PhysicalSystems/HardSphereBosons.d \
-./src/PhysicalSystems/HardSphereBosonsExp.d \
 ./src/PhysicalSystems/HeBulk.d \
 ./src/PhysicalSystems/HeDrop.d \
-./src/PhysicalSystems/NUBosonsBulk.d \
-./src/PhysicalSystems/PBosonsBulk.d 
+./src/PhysicalSystems/NUBosonsBulk.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes

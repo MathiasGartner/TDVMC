@@ -25,6 +25,7 @@ C_DEPS :=
 SUBDIRS := \
 resources \
 src \
+src/Observables \
 src/PhysicalSystems \
 src/Potentials \
 

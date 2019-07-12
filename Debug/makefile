@@ -10,6 +10,7 @@ RM := rm -rf
 -include sources.mk
 -include src/Potentials/subdir.mk
 -include src/PhysicalSystems/subdir.mk
+-include src/Observables/subdir.mk
 -include src/subdir.mk
 -include resources/subdir.mk
 -include subdir.mk
