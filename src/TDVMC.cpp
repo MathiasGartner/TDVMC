@@ -26,6 +26,7 @@
 #include "PhysicalSystems/HeBulk.h"
 #include "PhysicalSystems/HeDrop.h"
 #include "PhysicalSystems/NUBosonsBulk.h"
+#include "PhysicalSystems/NUBosonsBulkPB.h"
 
 #include "Potentials/PotentialManager.h"
 
@@ -94,6 +95,7 @@ double PARAM_PHII;
 int USE_PARAMETER_ACCEPTANCE_CHECK;
 int PARAMETER_ACCEPTANCE_CHECK_TYPE;
 int WRITE_EVERY_NTH_STEP_TO_FILE;
+int CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP;
 int WRITE_SINGLE_FILES;
 int MC_NSTEP_MULTIPLICATION_FACTOR_FOR_WRITE_DATA;
 int USE_MEAN_FOR_FINAL_PARAMETERS;
@@ -107,12 +109,14 @@ vector<double> NURBS_GRID;
 vector<int> PARTICLE_TYPES;
 vector<double> SYSTEM_PARAMS;
 
-string requiredConfigVersion = "0.18";
+string requiredConfigVersion = "0.19";
 int numOfProcesses = 1;
 int rootRank = 0;
 int processRank = 0;
 long long nAcceptances = 0;
 long long nTrials = 0;
+vector<long long> nAcceptancesPP;
+vector<long long> nTrialsPP;
 double mc_nsteps;
 int mc_nsteps_original;
 double mc_nadditionalsteps;
@@ -355,9 +359,9 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("MC_NTHERMSTEPS", &MC_NTHERMSTEPS, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("MC_NINITIALIZATIONSTEPS", &MC_NINITIALIZATIONSTEPS, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("MC_VERY_FIRST_NINITIALIZATIONSTEPS", &MC_VERY_FIRST_NINITIALIZATIONSTEPS, ConfigItemType::INT));
-	configItems.push_back(ConfigItem("MC_NADDITIONALSTEPS", &MC_NADDITIONALSTEPS, ConfigItemType::INT));
-	configItems.push_back(ConfigItem("MC_NADDITIONALTHERMSTEPS", &MC_NADDITIONALTHERMSTEPS, ConfigItemType::INT));
-	configItems.push_back(ConfigItem("MC_NADDITIONALINITIALIZATIONSTEPS", &MC_NADDITIONALINITIALIZATIONSTEPS, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("MC_NADDITIONALSTEPS", &MC_NADDITIONALSTEPS, ConfigItemType::INT, true));
+	configItems.push_back(ConfigItem("MC_NADDITIONALTHERMSTEPS", &MC_NADDITIONALTHERMSTEPS, ConfigItemType::INT, true));
+	configItems.push_back(ConfigItem("MC_NADDITIONALINITIALIZATIONSTEPS", &MC_NADDITIONALINITIALIZATIONSTEPS, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("TIMESTEP", &TIMESTEP, ConfigItemType::DOUBLE));
 	configItems.push_back(ConfigItem("TOTALTIME", &TOTALTIME, ConfigItemType::DOUBLE, true));
 	configItems.push_back(ConfigItem("IMAGINARY_TIME", &IMAGINARY_TIME, ConfigItemType::INT));
@@ -366,6 +370,7 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("USE_PARAMETER_ACCEPTANCE_CHECK", &USE_PARAMETER_ACCEPTANCE_CHECK, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("PARAMETER_ACCEPTANCE_CHECK_TYPE", &PARAMETER_ACCEPTANCE_CHECK_TYPE, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("WRITE_EVERY_NTH_STEP_TO_FILE", &WRITE_EVERY_NTH_STEP_TO_FILE, ConfigItemType::INT, true));
+	configItems.push_back(ConfigItem("CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP", &CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("WRITE_SINGLE_FILES", &WRITE_SINGLE_FILES, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("MC_NSTEP_MULTIPLICATION_FACTOR_FOR_WRITE_DATA", &MC_NSTEP_MULTIPLICATION_FACTOR_FOR_WRITE_DATA, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("USE_MEAN_FOR_FINAL_PARAMETERS", &USE_MEAN_FOR_FINAL_PARAMETERS, ConfigItemType::INT, true));
@@ -553,6 +558,8 @@ void Init()
 	LBOX_R = 1.0 / LBOX;
 	nAcceptances = 0;
 	nTrials = 0;
+	InitVector(nAcceptancesPP, N, 0);
+	InitVector(nTrialsPP, N, 0);
 
 	mc_nsteps = (double) MC_NSTEPS;
 	mc_nsteps_original = MC_NSTEPS;
@@ -860,8 +867,10 @@ void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<dou
 	{
 		sys->AcceptMove();
 		nAcceptances++;
+		nAcceptancesPP[randomParticle]++;
 	}
 	nTrials++;
+	nTrialsPP[randomParticle]++;
 }
 
 //////////////////////////////////////////
@@ -1020,7 +1029,7 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 
 		sys->CalculateExpectationValues(R, uR, uI, phiR, phiI);
 
-		if (i < mc_nsteps_original)
+		if (i < mc_nsteps_original && UPDATE_SAMPLES_EVERY_NTH_STEP > 0)
 		{
 			correlatedSamplingData[i]->R = R;
 			correlatedSamplingData[i]->wf = sys->GetWf();
@@ -1081,6 +1090,10 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 	if (processRank == rootRank && !intermediateStep)
 	{
 		cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
+		for (int i = 0; i < N; i++)
+		{
+			//cout << i << ": " << (nAcceptancesPP[i] / (nTrialsPP[i] / 100.0)) << "% (" << nAcceptancesPP[i] << "/" << nTrialsPP[i] << ")" << endl;
+		}
 	}
 
 	MC_NSTEPS /= (sys->GetStep() % WRITE_EVERY_NTH_STEP_TO_FILE == 0 ? MC_NSTEP_MULTIPLICATION_FACTOR_FOR_WRITE_DATA : 1);
@@ -1307,56 +1320,60 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
 	if (processRank == rootRank)
 	{
 		cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
+		for (int i = 0; i < N; i++)
+		{
+			cout << i << ": " << (nAcceptancesPP[i] / (nTrialsPP[i] / 100.0)) << "% (" << nAcceptancesPP[i] << "/" << nTrialsPP[i] << ")" << endl;
+		}
 	}
 }
 
 /*void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
-{
-	int percent = 0;
-	ClearVector(additionalSystemProperties);
-	ClearVector(AllAdditionalSystemProperties);
-	sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
-	for (int i = 0; i < MC_NADDITIONALINITIALIZATIONSTEPS; i++)
-	{
-		DoMetropolisStep(R, uR, uI, phiR, phiI);
-	}
-	for (int i = 0; i < MC_NADDITIONALSTEPS; i++)
-	{
-		for (int nTherm = 0; nTherm < MC_NADDITIONALTHERMSTEPS; nTherm++)
-		{
-			DoMetropolisStep(R, uR, uI, phiR, phiI);
-		}
+ {
+ int percent = 0;
+ ClearVector(additionalSystemProperties);
+ ClearVector(AllAdditionalSystemProperties);
+ sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
+ for (int i = 0; i < MC_NADDITIONALINITIALIZATIONSTEPS; i++)
+ {
+ DoMetropolisStep(R, uR, uI, phiR, phiI);
+ }
+ for (int i = 0; i < MC_NADDITIONALSTEPS; i++)
+ {
+ for (int nTherm = 0; nTherm < MC_NADDITIONALTHERMSTEPS; nTherm++)
+ {
+ DoMetropolisStep(R, uR, uI, phiR, phiI);
+ }
 
-		sys->CalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
+ sys->CalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
 
-		//INFO: calculate contribution to average value
-		additionalSystemProperties += sys->GetAdditionalSystemProperties() / mc_nadditionalsteps;
-		//INFO: is too much data when calculating distance matrices
-		//AllAdditionalSystemProperties.push_back(sys->GetAdditionalSystemProperties());
+ //INFO: calculate contribution to average value
+ additionalSystemProperties += sys->GetAdditionalSystemProperties() / mc_nadditionalsteps;
+ //INFO: is too much data when calculating distance matrices
+ //AllAdditionalSystemProperties.push_back(sys->GetAdditionalSystemProperties());
 
-		//additionalObservablesMean = additionalObservablesMean + (sys->GetAdditionalObservables() - additionalObservablesMean) / (i + 1.0);
+ //additionalObservablesMean = additionalObservablesMean + (sys->GetAdditionalObservables() - additionalObservablesMean) / (i + 1.0);
 
 
-		if ((100 * i) % MC_NADDITIONALSTEPS == 0)
-		{
-			//cout << (i / (double)MC_NSTEPS * 100.0) << "%" << endl;
-			if (processRank == rootRank)
-			{
-				//cout << "." << flush;
-				percent++;
-				cout << percent << "%" << endl;
-			}
-		}
-	}
-	if (processRank == rootRank)
-	{
-		cout << endl;
-	}
-	if (processRank == rootRank)
-	{
-		cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
-	}
-}*/
+ if ((100 * i) % MC_NADDITIONALSTEPS == 0)
+ {
+ //cout << (i / (double)MC_NSTEPS * 100.0) << "%" << endl;
+ if (processRank == rootRank)
+ {
+ //cout << "." << flush;
+ percent++;
+ cout << percent << "%" << endl;
+ }
+ }
+ }
+ if (processRank == rootRank)
+ {
+ cout << endl;
+ }
+ if (processRank == rootRank)
+ {
+ cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
+ }
+ }*/
 
 void ParallelCalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
@@ -2699,6 +2716,15 @@ bool InitializePhysicalSystem()
 		}
 		dynamic_cast<PhysicalSystems::NUBosonsBulk*>(sys)->SetGrBinCount(GR_BIN_COUNT);
 	}
+	else if (SYSTEM_TYPE == "NUBosonsBulkPB")
+	{
+		sys = new PhysicalSystems::NUBosonsBulkPB(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PhysicalSystems::NUBosonsBulkPB*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<PhysicalSystems::NUBosonsBulkPB*>(sys)->SetGrBinCount(GR_BIN_COUNT);
+	}
 	else
 	{
 		if (processRank == rootRank)
@@ -2887,6 +2913,9 @@ int mainMPI(int argc, char** argv)
 		MC_NSTEPS = mc_nsteps_original;
 		nAcceptances = 0;
 		nTrials = 0;
+		ClearVector(nAcceptancesPP);
+		ClearVector(nTrialsPP);
+
 		step++;
 		sys->SetTime(currentTime);
 		sys->SetStep(step);
@@ -3119,6 +3148,22 @@ int mainMPI(int argc, char** argv)
 			}
 		}
 
+		//////////////////////////////////////////////
+		/// calculate additional system properties ///
+		/// for visualization of dynamic data      ///
+		//////////////////////////////////////////////
+		if (CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP > 0 && (step % CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP == 0 || step == 1))
+		{
+			ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
+			if (processRank == rootRank)
+			{
+				if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+				{
+					AppendDataToFile(o->observablesV[0].values, "gr");
+				}
+			}
+		}
+
 		// check if simulation should be cancelled or set back to a previous timestep
 		int cancel = 0;
 		int configChanged = 0;
@@ -3244,6 +3289,8 @@ int mainMPI(int argc, char** argv)
 
 	nAcceptances = 0;
 	nTrials = 0;
+	ClearVector(nAcceptancesPP);
+	ClearVector(nTrialsPP);
 	if (USE_MEAN_FOR_FINAL_PARAMETERS == 1)
 	{
 		if (processRank == rootRank)
@@ -3592,9 +3639,10 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "HeDrop";
 		//SYSTEM_TYPE = "BosonCluster";
 		//SYSTEM_TYPE = "BosonClusterWithLog";
-		SYSTEM_TYPE = "BosonClusterWithLogParam";
-		SYSTEM_TYPE = "BosonMixtureCluster";
+		//SYSTEM_TYPE = "BosonClusterWithLogParam";
+		//SYSTEM_TYPE = "BosonMixtureCluster";
 		//SYSTEM_TYPE = "NUBosonsBulk";
+		SYSTEM_TYPE = "NUBosonsBulkPB";
 		//SYSTEM_TYPE = "BosonsBulkDamped";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
@@ -3648,6 +3696,12 @@ int main(int argc, char **argv)
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulk1D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulk2D.config";
+		}
+		else if (SYSTEM_TYPE == "NUBosonsBulkPB")
+		{
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB1D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB2D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB3D.config";
 		}
 		//if (processRank == rootRank) //INFO: no processRank assigned so far. this is done in mainMPI or startVMCSamplerMPI
 		//{

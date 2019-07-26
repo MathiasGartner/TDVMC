@@ -125,6 +125,7 @@ double GetSizeOfVector(vector<double>& v);
 double GetSizeOfVector(vector<vector<double> >& v);
 double GetSizeOfVector(vector<vector<vector<double> > >& v);
 
+void ClearVector(vector<long long>& v);
 void ClearVector(vector<double>& v);
 void ClearVector(vector<vector<double> >& v);
 void ClearVector(vector<vector<vector<double> > >& v);
@@ -132,6 +133,7 @@ void ClearVector(vector<vector<vector<vector<double> > > >& v);
 
 void InitVector(vector<int>& v, int size, int initialValue);
 void InitVector(vector<vector<int> >& v, int size1, int size2, int initialValue);
+void InitVector(vector<long long>& v, int size, long long initialValue);
 void InitVector(vector<double>& v, int size, double initialValue);
 void InitVector(vector<vector<double> >& v, int size1, int size2, double initialValue);
 void InitVector(vector<vector<vector<double> > >& v, int size1, int size2, int size3, double initialValue);

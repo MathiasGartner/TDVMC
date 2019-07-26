@@ -18,7 +18,8 @@ CPP_SRCS += \
 ../src/PhysicalSystems/GaussianWavepacket.cpp \
 ../src/PhysicalSystems/HeBulk.cpp \
 ../src/PhysicalSystems/HeDrop.cpp \
-../src/PhysicalSystems/NUBosonsBulk.cpp 
+../src/PhysicalSystems/NUBosonsBulk.cpp \
+../src/PhysicalSystems/NUBosonsBulkPB.cpp 
 
 OBJS += \
 ./src/PhysicalSystems/BosonCluster.o \
@@ -35,7 +36,8 @@ OBJS += \
 ./src/PhysicalSystems/GaussianWavepacket.o \
 ./src/PhysicalSystems/HeBulk.o \
 ./src/PhysicalSystems/HeDrop.o \
-./src/PhysicalSystems/NUBosonsBulk.o 
+./src/PhysicalSystems/NUBosonsBulk.o \
+./src/PhysicalSystems/NUBosonsBulkPB.o 
 
 CPP_DEPS += \
 ./src/PhysicalSystems/BosonCluster.d \
@@ -52,7 +54,8 @@ CPP_DEPS += \
 ./src/PhysicalSystems/GaussianWavepacket.d \
 ./src/PhysicalSystems/HeBulk.d \
 ./src/PhysicalSystems/HeDrop.d \
-./src/PhysicalSystems/NUBosonsBulk.d 
+./src/PhysicalSystems/NUBosonsBulk.d \
+./src/PhysicalSystems/NUBosonsBulkPB.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes

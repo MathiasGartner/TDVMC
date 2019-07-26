@@ -21,7 +21,18 @@ void ObservableVsOnGridWithScaling::InitScaling()
 	InitVector(scalingGrid, gridCount, 0.0);
 	for (int i = 0; i < gridCount; i++)
 	{
-		scalingGrid[i] = 4.0 * M_PI * pow(gridSpacing * (i + 1), 3.0) / 3.0;
+		if (DIM == 3)
+		{
+			scalingGrid[i] = 4.0 * M_PI * pow(gridSpacing * (i + 1), 3.0) / 3.0; //INFO: 3D sphere volume
+		}
+		else if (DIM == 2)
+		{
+			scalingGrid[i] = M_PI * pow(gridSpacing * (i + 1), 2.0); //INFO: 2D "sphere" volume
+		}
+		else if (DIM == 1)
+		{
+			scalingGrid[i] = 2.0 * (gridSpacing * (i + 1)); //INFO: 1D "sphere" volume
+		}
 	}
 	for (int i = gridCount - 1; i > 0; i--)
 	{

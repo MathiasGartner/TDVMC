@@ -587,6 +587,11 @@ double GetSizeOfVector(vector<vector<vector<double> > >& v)
 	return size;
 }
 
+void ClearVector(vector<long long>& v)
+{
+	fill(v.begin(), v.end(), 0);
+}
+
 void ClearVector(vector<double>& v)
 {
 	fill(v.begin(), v.end(), 0);
@@ -616,6 +621,7 @@ void ClearVector(vector<vector<vector<vector<double> > > >& v)
 	}
 }
 
+//TODO: use templates here!
 void InitVector(vector<int>& v, int size, int initialValue)
 {
 	v.resize(size);
@@ -629,6 +635,12 @@ void InitVector(vector<vector<int> >& v, int size1, int size2, int initialValue)
 	{
 		InitVector(i, size2, initialValue);
 	}
+}
+
+void InitVector(vector<long long>& v, int size, long long initialValue)
+{
+	v.resize(size);
+	fill(v.begin(), v.end(), initialValue);
 }
 
 void InitVector(vector<double>& v, int size, double initialValue)
@@ -748,7 +760,7 @@ void WriteDataToFile(Observables::ObservableCollection& data, string filename)
 	for (auto& obs : data.observables)
 	{
 		ofstream file;
-		file.open(OUT_DIR + filename + "_" + obs->name + ".dat", ios::out);
+		file.open(OUT_DIR + filename + "_" + obs->name + fileExtension, ios::out);
 		SetFileFormat(file);
 
 		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(obs))
