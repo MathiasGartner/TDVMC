@@ -27,6 +27,8 @@
 #include "PhysicalSystems/HeDrop.h"
 #include "PhysicalSystems/NUBosonsBulk.h"
 #include "PhysicalSystems/NUBosonsBulkPB.h"
+#include "PhysicalSystems/NUBosonsBulkPBBox.h"
+#include "PhysicalSystems/NUBosonsBulkPBBoxAndRadial.h"
 
 #include "Potentials/PotentialManager.h"
 
@@ -703,7 +705,7 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 		{
 			cout << "LBOX=" << LBOX << endl;
 		}
-		int type = 2; //INFO: 1: lattice, 2: drop
+		int type = 1; //INFO: 1: lattice, 2: drop
 		if (type == 0)
 		{
 			//Random
@@ -1106,9 +1108,11 @@ void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>&
 	t.start();
 
 	UpdateExpectationValues(R, uR, uI, phiR, phiI, intermediateStep);
+	//MPIMethods::Barrier();
 
 	t.stop();
 	dblDuration = (double) t.duration();
+	//INFO: sometimes error **MPI Error, rank:0, function:MPI_REDUCE, Message truncated on receive**
 	vector<double> timings = MPIMethods::ReduceToMinMaxMean(dblDuration);
 	if (processRank == rootRank && !intermediateStep)
 	{
@@ -2382,7 +2386,8 @@ void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<doubl
 
 void NormalizeWavefunction(double wf, double *phiR)
 {
-	*phiR = *phiR - log(wf);
+	//*phiR = *phiR - log(wf);
+	*phiR = -wf;
 }
 
 void AdjustParameters(vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
@@ -2725,6 +2730,24 @@ bool InitializePhysicalSystem()
 		}
 		dynamic_cast<PhysicalSystems::NUBosonsBulkPB*>(sys)->SetGrBinCount(GR_BIN_COUNT);
 	}
+	else if (SYSTEM_TYPE == "NUBosonsBulkPBBox")
+	{
+		sys = new PhysicalSystems::NUBosonsBulkPBBox(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PhysicalSystems::NUBosonsBulkPBBox*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<PhysicalSystems::NUBosonsBulkPBBox*>(sys)->SetGrBinCount(GR_BIN_COUNT);
+	}
+	else if (SYSTEM_TYPE == "NUBosonsBulkPBBoxAndRadial")
+	{
+		sys = new PhysicalSystems::NUBosonsBulkPBBoxAndRadial(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PhysicalSystems::NUBosonsBulkPBBoxAndRadial*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<PhysicalSystems::NUBosonsBulkPBBoxAndRadial*>(sys)->SetGrBinCount(GR_BIN_COUNT);
+	}
 	else
 	{
 		if (processRank == rootRank)
@@ -2951,10 +2974,26 @@ int mainMPI(int argc, char** argv)
 		//PrintParameters(uI);
 		//cout << "phiR=" << phiR << ", phiI=" << phiI << endl;
 
+
+		//////////////////////////////////////////////
+		/// calculate additional system properties ///
+		/// for visualization of dynamic data      ///
+		//////////////////////////////////////////////
+		if (CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP > 0 && (step % CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP == 0 || step == 1))
+		{
+			ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
+			if (processRank == rootRank)
+			{
+				if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+				{
+					AppendDataToFile(o->observablesV[0].values, "gr");
+				}
+			}
+		}
+
 		////////////////////////////////////////
 		/// try to calculate next parameters ///
 		////////////////////////////////////////
-
 		while (acceptNewParams != 1 && nrOfAcceptParameterTrials < maxNrOfAcceptParameterTrials)
 		{
 			nrOfAcceptParameterTrials++;
@@ -3069,7 +3108,8 @@ int mainMPI(int argc, char** argv)
 				CalculateNextParameters(dynTimestep, R, uR, uI, &phiR, &phiI);
 				if (processRank == rootRank && USE_NORMALIZE_WF == 1)
 				{
-					NormalizeWavefunction(sys->GetWf(), &phiR);
+					//NormalizeWavefunction(sys->GetWf(), &phiR);
+					NormalizeWavefunction(sys->GetExponent(), &phiR);
 					//or better use
 					//NormalizeWavefunction(otherExpectationValues[2], &phiR);
 				}
@@ -3148,22 +3188,6 @@ int mainMPI(int argc, char** argv)
 			}
 		}
 
-		//////////////////////////////////////////////
-		/// calculate additional system properties ///
-		/// for visualization of dynamic data      ///
-		//////////////////////////////////////////////
-		if (CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP > 0 && (step % CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP == 0 || step == 1))
-		{
-			ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
-			if (processRank == rootRank)
-			{
-				if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-				{
-					AppendDataToFile(o->observablesV[0].values, "gr");
-				}
-			}
-		}
-
 		// check if simulation should be cancelled or set back to a previous timestep
 		int cancel = 0;
 		int configChanged = 0;
@@ -3183,9 +3207,17 @@ int mainMPI(int argc, char** argv)
 				cancel = 2;
 				//setBack = 3;
 			}
-			else if (!std::isfinite(sys->GetExponent()) || std::isnan(sys->GetExponent()) || !std::isfinite(sys->GetWf()) || std::isnan(sys->GetWf()))
+			else if (!std::isfinite(sys->GetWf()) || std::isnan(sys->GetWf()))
 			{
-				Log("Energy not finite", ERROR);
+				Log("wf not finite", ERROR);
+				Log("exponent: " + to_string(sys->GetExponent()) + ", wf: " + to_string(sys->GetWf()) + ", phiR: " + to_string(phiR), ERROR);
+				//cancel = 2;
+				//setBack = 3;
+			}
+			else if (!std::isfinite(sys->GetExponent()) || std::isnan(sys->GetExponent()))
+			{
+				Log("exponent not finite", ERROR);
+				Log("exponent: " + to_string(sys->GetExponent()) + ", wf: " + to_string(sys->GetWf()) + ", phiR: " + to_string(phiR), ERROR);
 				//cancel = 2;
 				setBack = 3;
 			}
@@ -3642,7 +3674,9 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BosonClusterWithLogParam";
 		//SYSTEM_TYPE = "BosonMixtureCluster";
 		//SYSTEM_TYPE = "NUBosonsBulk";
-		SYSTEM_TYPE = "NUBosonsBulkPB";
+		//SYSTEM_TYPE = "NUBosonsBulkPB";
+		//SYSTEM_TYPE = "NUBosonsBulkPBBox";
+		SYSTEM_TYPE = "NUBosonsBulkPBBoxAndRadial";
 		//SYSTEM_TYPE = "BosonsBulkDamped";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
@@ -3699,9 +3733,19 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "NUBosonsBulkPB")
 		{
-			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB1D.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB2D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB1D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB2D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB3D.config";
+		}
+		else if (SYSTEM_TYPE == "NUBosonsBulkPBBox")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPBBox1D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPBBox2D.config";
+		}
+		else if (SYSTEM_TYPE == "NUBosonsBulkPBBoxAndRadial")
+		{
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPBBoxAndRadial1D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPBBoxAndRadial2D.config";
 		}
 		//if (processRank == rootRank) //INFO: no processRank assigned so far. this is done in mainMPI or startVMCSamplerMPI
 		//{
