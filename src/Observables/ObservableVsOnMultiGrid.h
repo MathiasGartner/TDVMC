@@ -12,23 +12,24 @@ using namespace std;
 namespace Observables
 {
 
-class ObservableVsOnGrid : public IObservable
+class ObservableVsOnMultiGrid : public IObservable
 {
 public:
 	vector<ObservableV> observablesV;
 
-	Grid grid;
+	vector<Grid> grids;
+	int totalGridPoints;
 
 public:
-	ObservableVsOnGrid();
+	ObservableVsOnMultiGrid();
 
-	virtual ObservableVsOnGrid* Clone() const override;
+	virtual ObservableVsOnMultiGrid* Clone() const override;
 
 	void ClearValues() override;
 
-	void InitGrid(double min, double max, double spacing);
+	void InitGrid(vector<vector<double> > gridProperties);
 	void InitObservables(vector<string> names);
-	virtual void AddToHistogram(int observableIndex, double gridValue, double value);
+	virtual void AddToHistogram(int observableIndex, vector<double> gridValues, double value);
 
 	IObservable& operator+=(const IObservable& oc) override;
 	IObservable& operator-=(const IObservable& oc) override;

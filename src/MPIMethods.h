@@ -238,7 +238,7 @@ void ReduceToAverage(Observables::ObservableVsOnGrid& data)
 {
 	if (data.observablesV.size() > 0)
 	{
-		double* reducedValues = new double[data.grid.size()]; //TODO: check on zusie what method is faster
+		double* reducedValues = new double[data.grid.count]; //TODO: check on zusie what method is faster
 
 		for (unsigned int j = 0; j < data.observablesV.size(); j++)
 		{
@@ -247,7 +247,31 @@ void ReduceToAverage(Observables::ObservableVsOnGrid& data)
 			//INFO: only root process holds the average values from all processes.
 			if (processRank == rootRank)
 			{
-				for (unsigned int i = 0; i < data.grid.size(); i++)
+				for (unsigned int i = 0; i < data.grid.count; i++)
+				{
+					data.observablesV[j].values[i] = reducedValues[i] / (double) numOfProcesses;
+				}
+			}
+		}
+
+		delete[] reducedValues;
+	}
+}
+
+void ReduceToAverage(Observables::ObservableVsOnMultiGrid& data)
+{
+	if (data.observablesV.size() > 0)
+	{
+		double* reducedValues = new double[data.totalGridPoints]; //TODO: check on zusie what method is faster
+
+		for (unsigned int j = 0; j < data.observablesV.size(); j++)
+		{
+			//TODO: just use ReduceToAverage(data.observablesV[j]); ??
+			MPI_Reduce(data.observablesV[j].values.data(), reducedValues, data.observablesV[j].values.size(), MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
+			//INFO: only root process holds the average values from all processes.
+			if (processRank == rootRank)
+			{
+				for (int i = 0; i < data.totalGridPoints; i++)
 				{
 					data.observablesV[j].values[i] = reducedValues[i] / (double) numOfProcesses;
 				}
@@ -262,7 +286,11 @@ void ReduceToAverage(Observables::ObservableCollection& data)
 {
 	for (auto& obs : data.observables)
 	{
-		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(obs))
+		if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(obs))
+		{
+			ReduceToAverage(*o);
+		}
+		else if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(obs))
 		{
 			ReduceToAverage(*o);
 		}
@@ -276,7 +304,7 @@ void ReduceToAverage(Observables::ObservableCollection& data)
 		}
 		else
 		{
-			 throw std::invalid_argument("ReduceToAverage of IObservable* not implemented for given type.");
+			throw std::invalid_argument("ReduceToAverage of IObservable* not implemented for given type.");
 		}
 	}
 }

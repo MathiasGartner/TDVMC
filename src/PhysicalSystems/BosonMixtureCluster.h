@@ -61,9 +61,6 @@ protected:
 	Observables::ObservableVsOnGridWithScaling densityFromCOM;
 	Observables::ObservableVsOnGrid particleDistances;
 
-protected:
-	double exponentNew;
-
 public:
 	void SetNodes(vector<double> n); //TODO: do this for different CorrelationTypes
 	void SetDensityProfileBinCount(double n); //TODO: do this for different CorrelationTypes
@@ -97,6 +94,8 @@ public:
 	double CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition) override;
 
 	void AcceptMove() override;
+
+	void InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data) override;
 
 	void FillCorrelatedSamplingData(ICorrelatedSamplingData* data) override;
 };

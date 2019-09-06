@@ -571,6 +571,10 @@ void BulkSplinesScaled::AcceptMove()
 	splineSums = splineSumsNew;
 }
 
+void BulkSplinesScaled::InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data)
+{
+}
+
 void BulkSplinesScaled::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
 {
 }

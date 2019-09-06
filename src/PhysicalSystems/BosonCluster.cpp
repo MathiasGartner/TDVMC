@@ -789,6 +789,10 @@ void BosonCluster::AcceptMove()
 	linearSum = linearSumNew;
 }
 
+void BosonCluster::InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data)
+{
+}
+
 void BosonCluster::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
 {
 	//TODO: implement

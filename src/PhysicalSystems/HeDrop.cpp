@@ -951,6 +951,10 @@ void HeDrop::AcceptMove()
 	linearSum = linearSumNew;
 }
 
+void HeDrop::InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data)
+{
+}
+
 void HeDrop::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
 {
 }

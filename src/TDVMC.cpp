@@ -3,6 +3,7 @@
 #include "ConfigItem.h"
 #include "Constants.h"
 #include "ICorrelatedSamplingData.h"
+#include "CSDataBulkSplinesBR.h"
 #include "MathOperators.h"
 #include "MPIMethods.h"
 #include "SimulationStepData.h"
@@ -29,6 +30,7 @@
 #include "PhysicalSystems/NUBosonsBulkPB.h"
 #include "PhysicalSystems/NUBosonsBulkPBBox.h"
 #include "PhysicalSystems/NUBosonsBulkPBBoxAndRadial.h"
+#include "PhysicalSystems/NUBosonsBulkPBWhitehead.h"
 
 #include "Potentials/PotentialManager.h"
 
@@ -70,6 +72,8 @@ string configDirectory;
 string configFilePath;
 string OUT_DIR;					//directory name generated from parameter settings
 int N;           	    		//number of particles
+double LBOX;
+double LBOX_R;
 int DIM;     	        	 	//number of dimensions
 int N_PARAM;	        	  	//number of parameters of trial function
 double MC_STEP;
@@ -88,8 +92,6 @@ double TOTALTIME;
 int IMAGINARY_TIME;
 int ODE_SOLVER_TYPE;
 int USE_PRECONDITIONING;
-double LBOX;
-double LBOX_R;
 vector<double> PARAMS_REAL;
 vector<double> PARAMS_IMAGINARY;
 double PARAM_PHIR;
@@ -111,7 +113,7 @@ vector<double> NURBS_GRID;
 vector<int> PARTICLE_TYPES;
 vector<double> SYSTEM_PARAMS;
 
-string requiredConfigVersion = "0.19";
+string requiredConfigVersion = "0.20";
 int numOfProcesses = 1;
 int rootRank = 0;
 int processRank = 0;
@@ -351,6 +353,7 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("SYSTEM_TYPE", &SYSTEM_TYPE, ConfigItemType::STRING));
 	configItems.push_back(ConfigItem("OUTPUT_DIRECTORY", &OUTPUT_DIRECTORY, ConfigItemType::STRING));
 	configItems.push_back(ConfigItem("N", &N, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("LBOX", &LBOX, ConfigItemType::DOUBLE));
 	configItems.push_back(ConfigItem("DIM", &DIM, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("N_PARAM", &N_PARAM, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("RHO", &RHO, ConfigItemType::DOUBLE));
@@ -556,7 +559,8 @@ void Init()
 		distParticleIndex = uniform_int_distribution<int>(0, N - 1);
 		srand(processRank + 1);
 	}
-	LBOX = pow((N / RHO), 1.0 / DIM); //box with dimensions [-L/2, L/2]
+	//INFO: box length is specified in cofig file due to problems with rounding errors
+	//LBOX = pow((N / RHO), 1.0 / DIM); //box with dimensions [-L/2, L/2]
 	LBOX_R = 1.0 / LBOX;
 	nAcceptances = 0;
 	nTrials = 0;
@@ -569,11 +573,13 @@ void Init()
 
 	currentSampleIndexForUpdate = 0;
 	correlatedSamplingData.resize(MC_NSTEPS);
+	sys->InitCorrelatedSamplingData(correlatedSamplingData);
 	//TODO: Let the IPhysicalSystem sys create the objects needed for storing the correlated sampling data
-	for (int i = 0; i < MC_NSTEPS; i++)
-	{
-		correlatedSamplingData[i] = new CSDataBulkSplines();
-	}
+	//for (int i = 0; i < MC_NSTEPS; i++)
+	//{
+	//	//correlatedSamplingData[i] = new CSDataBulkSplines();
+	//	correlatedSamplingData[i] = new CSDataBulkSplinesBR();
+	//}
 
 	//INFO: Init Utils and dimension-dependent functions
 	switch (DIM)
@@ -705,7 +711,7 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 		{
 			cout << "LBOX=" << LBOX << endl;
 		}
-		int type = 1; //INFO: 1: lattice, 2: drop
+		int type = sys->USE_NIC ? 1 : 2; //INFO: 1: lattice, 2: drop
 		if (type == 0)
 		{
 			//Random
@@ -844,13 +850,15 @@ void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<dou
 	//	cout << "wfQuotient=" << wfQuotient << ", wfNew=" << Sys::wfNew << ", wf=" << Sys::wf << ", nTrials=" << nTrials << endl;
 	//	sleep(1);
 	//}
-	if (!isfinite(wfQuotient) || !isfinite(sys->GetWfNew()) || !isfinite(sys->GetWf()))
+	//if (!isfinite(wfQuotient) || !isfinite(sys->GetWfNew()) || !isfinite(sys->GetWf()))
+	if (!isfinite(wfQuotient) || !isfinite(sys->GetExponentNew()) || !isfinite(sys->GetExponent()))
 	{
 		//cout << "something != finite !!!!!!!!!!!!!!!!!!!!!!!!" << endl;
 		//cout << "wfQuotient=" << wfQuotient << ", wfNew=" << sys->GetWfNew() << ", wf=" << sys->GetWf() << ", nTrials=" << nTrials << endl;
 		//sleep(1);
 		sampleOkay = false;
-		if (!isfinite(wfQuotient) && sys->GetWfNew() > 0 && sys->GetWf() == 0) //INFO: this can happen when a new timestep is startet and the wavefunction is zero for the first particle configuration
+		//if (!isfinite(wfQuotient) && sys->GetWfNew() > 0 && sys->GetWf() == 0) //INFO: this can happen when a new timestep is startet and the wavefunction is zero for the first particle configuration
+		if (!isfinite(wfQuotient) && sys->GetExponentNew() > 0 && sys->GetExponent() == 0) //INFO: this can happen when a new timestep is startet and the wavefunction is zero for the first particle configuration
 		{
 			sampleOkay = true;
 			wfQuotient = 1; //INFO: accept by 100%
@@ -2748,6 +2756,15 @@ bool InitializePhysicalSystem()
 		}
 		dynamic_cast<PhysicalSystems::NUBosonsBulkPBBoxAndRadial*>(sys)->SetGrBinCount(GR_BIN_COUNT);
 	}
+	else if (SYSTEM_TYPE == "NUBosonsBulkPBWhitehead")
+	{
+		sys = new PhysicalSystems::NUBosonsBulkPBWhitehead(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PhysicalSystems::NUBosonsBulkPBWhitehead*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<PhysicalSystems::NUBosonsBulkPBWhitehead*>(sys)->SetGrBinCount(GR_BIN_COUNT);
+	}
 	else
 	{
 		if (processRank == rootRank)
@@ -2887,20 +2904,53 @@ int mainMPI(int argc, char** argv)
 	sys->InitSystem();
 	PostSystemInit();
 
-	//vector<vector<double> > tmpR;
-	//vector<double> wfValues;
-	//int tmpN = N;
-	//N = 2;
-	//InitVector(tmpR, 2, DIM, 0.0);
-	//for (int i = 0; i < 1000; i++)
-	//{
-	//	tmpR[1][0] += 0.05;
-	//	sys->CalculateWavefunction(tmpR, uR, uI, phiR, phiI);
-	//	wfValues.push_back(sys->GetWf());
-	//}
-	//N = tmpN;
-	////WriteDataToFile(wfValues, "wfValuesHeHe", "wfValuesHeHe");
-	//WriteDataToFile(wfValues, "wfValuesHeNa", "wfValuesHeNa");
+	bool saveWfToFile = false;
+	if (saveWfToFile)
+	{
+		vector<vector<double> > tmpR;
+		vector<vector<double> > wfValues;
+		int tmpN = N;
+		N = 2;
+		InitVector(tmpR, 2, DIM, 0.0);
+		tmpR[1][0] = -2.501;
+		for (int i = 0; i < 500; i++)
+		{
+			sys->CalculateWavefunction(tmpR, uR, uI, phiR, phiI);
+			wfValues.push_back( { tmpR[1][0], sys->GetWf() });
+			tmpR[1][0] += 0.01;
+		}
+		N = tmpN;
+		string name = "wf";
+		string nameEnd = "WH";
+		WriteDataToFile(wfValues, name + nameEnd, name + nameEnd);
+		//WriteDataToFile(wfValues, "wfValuesHeNa", "wfValuesHeNa");
+	}
+	bool saveToKineticFile = false;
+	if (saveToKineticFile)
+	{
+		vector<vector<double> > tmpR;
+		vector<vector<double> > kineticValues;
+		int tmpN = N;
+		N = 2;
+		InitVector(tmpR, 2, DIM, 0.0);
+		tmpR[1][0] = -2.501;
+		for (int i = 0; i < 500; i++)
+		{
+			sys->CalculateWavefunction(tmpR, uR, uI, phiR, phiI);
+			sys->CalculateExpectationValues(tmpR, uR, uI, phiR, phiI);
+			auto values = sys->GetOtherExpectationValues();
+			kineticValues.push_back( { tmpR[1][0], values[0], values[1], values[2] });
+			tmpR[1][0] += 0.01;
+		}
+		N = tmpN;
+		string name = "kineticValues";
+		string nameEnd = "WH";
+		WriteDataToFile(kineticValues, name + nameEnd, name + nameEnd);
+		//if (auto s = dynamic_cast<PhysicalSystems::NUBosonsBulkPBWhitehead*>(sys))
+		//{
+		//	WriteDataToFile(s->test, "test", "test");
+		//}
+	}
 
 	////////////////////////
 	/// start simulation ///
@@ -2974,7 +3024,6 @@ int mainMPI(int argc, char** argv)
 		//PrintParameters(uI);
 		//cout << "phiR=" << phiR << ", phiI=" << phiI << endl;
 
-
 		//////////////////////////////////////////////
 		/// calculate additional system properties ///
 		/// for visualization of dynamic data      ///
@@ -2984,9 +3033,23 @@ int mainMPI(int argc, char** argv)
 			ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
 			if (processRank == rootRank)
 			{
-				if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+				if (auto s = dynamic_cast<PhysicalSystems::NUBosonsBulkPB*>(sys))
 				{
-					AppendDataToFile(o->observablesV[0].values, "gr");
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "gr");
+					}
+				}
+				else if (auto s = dynamic_cast<PhysicalSystems::NUBosonsBulkPBWhitehead*>(sys))
+				{
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "gr");
+					}
+					if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[1]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "grMulti");
+					}
 				}
 			}
 		}
@@ -3676,7 +3739,8 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "NUBosonsBulk";
 		//SYSTEM_TYPE = "NUBosonsBulkPB";
 		//SYSTEM_TYPE = "NUBosonsBulkPBBox";
-		SYSTEM_TYPE = "NUBosonsBulkPBBoxAndRadial";
+		//SYSTEM_TYPE = "NUBosonsBulkPBBoxAndRadial";
+		SYSTEM_TYPE = "NUBosonsBulkPBWhitehead";
 		//SYSTEM_TYPE = "BosonsBulkDamped";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
@@ -3723,8 +3787,9 @@ int main(int argc, char **argv)
 		{
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/BosonMixtureCluster.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/He4He4Na.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/He4He4Na_reverse.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/He4He4Cs.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/He3He4Cs.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/He3He4Cs.config";
 		}
 		else if (SYSTEM_TYPE == "NUBosonsBulk")
 		{
@@ -3745,7 +3810,14 @@ int main(int argc, char **argv)
 		else if (SYSTEM_TYPE == "NUBosonsBulkPBBoxAndRadial")
 		{
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPBBoxAndRadial1D.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPBBoxAndRadial2D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPBBoxAndRadial2D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPBBoxAndRadial3D.config";
+		}
+		else if (SYSTEM_TYPE == "NUBosonsBulkPBWhitehead")
+		{
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPBWhitehead1D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPBWhitehead2D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPBWhitehead3D.config";
 		}
 		//if (processRank == rootRank) //INFO: no processRank assigned so far. this is done in mainMPI or startVMCSamplerMPI
 		//{

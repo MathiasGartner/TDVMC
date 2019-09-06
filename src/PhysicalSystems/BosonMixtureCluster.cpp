@@ -241,7 +241,7 @@ void BosonMixtureCluster::InitSystem()
 	if (index > -1)
 	{
 		ParticlePairProperties& ppp = this->particlePairProperties[index];
-		ppp.potential = new Potentials::LJ_He_He();
+		ppp.potential = new Potentials::HFDB_He_He();
 	}
 	index = this->correlationIndexMapping[Na][Na];
 	if (index > -1)
@@ -254,7 +254,7 @@ void BosonMixtureCluster::InitSystem()
 	if (index > -1)
 	{
 		ParticlePairProperties& ppp = this->particlePairProperties[index];
-		ppp.potential = new Potentials::LJ_He_He();
+		ppp.potential = new Potentials::HFDB_He_He();
 	}
 	index = this->correlationIndexMapping[He3][Na];
 	if (index > -1)
@@ -392,6 +392,8 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 	double potentialIntern = 0;
 
 	double kineticR = 0;
+	double kineticR_part1 = 0;
+	double kineticR_part2 = 0;
 	double kineticI = 0;
 
 	for (auto& cfd : this->corrFuncData)
@@ -610,6 +612,9 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 
 		kineticR += -pp.hbarOver2m * (opd.kineticSumR1 - opd.kineticSumI1 + opd.kineticSumR2);
 		kineticI += -pp.hbarOver2m * (opd.kineticSumR1I1 + opd.kineticSumI2);
+
+		kineticR_part1 += -pp.hbarOver2m * opd.kineticSumR1;
+		kineticR_part2 += -pp.hbarOver2m * opd.kineticSumR2;
 	}
 
 	localEnergyR = kineticR + potentialIntern + potentialExtern;
@@ -653,9 +658,9 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 		localOperatorlocalEnergyI[k] = localOperators[k] * localEnergyI;
 	}
 
-	otherExpectationValues[0] = kineticR;
-	otherExpectationValues[1] = potentialIntern;
-	otherExpectationValues[2] = wf;
+	otherExpectationValues[0] = kineticR_part1;
+	otherExpectationValues[1] = kineticR_part2;
+	otherExpectationValues[2] = kineticR;
 	for (int i = 0; i < globalNumOfDensityProfileValues; i++)
 	{
 		otherExpectationValues[3 + i] = globalDensityProfileBins[i];
@@ -708,7 +713,7 @@ void BosonMixtureCluster::CalculateAdditionalSystemProperties(vector<vector<doub
 	for (int i = 0; i < N; i++)
 	{
 		rni = VectorDisplacement(R[i], com, vecrni);
-		if (rni < densityFromCOM.gridMax)
+		if (rni < densityFromCOM.grid.max)
 		{
 			densityFromCOM.AddToHistogram(i, rni, 1.0);
 		}
@@ -722,7 +727,7 @@ void BosonMixtureCluster::CalculateAdditionalSystemProperties(vector<vector<doub
 		for (int j = 0; j < i; j++)
 		{
 			rni = VectorDisplacement(R[i], R[j], vecrni);
-			if (rni < particleDistances.gridMax)
+			if (rni < particleDistances.grid.max)
 			{
 				particleDistances.AddToHistogram(index, rni, 1.0);
 			}
@@ -1064,6 +1069,10 @@ void BosonMixtureCluster::AcceptMove()
 		cfd.logSum = cfd.logSumNew;
 		cfd.linearSum = cfd.linearSumNew;
 	}
+}
+
+void BosonMixtureCluster::InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data)
+{
 }
 
 void BosonMixtureCluster::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)

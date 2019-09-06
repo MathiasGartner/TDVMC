@@ -5,7 +5,7 @@
 #include "../Observables/ObservableVsOnGridWithScaling.h"
 
 #include "../Constants.h"
-#include "../CSDataBulkSplines.h"
+#include "../CSDataBulkSplinesBR.h"
 #include "../MathOperators.h"
 #include "../Utils.h"
 
@@ -62,9 +62,6 @@ private:
 
 	Observables::ObservableVsOnGridWithScaling pairDistribution;
 
-protected:
-	double exponentNew;
-
 private:
 	double GetExternalPotential(vector<double>& r);
 	void RefreshLocalOperators();
@@ -101,6 +98,8 @@ public:
 	double CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition) override;
 
 	void AcceptMove() override;
+
+	void InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data) override;
 
 	void FillCorrelatedSamplingData(ICorrelatedSamplingData* data) override;
 };

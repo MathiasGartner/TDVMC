@@ -1,11 +1,11 @@
-#include "NUBosonsBulkPBBox.h"
+#include "NUBosonsBulkPBWhitehead.h"
 
 #include "../SplineFactory.h"
 
 namespace PhysicalSystems
 {
 
-NUBosonsBulkPBBox::NUBosonsBulkPBBox(vector<double>& params, string configDirectory) :
+NUBosonsBulkPBWhitehead::NUBosonsBulkPBWhitehead(vector<double>& params, string configDirectory) :
 		IPhysicalSystem(params, configDirectory)
 {
 	this->USE_NORMALIZATION_AND_PHASE = true;
@@ -30,7 +30,7 @@ NUBosonsBulkPBBox::NUBosonsBulkPBBox(vector<double>& params, string configDirect
 	changedParticleIndex = 0;
 }
 
-void NUBosonsBulkPBBox::SetNodes(vector<double> n)
+void NUBosonsBulkPBWhitehead::SetNodes(vector<double> n)
 {
 	this->nodes = n;
 	int periodicNodeCount = 3;
@@ -41,12 +41,12 @@ void NUBosonsBulkPBBox::SetNodes(vector<double> n)
 	}
 }
 
-void NUBosonsBulkPBBox::SetGrBinCount(double n)
+void NUBosonsBulkPBWhitehead::SetGrBinCount(double n)
 {
 	this->grBinCount = n;
 }
 
-void NUBosonsBulkPBBox::InitSystem()
+void NUBosonsBulkPBWhitehead::InitSystem()
 {
 	numOfOtherLocalOperators = 4; //INFO: potentialIntern, potentialInternComplex, potentialExtern, potentialExternComplex
 	otherLocalOperators.resize(numOfOtherLocalOperators);
@@ -66,13 +66,13 @@ void NUBosonsBulkPBBox::InitSystem()
 	//INFO: N_PARAM + 2 - 2 for no BC and real time;
 	//INFO: +1 for ignoring first one
 	//numberOfSplines = N_PARAM + 2;//BC 1.1
-	numberOfSplines = N_PARAM + 3;//PB lt. pdf paper sheet
+	numberOfSplines = N_PARAM + 3;	//PB lt. pdf paper
 	//numberOfSplines = N_PARAM + 2; //PB 1.2
 	//numberOfSplines = N_PARAM + 3; //PB 1.1
 	//numberOfSplines = N_PARAM + 2;//BC 2.1
 	halfLength = LBOX / 2.0;
-	//maxDistance = nodes[nodes.size() - 4];
-	maxDistance = halfLength;
+	maxDistance = nodes[nodes.size() - 4];
+	//maxDistance = halfLength;
 
 	//nodes.resize(numberOfSplines + 4);
 	//double baseSpacing = pow(maxDistance, 1.0/1.5) / (double) (N_PARAM - 2.0);
@@ -88,9 +88,9 @@ void NUBosonsBulkPBBox::InitSystem()
 	//}
 	if (nodes.empty())
 	{
-		for (int i = -3; i < N_PARAM + 3;  i++)
+		for (int i = -3; i < N_PARAM + 3; i++)
 		{
-			nodes.push_back((i * halfLength) / ((double)N_PARAM - 1));
+			nodes.push_back((i * halfLength) / ((double) N_PARAM - 1));
 		}
 	}
 	splineWeights = SplineFactory::GetWeights(nodes);
@@ -119,14 +119,6 @@ void NUBosonsBulkPBBox::InitSystem()
 	for (auto &k : splineSumsD2)
 	{
 		k.resize(N);
-	}
-
-	//TODO: calculate scaling factors according to the node structure
-	scalingFactors.resize(numberOfSplines);
-	for (int i = 0; i < numberOfSplines; i++)
-	{
-		//scalingFactors[i] = 1.0 / pow((i + 1), DIM - 1); //INFO: dV that is assigned to one spline scales with i^2 for 3D and i for 2D, 1 for 1D
-		scalingFactors[i] = 1.0;
 	}
 
 	localEnergyR = 0;
@@ -196,16 +188,34 @@ void NUBosonsBulkPBBox::InitSystem()
 	//cout << "maxDistance=" << maxDistance << endl;
 	//cout << "nodePointSpacing=" << nodePointSpacing << endl;
 
-	pairDistribution.name = "pairDistribution";
-	//pairDistribution.InitGrid(0.0, halfLength, 0.05);
-	pairDistribution.InitGrid(0.0, nodes[nodes.size() - 4], 0.05);
-	pairDistribution.InitScaling();
-	pairDistribution.InitObservables({"g_2(r_ij)"});
+	pairDistributionRad.name = "pairDistributionRad";
+	pairDistributionRad.InitGrid(0.0, halfLength, 0.05);
+	//pairDistributionRad.InitGrid(0.0, nodes[nodes.size() - 4], 0.05);
+	pairDistributionRad.InitScaling();
+	pairDistributionRad.InitObservables( { "g_2(r_ij)" });
 
+	pairDistribution.name = "pairDistribution";
+	if (DIM == 1)
+	{
+		pairDistribution.InitGrid({{0.0, halfLength, 0.05}});
+		pairDistribution.InitObservables( { "g_2(x)" });
+	}
+	else if (DIM == 2)
+	{
+		pairDistribution.InitGrid({{0.0, halfLength, 0.05}, {0.0, halfLength, 0.05}});
+		pairDistribution.InitObservables( { "g_2(x,y)" });
+	}
+	else if (DIM == 3)
+	{
+		pairDistribution.InitGrid({{0.0, halfLength, 0.05}, {0.0, halfLength, 0.05}, {0.0, halfLength, 0.05}});
+		pairDistribution.InitObservables( { "g_2(x,y,z)" });
+	}
+
+	additionalObservables.Add(&pairDistributionRad);
 	additionalObservables.Add(&pairDistribution);
 }
 
-void NUBosonsBulkPBBox::RefreshLocalOperators()
+void NUBosonsBulkPBWhitehead::RefreshLocalOperators()
 {
 	//INFO: BC
 	for (int i = 0; i < numberOfStandardParameters; i++)
@@ -215,19 +225,16 @@ void NUBosonsBulkPBBox::RefreshLocalOperators()
 	this->localOperators[1] += splineSums[0];
 	this->localOperators[numberOfStandardParameters - 1] += splineSums[numberOfSplines - 2];
 	this->localOperators[numberOfStandardParameters - 1] += splineSums[numberOfSplines - 1];
-	//this->localOperators[numberOfStandardParameters - 2] += splineSums[numberOfSplines - 1];
-	//this->localOperators[numberOfStandardParameters - 1] += splineSums[numberOfSplines - 2] / (-2.0);
-	//this->localOperators[numberOfStandardParameters - 1] += splineSums[numberOfSplines - 1];
 }
 
-void NUBosonsBulkPBBox::CalculateLocalOperators(vector<vector<double> >& R)
+void NUBosonsBulkPBWhitehead::CalculateLocalOperators(vector<vector<double> >& R)
 {
 	int bin;
 	double rni;
-	double rnia;
-	double rnia2;
-	double rnia3;
+	double rni2;
+	double rni3;
 	vector<double> vecrni(DIM);
+	vector<double> vecrniT(DIM);
 
 	ClearVector(splineSums);
 
@@ -236,38 +243,34 @@ void NUBosonsBulkPBBox::CalculateLocalOperators(vector<vector<double> >& R)
 		for (int i = 0; i < n; i++)
 		{
 			rni = VectorDisplacementNIC_DIM(R[n], R[i], vecrni);
-			for (int a = 0; a < DIM; a++)
+			rni = TransformCoordinates(vecrni, vecrniT);
+			if (rni < maxDistance)
 			{
-				rnia = abs(vecrni[a]);
-				auto interval = lower_bound(nodes.begin(), nodes.end(), rnia);
+				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
 				bin = interval - nodes.begin() - 1;
-				rnia2 = rnia * rnia;
-				rnia3 = rnia2 * rnia;
+				rni2 = rni * rni;
+				rni3 = rni2 * rni;
 
 				for (int p = 0; p < 4; p++)
 				{
-					splineSums[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rnia + splineWeights[bin - p][p][2] * rnia2 + splineWeights[bin - p][p][3] * rnia3;
+					splineSums[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rni + splineWeights[bin - p][p][2] * rni2 + splineWeights[bin - p][p][3] * rni3;
 				}
 			}
 		}
 	}
-	for (int i = 0; i < numberOfSplines; i++)
-	{
-		splineSums[i] *= scalingFactors[i];
-	}
 	RefreshLocalOperators();
 }
 
-void NUBosonsBulkPBBox::CalculateOtherLocalOperators(vector<vector<double> >& R)
+void NUBosonsBulkPBWhitehead::CalculateOtherLocalOperators(vector<vector<double> >& R)
 {
 	int s = 4;
 	vector<double> vecrni(DIM);
+	vector<double> vecrniT(DIM);
 	vector<double> tmp1(s);
 	vector<double> tmp2(s);
 	int bin;
 	double rni;
-	double rnia;
-	double rnia2;
+	double rni2;
 
 	double grBinInterval;
 	int grBin;
@@ -309,16 +312,14 @@ void NUBosonsBulkPBBox::CalculateOtherLocalOperators(vector<vector<double> >& R)
 				grBins[grBin] += 1.0 / grBinVolumes[grBin];
 			}
 
-			//internal potential energy
-			if (rni < maxDistance)
+			if (rni < halfLength)
 			{
+				//internal potential energy
 				if (i < n)
 				{
-					//gauss potential
 					double rnia = rni / a;
 					potentialIntern += b * exp(-(rnia * rnia) / 2.0);
 
-					//step potential
 					//if (rni < a)
 					//{
 					//	potentialIntern += b;
@@ -333,67 +334,131 @@ void NUBosonsBulkPBBox::CalculateOtherLocalOperators(vector<vector<double> >& R)
 				}
 			}
 
-			//kinetic energy
-			for (int a = 0; a < DIM; a++)
+			rni = TransformCoordinates(vecrni, vecrniT);
+			if (rni < maxDistance)
 			{
-				rnia = abs(vecrni[a]);
 				//kinetic energy
 				//TODO: maybe it is faster to calculate all localOperators[i][n] before and then loop over this precalculated values
 				//		otherwise values are calculated multiple times
 				if (i != n) //TODO: also include in (i < n) branch -> then only loop over i < n in "for (int i = 0; i < N; i++)"
 				{
-					auto interval = lower_bound(nodes.begin(), nodes.end(), rnia);
+					auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
 					bin = interval - nodes.begin() - 1;
-					rnia2 = rnia * rnia;
+					rni2 = rni * rni;
 
 					for (int p = 0; p < s; p++)
 					{
 						//first derivative
-						tmp1[3 - p] = splineWeights[bin - p][p][1] + 2.0 * splineWeights[bin - p][p][2] * rnia + 3.0 * splineWeights[bin - p][p][3] * rnia2;
+						tmp1[3 - p] = splineWeights[bin - p][p][1] + 2.0 * splineWeights[bin - p][p][2] * rni + 3.0 * splineWeights[bin - p][p][3] * rni2;
 						//second derivative
-						tmp2[3 - p] = 2.0 * splineWeights[bin - p][p][2] + 6.0 * splineWeights[bin - p][p][3] * rnia;
+						tmp2[3 - p] = 2.0 * splineWeights[bin - p][p][2] + 6.0 * splineWeights[bin - p][p][3] * rni;
 					}
 
-					//for (int a = 0; a < DIM; a++)
+					for (int a = 0; a < DIM; a++)
 					{
+						//int sign = vecrni[a] < 0 ? -1.0 : 1.0;
+						//double absa = abs(vecrni[a]);
+						//double al = absa / halfLength;
+						//double fa = vecrniT[a];
+						//double dfa = sign - sign * al * al * al;
+						//double dfa2 = dfa * dfa;
+						//double d2fa = -3.0 / halfLength * al * al;
+						//double drT = fa / rni;
+						//double d2rT = 1.0 / rni - fa * fa / rni3;
+
+						//double xl = M_PI * vecrni[a] / halfLength;
+						//double pi2 = M_PI * M_PI;
+						//double df = 1.0 / 2.0 * M_PI * sin(xl);
+						//double df2 = df * df;
+						//double d2f = pi2 * cos(xl) / 2.0 / halfLength;
+						//double rni3 = rni2 * rni;
+						//double cosxl = cos(xl);
+						//double cosxl2 = cosxl * cosxl;
+						//double sinxl = sin(xl);
+						//double sinxl2 = sinxl * sinxl;
+
+						//int sign = vecrni[a] < 0 ? -1.0 : 1.0;
+						//double df = 2.0 * vecrni[a] / halfLength * sign;
+						//double df2 = df * df;
+						//double d2f = 2.0 / halfLength;
+						//double rni3 = rni2 * rni;
+
+						int sign = vecrni[a] < 0 ? -1.0 : 1.0;
+						double rni3 = rni2 * rni;
+						double dr = vecrniT[a] / rni;
+						double dr2 = dr * dr;
+						double d2r = 1.0 / rni - 1.0 / rni3 * vecrniT[a] * vecrniT[a];
+
+						//x
+						//double df = 1.0;
+						//double df2 = df * df;
+						//double d2f = 0.0;
+
+						//x^2/L
+						//double df = 2.0 * vecrni[a] / halfLength * sign;
+						//double df2 = df * df;
+						//double d2f = 2.0 / halfLength;
+
+						//x^3/L^2
+						//double df = 3.0 * vecrni[a] * vecrni[a] / halfLength / halfLength;
+						//double df2 = df * df;
+						//double d2f = 6.0 * vecrni[a] / halfLength / halfLength;
+
+						//nu-term
+						double absa = abs(vecrni[a]);
+						double al = absa / halfLength;
+						//double df = sign - sign * al * al * al;
+						double df = -(sign - vecrni[a] * abs(vecrni[a]) * abs(vecrni[a]) / halfLength / halfLength / halfLength);
+						double df2 = df * df;
+						double d2f = -3.0 / halfLength * al * al;
+
+						//sin
+						//double df = 1.0 / 2.0 * M_PI * sin(M_PI * vecrni[a] / halfLength);
+						//double df2 = df * df;
+						//double d2f = M_PI * M_PI * cos(M_PI * vecrni[a] / halfLength) / 2.0 / halfLength;
+
+						//if(a == 0 && n == 0)
+						//{
+						//	test.push_back({df, df2, d2f});
+						//	//cout << df << "," << d2f << endl;
+						//}
 						for (int b = 0; b < s; b++)
 						{
-							int sign = vecrni[a] < 0 ? -1.0 : 1.0;
-							splineSumsD[bin - b][n][a] += tmp1[3 - b] * sign;
+							splineSumsD[bin - b][n][a] += tmp1[3 - b] * dr * df;
+							//splineSumsD2[bin - b][n] += tmp2[3 - b] * dr2 * df2 + tmp1[3 - b] * d2r * df2 + tmp1[3 - b] * dr * d2f;
+							splineSumsD2[bin - b][n] += tmp2[3 - b] * dr2 * df2 * dr2 +
+														tmp1[3 - b] * dr * df2 * (1.0 / rni - vecrniT[a] * vecrniT[a] / pow(rni2, 3.0/ 2.0)) +
+														tmp1[3 - b] * d2r * df2 * dr2 +
+														tmp1[3 - b] * dr * d2f * dr;
 						}
-					}
-					for (int b = 0; b < s; b++)
-					{
-						splineSumsD2[bin - b][n] += tmp2[3 - b];
 					}
 				}
 			}
-		}
-
-		for (int f = 0; f < numberOfSplines; f++)
-		{
-			splineSumsD[f][n] *= scalingFactors[f];
-			splineSumsD2[f][n] *= scalingFactors[f];
+			else
+			{
+				cout << "!!" << endl;
+			}
 		}
 	}
+	//WriteDataToFile(test, "test", "test");
 	otherLocalOperators[0] = potentialIntern;
 	otherLocalOperators[1] = potentialInternComplex;
 	otherLocalOperators[2] = potentialExtern;
 	otherLocalOperators[3] = potentialExternComplex;
 }
 
-vector<double> NUBosonsBulkPBBox::GetCenterOfMass(vector<vector<double> >& R)
+vector<double> NUBosonsBulkPBWhitehead::GetCenterOfMass(vector<vector<double> >& R)
 {
 	vector<double> com = { 0.0, 0.0, 0.0 };
 	return com;
 }
 
-double NUBosonsBulkPBBox::GetExternalPotential(vector<double>& r)
+double NUBosonsBulkPBWhitehead::GetExternalPotential(vector<double>& r)
 {
 	return 0;
 }
 
-void NUBosonsBulkPBBox::CalculateExpectationValues(vector<double>& O, vector<vector<vector<double> > >& sD, vector<vector<double> >& sD2, vector<double>& otherO, vector<double>& gr, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void NUBosonsBulkPBWhitehead::CalculateExpectationValues(vector<double>& O, vector<vector<vector<double> > >& sD, vector<vector<double> >& sD2, vector<double>& otherO, vector<double>& gr, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	double kineticR = 0;
 	double kineticI = 0;
@@ -421,6 +486,7 @@ void NUBosonsBulkPBBox::CalculateExpectationValues(vector<double>& O, vector<vec
 			vecKineticSumI1[a] = 0.0;
 		}
 
+		//INFO: BC
 		for (int k = 0; k < numberOfStandardParameters; k++)
 		{
 			for (int a = 0; a < DIM; a++)
@@ -438,7 +504,6 @@ void NUBosonsBulkPBBox::CalculateExpectationValues(vector<double>& O, vector<vec
 		}
 		kineticSumR2 += uR[1] * sD2[0][n];
 		kineticSumI2 += uI[1] * sD2[0][n];
-		//INFO: BC
 		for (int a = 0; a < DIM; a++)
 		{
 			vecKineticSumR1[a] += uR[N_PARAM - 1] * sD[numberOfSplines - 2][n][a];
@@ -453,7 +518,6 @@ void NUBosonsBulkPBBox::CalculateExpectationValues(vector<double>& O, vector<vec
 		}
 		kineticSumR2 += uR[N_PARAM - 1] * sD2[numberOfSplines - 1][n];
 		kineticSumI2 += uI[N_PARAM - 1] * sD2[numberOfSplines - 1][n];
-
 
 		kineticSumR1I1 += 2.0 * VectorDotProduct_DIM(vecKineticSumR1, vecKineticSumI1);
 		kineticSumR1 += VectorNorm2_DIM(vecKineticSumR1);
@@ -487,48 +551,49 @@ void NUBosonsBulkPBBox::CalculateExpectationValues(vector<double>& O, vector<vec
 	}
 
 	otherExpectationValues[0] = kineticR;
-	otherExpectationValues[1] = otherO[0];
-	otherExpectationValues[2] = wf;
+	otherExpectationValues[1] = otherO[0];//kineticSumR1;//
+	otherExpectationValues[2] = wf;//kineticSumR2;//
 	for (int i = 0; i < grBinCount; i++)
 	{
 		otherExpectationValues[i + grBinStartIndex] = gr[i];
 	}
 }
 
-void NUBosonsBulkPBBox::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void NUBosonsBulkPBWhitehead::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	RefreshLocalOperators();
 	CalculateOtherLocalOperators(R);
 	CalculateExpectationValues(this->localOperators, this->splineSumsD, this->splineSumsD2, this->otherLocalOperators, this->grBins, uR, uI, phiR, phiI);
 }
 
-void NUBosonsBulkPBBox::CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void NUBosonsBulkPBWhitehead::CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	CSDataBulkSplines* s = dynamic_cast<CSDataBulkSplines*>(sample);
 	CalculateExpectationValues(s->localOperators, s->splineSumsD, s->splineSumsD2, s->otherLocalOperators, s->grBins, uR, uI, phiR, phiI);
 }
 
-void NUBosonsBulkPBBox::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void NUBosonsBulkPBWhitehead::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	additionalObservables.ClearValues();
 	double rni;
 	vector<double> vecrni(DIM);
 
-	//pairDistribution
+	//pairDistributionRad
 	for (int i = 0; i < N; i++)
 	{
 		for (int j = 0; j < i; j++)
 		{
 			rni = VectorDisplacementNIC_DIM(R[i], R[j], vecrni);
-			if (rni < pairDistribution.grid.max)
+			if (rni < pairDistributionRad.grid.max)
 			{
-				pairDistribution.AddToHistogram(0, rni, 1.0);
+				pairDistributionRad.AddToHistogram(0, rni, 1.0);
 			}
+			pairDistribution.AddToHistogram(0, VectorAbs(vecrni), 1.0);
 		}
 	}
 }
 
-void NUBosonsBulkPBBox::CalculateWavefunction(vector<double>& O, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void NUBosonsBulkPBWhitehead::CalculateWavefunction(vector<double>& O, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	double sum = 0;
 
@@ -541,27 +606,58 @@ void NUBosonsBulkPBBox::CalculateWavefunction(vector<double>& O, vector<double>&
 	wf = exp(exponent + phiR);
 }
 
-void NUBosonsBulkPBBox::CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void NUBosonsBulkPBWhitehead::CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	CalculateLocalOperators(R);
 	CalculateWavefunction(this->localOperators, uR, uI, phiR, phiI);
 }
 
-void NUBosonsBulkPBBox::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void NUBosonsBulkPBWhitehead::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	CSDataBulkSplines* s = dynamic_cast<CSDataBulkSplines*>(sample);
 	CalculateWavefunction(s->localOperators, uR, uI, phiR, phiI);
 }
 
-void NUBosonsBulkPBBox::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
+double NUBosonsBulkPBWhitehead::TransformCoordinates(vector<double>& original, vector<double>& transformed)
+{
+	//double xl = 0.0;
+	//for (unsigned int i = 0; i < original.size(); i++)
+	//{
+	//	xl = abs(original[i] / halfLength);
+	//	transformed[i] = abs(original[i]) * (1.0 - xl * xl * xl / 4.0);
+	//}
+	for (unsigned int i = 0; i < original.size(); i++)
+	{
+		double absa = 0.0;
+		double absal = 0.0;
+		absa = abs(original[i]);
+		absal = absa / halfLength;
+		transformed[i] = absa * (1.0 - absal * absal * absal / 4.0);
+
+		//transformed[i] = abs(original[i]) * 4.0 / 3.0;
+		//transformed[i] = original[i];
+
+		//double sinxl = sin(original[i] / halfLength * M_PI / 2.0);
+		//transformed[i] = halfLength * sinxl * sinxl;
+
+		//transformed[i] = original[i];
+
+		//transformed[i] = original[i] * original[i] / halfLength;
+
+		//transformed[i] = original[i] * original[i] * original[i] / halfLength / halfLength;
+	}
+	return VectorNorm_DIM(transformed);
+}
+
+void NUBosonsBulkPBWhitehead::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
 	double sum = 0;
 	int bin;
 	double rni;
-	double rnia;
-	double rnia2;
-	double rnia3;
+	double rni2;
+	double rni3;
 	vector<double> vecrni(DIM);
+	vector<double> vecrniT(DIM);
 
 	ClearVector(sumOldPerBin);
 	ClearVector(sumNewPerBin);
@@ -570,40 +666,43 @@ void NUBosonsBulkPBBox::CalculateWFChange(vector<vector<double> >& R, vector<dou
 		if (i != changedParticleIndex)
 		{
 			rni = VectorDisplacementNIC_DIM(R[i], oldPosition, vecrni);
-			for (int a = 0; a < DIM; a++)
+			rni = TransformCoordinates(vecrni, vecrniT);
+			if (rni < maxDistance)
 			{
-				rnia = abs(vecrni[a]);
-				auto interval = lower_bound(nodes.begin(), nodes.end(), rnia);
+				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
 				bin = interval - nodes.begin() - 1;
-				rnia2 = rnia * rnia;
-				rnia3 = rnia2 * rnia;
+				rni2 = rni * rni;
+				rni3 = rni2 * rni;
 
 				for (int p = 0; p < 4; p++)
 				{
-					sumOldPerBin[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rnia + splineWeights[bin - p][p][2] * rnia2 + splineWeights[bin - p][p][3] * rnia3;
+					sumOldPerBin[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rni + splineWeights[bin - p][p][2] * rni2 + splineWeights[bin - p][p][3] * rni3;
 				}
+			}
+			else
+			{
+				cout << "!!" << endl;
 			}
 			rni = VectorDisplacementNIC_DIM(R[i], R[changedParticleIndex], vecrni);
-			for (int a = 0; a < DIM; a++)
+			rni = TransformCoordinates(vecrni, vecrniT);
+			if (rni < maxDistance)
 			{
-				rnia = abs(vecrni[a]);
-				auto interval = lower_bound(nodes.begin(), nodes.end(), rnia);
+				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
 				bin = interval - nodes.begin() - 1;
-				rnia2 = rnia * rnia;
-				rnia3 = rnia2 * rnia;
+				rni2 = rni * rni;
+				rni3 = rni2 * rni;
 
 				for (int p = 0; p < 4; p++)
 				{
-					sumNewPerBin[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rnia + splineWeights[bin - p][p][2] * rnia2 + splineWeights[bin - p][p][3] * rnia3;
+					sumNewPerBin[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rni + splineWeights[bin - p][p][2] * rni2 + splineWeights[bin - p][p][3] * rni3;
 				}
 			}
+			else
+			{
+				cout << "!!" << endl;
+				rni = TransformCoordinates(vecrni, vecrniT);
+			}
 		}
-	}
-
-	for (int i = 0; i < numberOfSplines; i++)
-	{
-		sumOldPerBin[i] *= scalingFactors[i];
-		sumNewPerBin[i] *= scalingFactors[i];
 	}
 	for (int i = 0; i < numberOfSplines; i++)
 	{
@@ -623,7 +722,7 @@ void NUBosonsBulkPBBox::CalculateWFChange(vector<vector<double> >& R, vector<dou
 	wfNew = exp(exponentNew + phiR);
 }
 
-double NUBosonsBulkPBBox::CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
+double NUBosonsBulkPBWhitehead::CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
 	CalculateWFChange(R, uR, uI, phiR, phiI, changedParticleIndex, oldPosition);
 	double wfQuotient = exp(2.0 * (exponentNew - exponent));
@@ -633,14 +732,14 @@ double NUBosonsBulkPBBox::CalculateWFQuotient(vector<vector<double> >& R, vector
 	return wfQuotient;
 }
 
-void NUBosonsBulkPBBox::AcceptMove()
+void NUBosonsBulkPBWhitehead::AcceptMove()
 {
 	wf = wfNew;
 	exponent = exponentNew;
 	splineSums = splineSumsNew;
 }
 
-void NUBosonsBulkPBBox::InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data)
+void NUBosonsBulkPBWhitehead::InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data)
 {
 	for (unsigned int i = 0; i < data.size(); i++)
 	{
@@ -648,7 +747,7 @@ void NUBosonsBulkPBBox::InitCorrelatedSamplingData(vector<ICorrelatedSamplingDat
 	}
 }
 
-void NUBosonsBulkPBBox::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
+void NUBosonsBulkPBWhitehead::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
 {
 	CSDataBulkSplines* d = dynamic_cast<CSDataBulkSplines*>(data);
 	d->splineSumsD = this->splineSumsD;

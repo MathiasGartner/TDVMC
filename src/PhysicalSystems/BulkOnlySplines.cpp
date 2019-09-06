@@ -752,9 +752,12 @@ void BulkOnlySplines::AcceptMove()
 	//}
 }
 
+void BulkOnlySplines::InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data)
+{
+}
+
 void BulkOnlySplines::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
 {
-
 }
 
 }

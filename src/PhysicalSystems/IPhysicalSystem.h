@@ -24,6 +24,7 @@ protected:
 	double wf;
 	double wfNew;
 	double exponent;
+	double exponentNew;
 
 	double localEnergyR; // for <E^R>
 	double localEnergyI; // for <E^I>
@@ -53,6 +54,7 @@ public:
 		this->wf = 0;
 		this->wfNew = 0;
 		this->exponent = 0;
+		this->exponentNew = 0;
 
 		this->localEnergyR = 0;
 		this->localEnergyI = 0;
@@ -77,6 +79,7 @@ public:
 	double GetWf() { return wf; }
 	double GetWfNew() { return wfNew; }
 	double GetExponent() { return exponent; }
+	double GetExponentNew() { return exponentNew; }
 
 	double GetLocalEnergyR() { return localEnergyR; }
 	double GetLocalEnergyI() { return localEnergyI; }
@@ -112,6 +115,8 @@ public:
 	virtual double CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition) = 0;
 
 	virtual void AcceptMove() = 0;
+
+	virtual void InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data) = 0;
 
 	virtual void FillCorrelatedSamplingData(ICorrelatedSamplingData* data) = 0;
 };

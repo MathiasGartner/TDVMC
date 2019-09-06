@@ -37,7 +37,6 @@ private:
 	vector<vector<vector<double> > > kValues;
 	int numOfkValues;
 
-	double exponentNew;
 	vector<double> splineSumsNew; //indices: k (bin); for <O_k>
 	vector<double> sumOldPerBin;
 	vector<double> sumNewPerBin;
@@ -70,6 +69,8 @@ public:
 	double CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition) override;
 
 	void AcceptMove() override;
+
+	void InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data) override;
 
 	void FillCorrelatedSamplingData(ICorrelatedSamplingData* data) override;
 };

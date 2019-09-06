@@ -43,6 +43,8 @@ public:
 
 	void AcceptMove() override;
 
+	void InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data) override;
+
 	void FillCorrelatedSamplingData(ICorrelatedSamplingData* data) override;
 };
 

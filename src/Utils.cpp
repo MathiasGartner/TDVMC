@@ -31,6 +31,15 @@ string PrintArrayValues(double* r, int length)
 	return s;
 }
 
+vector<double> VectorAbs(vector<double> v)
+{
+	for (unsigned int i = 0; i < v.size(); i++)
+	{
+		v[i] = abs(v[i]);
+	}
+	return v;
+}
+
 double (*VectorDotProduct_DIM)(vector<double>&, vector<double>&);
 
 double VectorDotProduct_1D(vector<double>& v1, vector<double>& v2)
@@ -763,17 +772,45 @@ void WriteDataToFile(Observables::ObservableCollection& data, string filename)
 		file.open(OUT_DIR + filename + "_" + obs->name + fileExtension, ios::out);
 		SetFileFormat(file);
 
-		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(obs))
+		if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(obs))
 		{
-			file << setw(colWidth) << o->gridName;
+			for (auto& j : o->grids)
+			{
+				file << setw(colWidth) << j.name;
+			}
 			for (auto& j : o->observablesV)
 			{
 				file << setw(colWidth) << j.name;
 			}
 			file << endl;
-			for (unsigned int i = 0; i < o->grid.size(); i++)
+
+			for (int i = 0; i < o->totalGridPoints; i++)
 			{
-				file << setw(colWidth) << o->grid[i];
+				int offset = 1;
+				for (auto&j : o->grids)
+				{
+					int gridIndex = i / offset;
+					file << setw(colWidth) << j.grid[gridIndex];
+					offset *= j.count;
+				}
+				for (auto& j : o->observablesV)
+				{
+					file << setw(colWidth) << j.values[i];
+				}
+				file << endl;
+			}
+		}
+		else if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(obs))
+		{
+			file << setw(colWidth) << o->grid.name;
+			for (auto& j : o->observablesV)
+			{
+				file << setw(colWidth) << j.name;
+			}
+			file << endl;
+			for (int i = 0; i < o->grid.count; i++)
+			{
+				file << setw(colWidth) << o->grid.grid[i];
 				for (auto& j : o->observablesV)
 				{
 					file << setw(colWidth) << j.values[i];

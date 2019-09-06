@@ -140,6 +140,10 @@ void GaussianWavepacket::AcceptMove()
 	this->wf = this->wfNew;
 }
 
+void GaussianWavepacket::InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data)
+{
+}
+
 void GaussianWavepacket::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
 {
 }

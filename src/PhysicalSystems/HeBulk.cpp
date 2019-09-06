@@ -614,6 +614,10 @@ void HeBulk::AcceptMove()
 	}
 }
 
+void HeBulk::InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data)
+{
+}
+
 void HeBulk::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
 {
 }

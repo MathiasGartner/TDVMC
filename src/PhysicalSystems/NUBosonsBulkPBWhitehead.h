@@ -2,7 +2,11 @@
 
 #include "IPhysicalSystem.h"
 
+#include "../Observables/ObservableVsOnGridWithScaling.h"
+#include "../Observables/ObservableVsOnMultiGrid.h"
+
 #include "../Constants.h"
+#include "../CSDataBulkSplines.h"
 #include "../MathOperators.h"
 #include "../Utils.h"
 
@@ -13,35 +17,21 @@ using namespace std;
 namespace PhysicalSystems
 {
 
-class HeDrop: public IPhysicalSystem
+class NUBosonsBulkPBWhitehead: public IPhysicalSystem
 {
 private:
 	int numberOfSplines;
-	int numberOfShortSplines;
-	int numberOfLargeSplines;
 	vector<double> splineSums; //indices: k (bin); for <O_k>
 	vector<vector<vector<double> > > splineSumsD; //indices: k (bin), n (particle), a (coordinate)
 	vector<vector<double> > splineSumsD2; //indices: k (bin), n (particle)
-	double mcMillanSum;
-	vector<vector<double> > mcMillanSumD;
-	vector<double> mcMillanSumD2;
-	double constSum;
-	vector<vector<double> > constSumD;
-	vector<double> constSumD2;
-	//double logSum;
-	//vector<vector<double> > logSumD;
-	//vector<double> logSumD2;
-	double linearSum;
-	vector<vector<double> > linearSumD;
-	vector<double> linearSumD2;
-	double rijSplit;
-	double rijSplineSplit;
-	double nodePointSpacingShort;
-	double nodePointSpacingShort2;
-	double nodePointSpacingLarge;
-	double nodePointSpacingLarge2;
-	double rijTail;
 
+	double halfLength;
+	double maxDistance;
+	int numberOfSpecialParameters;
+	int numberOfStandardParameters;
+
+	int numOfOtherLocalOperators;
+	vector<double> otherLocalOperators;
 	int grBinCount;
 	int grBinStartIndex;
 	vector<double> grBins;
@@ -50,47 +40,38 @@ private:
 	double grNodePointSpacing;
 	vector<vector<vector<double> > > kValues;
 	int numOfkValues;
-	double densityProfileMaxDistance;
-	int numOfDensityProfileValues;
-	vector<double> densityProfileBins;
-	double densityProfileBinInterval;
-	int densityProfileBin;
-	double densityProfileNodePointSpacing;
 
-	double mcMillanFactor;
-
-	double mcMillanSumNew;
-	double constSumNew;
-	//double logSumNew;
-	double linearSumNew;
 	vector<double> splineSumsNew; //indices: k (bin); for <O_k>
 	vector<double> sumOldPerBin;
 	vector<double> sumNewPerBin;
+	int changedParticleIndex;
 
-	double factorFirstSpline1;
-	double factorFirstSpline2;
-	double factorSecondSpline1;
-	double factorSecondSpline2;
-	double factorSecondLastSpline;
-	double factorSecondLastSplineConst;
-	//double factorSecondLastSplineLog;
-	double factorSecondLastSplineLinear;
-	double factorLastSpline;
-	double factorLastSplineConst;
-	//double factorLastSplineLog;
-	double factorLastSplineLinear;
-	double factorSecondLastShort;
-	double factorSecondLastLarge;
-	double factorLastShort;
-	double factorLastLarge;
-	double factorFirstShort;
-	double factorFirstLarge;
-	double factorSecondShort;
-	double factorSecondLarge;
+	vector<vector<double> > bcFactors; //factors according to the boundary conditions
+
+	vector<double> nodes;
+	vector<vector<vector<double> > > splineWeights;
+
+	Observables::ObservableVsOnGridWithScaling pairDistributionRad;
+	Observables::ObservableVsOnMultiGrid pairDistribution;
+
+private:
+	double GetExternalPotential(vector<double>& r);
+	void RefreshLocalOperators();
+	void CalculateLocalOperators(vector<vector<double> >& R);
+	void CalculateExpectationValues(vector<double>& O, vector<vector<vector<double> > >& sD, vector<vector<double> >& sD2, vector<double>& otherO, vector<double>& gr, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
+	void CalculateWavefunction(vector<double>& O, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
+
+	double TransformCoordinates(vector<double>& original, vector<double>& transformed);
+
+public:
+	void SetNodes(vector<double> n);
+	void SetGrBinCount(double n);
+
+	//vector<vector<double> > test;
 
 //Implementation of IPhysicalSystem
 public:
-	HeDrop(vector<double>& params, string configDirectory);
+	NUBosonsBulkPBWhitehead(vector<double>& params, string configDirectory);
 
 	void InitSystem() override;
 

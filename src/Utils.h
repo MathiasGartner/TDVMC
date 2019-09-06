@@ -6,6 +6,7 @@
 #include "Observables/Observable.h"
 #include "Observables/ObservableV.h"
 #include "Observables/ObservableVsOnGrid.h"
+#include "Observables/ObservableVsOnMultiGrid.h"
 
 #include <cmath>
 #include <cstring>
@@ -48,6 +49,8 @@ void RemoveFile(string path);
 bool CopyFile(string filePathSource, string filePathNew);
 
 string PrintArrayValues(double* r, int length);
+
+vector<double> VectorAbs(vector<double> v);
 
 extern double (*VectorDotProduct_DIM)(vector<double>&, vector<double>&);
 double VectorDotProduct_1D(vector<double>& v1, vector<double>& v2);

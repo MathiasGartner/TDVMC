@@ -7,11 +7,6 @@ namespace Observables
 
 ObservableVsOnGrid::ObservableVsOnGrid()
 {
-	gridName = "grid";
-	gridMin = 0.0;
-	gridMax = 0.0;
-	gridCount = 0;
-	gridSpacing = 0.0;
 }
 
 ObservableVsOnGrid* ObservableVsOnGrid::Clone() const
@@ -29,19 +24,7 @@ void ObservableVsOnGrid::ClearValues()
 
 void ObservableVsOnGrid::InitGrid(double min, double max, double spacing)
 {
-	gridMin = min;
-	gridMax = max;
-	gridSpacing = spacing;
-	gridCount = (gridMax - gridMin) / gridSpacing;
-	InitVector(grid, gridCount, 0.0);
-
-	double val = gridMin;
-	for (unsigned int i = 0; i < grid.size(); i++)
-	{
-		grid[i] = val;
-		val += gridSpacing;
-
-	}
+	grid.Init(min, max, spacing);
 }
 
 void ObservableVsOnGrid::InitObservables(vector<string> names)
@@ -49,17 +32,14 @@ void ObservableVsOnGrid::InitObservables(vector<string> names)
 	this->observablesV.resize(names.size());
 	for(unsigned int i = 0; i < names.size(); i++)
 	{
-		this->observablesV[i].Init(this->grid.size(), names[i]);
+		this->observablesV[i].Init(this->grid.count, names[i]);
 	}
 }
 
 void ObservableVsOnGrid::AddToHistogram(int observableIndex, double gridValue, double value)
 {
-	//INFO: only for grid that starts at zero. otherwise: (gridValue - this->gridMin) has to be used.
-	double interval;
 	int bin;
-	interval = gridValue / this->gridSpacing;
-	bin = floor(interval);
+	bin = this->grid.GetIndex(gridValue);
 	this->observablesV[observableIndex].values[bin] += value;
 }
 

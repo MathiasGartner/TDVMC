@@ -44,9 +44,6 @@ private:
 
 	vector<vector<double> > bcFactors; //factors according to the boundary conditions
 
-protected:
-	double exponentNew;
-
 private:
 	double GetExternalPotential(vector<double>& r);
 
@@ -75,6 +72,8 @@ public:
 	double CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition) override;
 
 	void AcceptMove() override;
+
+	void InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data) override;
 
 	void FillCorrelatedSamplingData(ICorrelatedSamplingData* data) override;
 };

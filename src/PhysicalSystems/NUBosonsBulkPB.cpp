@@ -523,8 +523,8 @@ void NUBosonsBulkPB::CalculateExpectationValues(vector<double>& O, vector<vector
 	}
 
 	otherExpectationValues[0] = kineticR;
-	otherExpectationValues[1] = otherO[0];
-	otherExpectationValues[2] = wf;
+	otherExpectationValues[1] = kineticSumR1;//otherO[0];
+	otherExpectationValues[2] = kineticSumR2;//wf;
 	for (int i = 0; i < grBinCount; i++)
 	{
 		otherExpectationValues[i + grBinStartIndex] = gr[i];
@@ -583,7 +583,7 @@ void NUBosonsBulkPB::CalculateAdditionalSystemProperties(vector<vector<double> >
 		for (int j = 0; j < i; j++)
 		{
 			rni = VectorDisplacementNIC_DIM(R[i], R[j], vecrni);
-			if (rni < pairDistribution.gridMax)
+			if (rni < pairDistribution.grid.max)
 			{
 				pairDistribution.AddToHistogram(0, rni, 1.0);
 			}
@@ -730,6 +730,14 @@ void NUBosonsBulkPB::AcceptMove()
 	exponent = exponentNew;
 	splineSums = splineSumsNew;
 	outerSum = outerSumNew;
+}
+
+void NUBosonsBulkPB::InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data)
+{
+	for (unsigned int i = 0; i < data.size(); i++)
+	{
+		data[i] = new CSDataBulkSplines();
+	}
 }
 
 void NUBosonsBulkPB::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)

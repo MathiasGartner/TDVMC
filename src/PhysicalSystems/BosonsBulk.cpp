@@ -614,6 +614,14 @@ void BosonsBulk::AcceptMove()
 	splineSums = splineSumsNew;
 }
 
+void BosonsBulk::InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data)
+{
+	for (unsigned int i = 0; i < data.size(); i++)
+	{
+		data[i] = new CSDataBulkSplines();
+	}
+}
+
 void BosonsBulk::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
 {
 	CSDataBulkSplines* d = dynamic_cast<CSDataBulkSplines*>(data);
