@@ -5,6 +5,7 @@
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
 ../src/CSDataBulkSplines.cpp \
+../src/CSDataBulkSplinesBR.cpp \
 ../src/ConfigItem.cpp \
 ../src/CorrelationFunctionData.cpp \
 ../src/MathOperators.cpp \
@@ -18,6 +19,7 @@ CPP_SRCS += \
 
 OBJS += \
 ./src/CSDataBulkSplines.o \
+./src/CSDataBulkSplinesBR.o \
 ./src/ConfigItem.o \
 ./src/CorrelationFunctionData.o \
 ./src/MathOperators.o \
@@ -31,6 +33,7 @@ OBJS += \
 
 CPP_DEPS += \
 ./src/CSDataBulkSplines.d \
+./src/CSDataBulkSplinesBR.d \
 ./src/ConfigItem.d \
 ./src/CorrelationFunctionData.d \
 ./src/MathOperators.d \

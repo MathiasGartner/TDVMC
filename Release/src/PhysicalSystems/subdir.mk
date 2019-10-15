@@ -19,7 +19,10 @@ CPP_SRCS += \
 ../src/PhysicalSystems/HeBulk.cpp \
 ../src/PhysicalSystems/HeDrop.cpp \
 ../src/PhysicalSystems/NUBosonsBulk.cpp \
-../src/PhysicalSystems/NUBosonsBulkPB.cpp 
+../src/PhysicalSystems/NUBosonsBulkPB.cpp \
+../src/PhysicalSystems/NUBosonsBulkPBBox.cpp \
+../src/PhysicalSystems/NUBosonsBulkPBBoxAndRadial.cpp \
+../src/PhysicalSystems/NUBosonsBulkPBWhitehead.cpp 
 
 OBJS += \
 ./src/PhysicalSystems/BosonCluster.o \
@@ -37,7 +40,10 @@ OBJS += \
 ./src/PhysicalSystems/HeBulk.o \
 ./src/PhysicalSystems/HeDrop.o \
 ./src/PhysicalSystems/NUBosonsBulk.o \
-./src/PhysicalSystems/NUBosonsBulkPB.o 
+./src/PhysicalSystems/NUBosonsBulkPB.o \
+./src/PhysicalSystems/NUBosonsBulkPBBox.o \
+./src/PhysicalSystems/NUBosonsBulkPBBoxAndRadial.o \
+./src/PhysicalSystems/NUBosonsBulkPBWhitehead.o 
 
 CPP_DEPS += \
 ./src/PhysicalSystems/BosonCluster.d \
@@ -55,7 +61,10 @@ CPP_DEPS += \
 ./src/PhysicalSystems/HeBulk.d \
 ./src/PhysicalSystems/HeDrop.d \
 ./src/PhysicalSystems/NUBosonsBulk.d \
-./src/PhysicalSystems/NUBosonsBulkPB.d 
+./src/PhysicalSystems/NUBosonsBulkPB.d \
+./src/PhysicalSystems/NUBosonsBulkPBBox.d \
+./src/PhysicalSystems/NUBosonsBulkPBBoxAndRadial.d \
+./src/PhysicalSystems/NUBosonsBulkPBWhitehead.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes

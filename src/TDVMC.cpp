@@ -42,7 +42,6 @@
 //#undef SEEK_END
 //#undef SEEK_CUR
 
-//#include <armadillo>
 #include <cstring>
 #include <ctime>
 #include <fstream>
@@ -55,7 +54,7 @@
 #include <unistd.h>
 #include <vector>
 
-//#include "../resources/armadillo"
+#include "../resources/Eigen/Dense"
 #include "../resources/json/json-forwards.h"
 #include "../resources/json/json.h"
 
@@ -91,6 +90,7 @@ double TIMESTEP;
 double TOTALTIME;
 int IMAGINARY_TIME;
 int ODE_SOLVER_TYPE;
+int LINEAR_EQUATION_SOLVER_TYPE;
 int USE_PRECONDITIONING;
 vector<double> PARAMS_REAL;
 vector<double> PARAMS_IMAGINARY;
@@ -113,7 +113,7 @@ vector<double> NURBS_GRID;
 vector<int> PARTICLE_TYPES;
 vector<double> SYSTEM_PARAMS;
 
-string requiredConfigVersion = "0.20";
+string requiredConfigVersion = "0.21";
 int numOfProcesses = 1;
 int rootRank = 0;
 int processRank = 0;
@@ -371,6 +371,7 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("TOTALTIME", &TOTALTIME, ConfigItemType::DOUBLE, true));
 	configItems.push_back(ConfigItem("IMAGINARY_TIME", &IMAGINARY_TIME, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("ODE_SOLVER_TYPE", &ODE_SOLVER_TYPE, ConfigItemType::INT, true));
+	configItems.push_back(ConfigItem("LINEAR_EQUATION_SOLVER_TYPE", &LINEAR_EQUATION_SOLVER_TYPE, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("USE_PRECONDITIONING", &USE_PRECONDITIONING, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("USE_PARAMETER_ACCEPTANCE_CHECK", &USE_PARAMETER_ACCEPTANCE_CHECK, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("PARAMETER_ACCEPTANCE_CHECK_TYPE", &PARAMETER_ACCEPTANCE_CHECK_TYPE, ConfigItemType::INT, true));
@@ -554,9 +555,12 @@ void Init()
 	}
 	else
 	{
+		//cout << "init with:" << (processRank + 1) << endl;
 		generator = mt19937_64(processRank + 1);
+		//cout << generator << endl;
 		//generator = default_random_engine(processRank + 1);
 		distParticleIndex = uniform_int_distribution<int>(0, N - 1);
+		//Log("uniform: " + to_string(random01()) + " normal: " + to_string(randomNormal()));
 		srand(processRank + 1);
 	}
 	//INFO: box length is specified in cofig file due to problems with rounding errors
@@ -1668,33 +1672,62 @@ void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double 
 
 	//WriteDataToFile(matrix, "Omatrix", "Omatrix");
 
-	vector<double> preconditionScalings;
-	if (USE_PRECONDITIONING == 1)
+	if (LINEAR_EQUATION_SOLVER_TYPE == 0) //Cholesky
 	{
-		PreconditionEquationSystemByScaling(matrix, energiesReal, energiesImag, preconditionScalings);
-		RegularizeEquationSystem(matrix, 0.001);
-	}
-
-	//WriteDataToFile(matrix, "PCmatrix", "PCmatrix");
-	//WriteDataToFile(energiesReal, "BBenergiesReal", "BBenergiesReal");
-	//WriteDataToFile(energiesImag, "BBenergiesImag", "BBenergiesImag");
-
-	PerformCholeskyDecomposition(matrix);
-	SolveCholeskyDecomposedEquationSystem(matrix, energiesReal, uDotR);
-	SolveCholeskyDecomposedEquationSystem(matrix, energiesImag, uDotI);
-	CalculatePhiDot(uDotR, uDotI, phiDotR, phiDotI);
-
-	if (USE_PRECONDITIONING)
-	{
-		for (unsigned int i = 0; i < uDotR.size(); i++)
+		vector<double> preconditionScalings;
+		if (USE_PRECONDITIONING == 1)
 		{
-			uDotR[i] /= preconditionScalings[i];
-			uDotI[i] /= preconditionScalings[i];
+			PreconditionEquationSystemByScaling(matrix, energiesReal, energiesImag, preconditionScalings);
+			RegularizeEquationSystem(matrix, 0.001);
 		}
-	}
 
-	//WriteDataToFile(matrix, "BBcholesky", "BBcholesky");
-	//WriteDataToFile(uDotR, "BBuDotR", "BBuDotR");
+		//WriteDataToFile(matrix, "PCmatrix", "PCmatrix");
+		//WriteDataToFile(energiesReal, "BBenergiesReal", "BBenergiesReal");
+		//WriteDataToFile(energiesImag, "BBenergiesImag", "BBenergiesImag");
+
+		PerformCholeskyDecomposition(matrix);
+		SolveCholeskyDecomposedEquationSystem(matrix, energiesReal, uDotR);
+		SolveCholeskyDecomposedEquationSystem(matrix, energiesImag, uDotI);
+		CalculatePhiDot(uDotR, uDotI, phiDotR, phiDotI);
+
+		if (USE_PRECONDITIONING == 1)
+		{
+			for (unsigned int i = 0; i < uDotR.size(); i++)
+			{
+				uDotR[i] /= preconditionScalings[i];
+				uDotI[i] /= preconditionScalings[i];
+			}
+		}
+
+		//WriteDataToFile(matrix, "BBcholesky", "BBcholesky");
+		//WriteDataToFile(uDotR, "BBuDotR", "BBuDotR");
+	}
+	else if (LINEAR_EQUATION_SOLVER_TYPE == 1) //SVD
+	{
+		Eigen::MatrixXd e_matrix(matrix.size(), matrix.size());
+		for (unsigned int i = 0; i < matrix.size(); i++)
+		{
+			e_matrix.row(i) = Eigen::VectorXd::Map(&matrix[i][0], matrix[i].size());
+		}
+		Eigen::VectorXd e_energiesReal = Eigen::VectorXd::Map(energiesReal.data(), energiesReal.size());
+		Eigen::VectorXd e_energiesImag = Eigen::VectorXd::Map(energiesImag.data(), energiesImag.size());
+
+		auto svd = e_matrix.bdcSvd(Eigen::DecompositionOptions::ComputeFullU | Eigen::DecompositionOptions::ComputeFullV);
+		svd.setThreshold(1e-4);
+		Eigen::VectorXd resultReal = svd.solve(e_energiesReal);
+		Eigen::VectorXd resultImag = svd.solve(e_energiesImag);
+
+		vector<double> uDotR_(resultReal.data(), resultReal.data() + resultReal.size());
+		vector<double> uDotI_(resultImag.data(), resultImag.data() + resultImag.size());
+		uDotR.resize(uDotR_.size());
+		uDotI.resize(uDotI_.size());
+		for (unsigned int i = 0; i < uDotR_.size(); i++)
+		{
+			uDotR[i] = uDotR_[i];
+			uDotI[i] = uDotI_[i];
+		}
+		CalculatePhiDot(uDotR, uDotI, phiDotR, phiDotI);
+	}
 }
 
 ///////////////////////
@@ -2854,6 +2887,7 @@ int mainMPI(int argc, char** argv)
 		//cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
 		//cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
 	}
+	//Log("uniform: " + to_string(random01()) + " normal: " + to_string(randomNormal()));
 
 	vector<vector<double> > R(N);
 	vector<double> uR(N_PARAM);
@@ -2904,6 +2938,43 @@ int mainMPI(int argc, char** argv)
 	sys->InitSystem();
 	PostSystemInit();
 
+	string tabs = "\t\t\t\t\t\t";
+	bool samplesToFile = false;
+	if (samplesToFile)
+	{
+		vector<double> tmp;
+		//WriteDataToFile(tmp, "samples", "He1 - x\t\t\t\tHe1 - y\t\t\t\tHe1 - z\t\t\t\tHe2 - x\t\t\t\tHe2 - y\t\t\t\tHe2 - z\t\t\t\tNa - x\t\t\t\tNa - y\t\t\t\tNa - z\t\t\t\tE_k,1\t\t\t\tE_k,2\t\t\t\tE_pot");
+		WriteDataToFile(tmp, "samples", string("He1 - x\t\t\t\tHe1 - y\t\t\t\tHe1 - z\t\t\t\t") + "He2 - x\t\t\t\tHe2 - y\t\t\t\tHe2 - z\t\t\t\t" + "Na - x\t\t\t\tNa - y\t\t\t\tNa - z\t\t\t\t" + "E_k,1\t\t\t\tE_k,2\t\t\t\tE_pot");
+	}
+
+	bool samplesToFile2Particles = true;
+	if (samplesToFile2Particles)
+	{
+		vector<double> tmp;
+		WriteDataToFile(tmp, "samples", string("") + "He1 - x" + tabs + "He1 - y" + tabs + "He1 - z" + tabs + "He2 - x" + tabs + "He2 - y" + tabs + "He2 - z" + tabs +
+		//"Na - x" + tabs + "Na - y" + tabs + "Na - z" + tabs +
+				"E_k,1" + tabs + "E_k,2" + tabs + "E_k" + tabs + "E_pot" + tabs + "wf" + tabs + "log(wf)");
+		vector<vector<double> > tmpR;
+		int tmpN = N;
+		N = 2;
+		InitVector(tmpR, 2, DIM, 0.0);
+		tmpR[1][0] = 1.5;
+		vector<double> gridvals = {2,2.1,2.2,2.300000001,2.4,2.5,2.6,2.75,2.94227,3.17052,3.52833,3.9086,4.44276,5.12719,6.15788,6.83052,7.6,8.45,9.3,10.3,11.3,12.3,13.3,14.3,15.3,16.3,17.3,18.3,19.3,20.3};
+		for (int i = 0; i < gridvals.size(); i++)
+		//for (int i = 0; i < 3000; i++)
+		{
+			tmpR[1][0] = gridvals[i];
+			sys->CalculateWavefunction(tmpR, uR, uI, phiR, phiI);
+			sys->CalculateExpectationValues(tmpR, uR, uI, phiR, phiI);
+			auto values = sys->GetOtherExpectationValues();
+			tmp =
+			{	tmpR[0][0], tmpR[0][1], tmpR[0][2], tmpR[1][0], tmpR[1][1], tmpR[1][2], values[0], values[1], values[2], values[3], values[4], values[5]};
+			AppendDataToFile(tmp, "samples");
+			//tmpR[1][0] += 0.01;
+		}
+		N = tmpN;
+	}
+
 	bool saveWfToFile = false;
 	if (saveWfToFile)
 	{
@@ -2933,14 +3004,14 @@ int mainMPI(int argc, char** argv)
 		int tmpN = N;
 		N = 2;
 		InitVector(tmpR, 2, DIM, 0.0);
-		tmpR[1][0] = -2.501;
-		for (int i = 0; i < 500; i++)
+		tmpR[1][0] = 1.501;
+		for (int i = 0; i < 5000; i++)
 		{
 			sys->CalculateWavefunction(tmpR, uR, uI, phiR, phiI);
 			sys->CalculateExpectationValues(tmpR, uR, uI, phiR, phiI);
 			auto values = sys->GetOtherExpectationValues();
 			kineticValues.push_back( { tmpR[1][0], values[0], values[1], values[2] });
-			tmpR[1][0] += 0.01;
+			tmpR[1][0] += 0.005;
 		}
 		N = tmpN;
 		string name = "kineticValues";
@@ -3719,6 +3790,13 @@ int main(int argc, char **argv)
 
 	//Potentials::SaveAllPotentialValues("/itpstore/gartner/Output/TDVMC/asterix/");
 
+	//Eigen::MatrixXd m(2, 2);
+	//m(0, 0) = 3;
+	//m(1, 0) = 2.5;
+	//m(0, 1) = -1;
+	//m(1, 1) = m(1, 0) + m(0, 1);
+	//cout << m << endl;
+
 	if (argc == 0) //INFO: started with pbs on mach
 	{
 		//cout << "Starting on MACH (argc=0)" << endl << endl;
@@ -3735,12 +3813,12 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BosonCluster";
 		//SYSTEM_TYPE = "BosonClusterWithLog";
 		//SYSTEM_TYPE = "BosonClusterWithLogParam";
-		//SYSTEM_TYPE = "BosonMixtureCluster";
+		SYSTEM_TYPE = "BosonMixtureCluster";
 		//SYSTEM_TYPE = "NUBosonsBulk";
 		//SYSTEM_TYPE = "NUBosonsBulkPB";
 		//SYSTEM_TYPE = "NUBosonsBulkPBBox";
 		//SYSTEM_TYPE = "NUBosonsBulkPBBoxAndRadial";
-		SYSTEM_TYPE = "NUBosonsBulkPBWhitehead";
+		//SYSTEM_TYPE = "NUBosonsBulkPBWhitehead";
 		//SYSTEM_TYPE = "BosonsBulkDamped";
 		if (SYSTEM_TYPE == "HeDrop")
 		{
@@ -3786,8 +3864,8 @@ int main(int argc, char **argv)
 		else if (SYSTEM_TYPE == "BosonMixtureCluster")
 		{
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/BosonMixtureCluster.config";
-			//configFilePath = "/home/gartner/Sources/TDVMC/config/He4He4Na.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/He4He4Na_reverse.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/He4He4Na.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/He4He4Na_reverse.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/He4He4Cs.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/He3He4Cs.config";
 		}
@@ -3798,7 +3876,8 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "NUBosonsBulkPB")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB1D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB1D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB1DLarge.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB2D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB3D.config";
 		}

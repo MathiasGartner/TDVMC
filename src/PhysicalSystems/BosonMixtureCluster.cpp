@@ -459,6 +459,10 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 				//		otherwise values are calculated multiple times
 				if (i != n) //TODO: also include in (i < n) branch -> then only loop over i < n
 				{
+					for (int a = 0; a < DIM; a++)
+					{
+						evecrni[a] = vecrni[a] / rni;
+					}
 					if (rni < cfd.rijSplit)
 					{
 						double rniMinusD = pow(rni, cfd.mcMillanFactor - 2.0);
@@ -494,11 +498,6 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 							tmp1[3 - p] = cfd.splineWeights[bin - p][p][1] + 2.0 * cfd.splineWeights[bin - p][p][2] * rni + 3.0 * cfd.splineWeights[bin - p][p][3] * rni2;
 							//second derivative
 							tmp2[3 - p] = 2.0 * cfd.splineWeights[bin - p][p][2] + 6.0 * cfd.splineWeights[bin - p][p][3] * rni;
-						}
-
-						for (int a = 0; a < DIM; a++)
-						{
-							evecrni[a] = vecrni[a] / rni;
 						}
 						for (int a = 0; a < DIM; a++)
 						{
@@ -658,12 +657,18 @@ void BosonMixtureCluster::CalculateExpectationValues(vector<vector<double> >& R,
 		localOperatorlocalEnergyI[k] = localOperators[k] * localEnergyI;
 	}
 
+	//otherExpectationValues[0] = kineticR;
+	//otherExpectationValues[1] = potentialIntern;
+	//otherExpectationValues[2] = exponent;
 	otherExpectationValues[0] = kineticR_part1;
 	otherExpectationValues[1] = kineticR_part2;
 	otherExpectationValues[2] = kineticR;
+	otherExpectationValues[3] = potentialIntern;
+	otherExpectationValues[4] = wf;
+	otherExpectationValues[5] = exponent;
 	for (int i = 0; i < globalNumOfDensityProfileValues; i++)
 	{
-		otherExpectationValues[3 + i] = globalDensityProfileBins[i];
+		//otherExpectationValues[3 + i] = globalDensityProfileBins[i];
 	}
 }
 

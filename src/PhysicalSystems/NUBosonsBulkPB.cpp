@@ -331,13 +331,15 @@ void NUBosonsBulkPB::CalculateOtherLocalOperators(vector<vector<double> >& R)
 				//internal potential energy
 				if (i < n)
 				{
-					double rnia = rni / a;
-					potentialIntern += b * exp(-(rnia * rnia) / 2.0);
+					//Gauss
+					//double rnia = rni / a;
+					//potentialIntern += b * exp(-(rnia * rnia) / 2.0);
 
-					//if (rni < a)
-					//{
-					//	potentialIntern += b;
-					//}
+					//square
+					if (rni < a)
+					{
+						potentialIntern += b;
+					}
 
 					//double rniAbsorption = rni - 4.5;
 					//double absorptionFactor = 0.0;//-3e-6;
@@ -523,8 +525,10 @@ void NUBosonsBulkPB::CalculateExpectationValues(vector<double>& O, vector<vector
 	}
 
 	otherExpectationValues[0] = kineticR;
-	otherExpectationValues[1] = kineticSumR1;//otherO[0];
-	otherExpectationValues[2] = kineticSumR2;//wf;
+	otherExpectationValues[1] = otherO[0];
+	otherExpectationValues[2] = wf;
+	//otherExpectationValues[1] = kineticSumR1;
+	//otherExpectationValues[2] = kineticSumR2;
 	for (int i = 0; i < grBinCount; i++)
 	{
 		otherExpectationValues[i + grBinStartIndex] = gr[i];
