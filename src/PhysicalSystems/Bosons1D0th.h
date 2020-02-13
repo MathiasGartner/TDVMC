@@ -16,48 +16,48 @@ using namespace std;
 namespace PhysicalSystems
 {
 
-class NUBosonsBulkPB: public IPhysicalSystem
+class Bosons1D0th: public IPhysicalSystem
 {
 private:
 	int numberOfSplines;
-	double outerSum;
 	vector<double> splineSums; //indices: k (bin); for <O_k>
 	vector<vector<vector<double> > > splineSumsD; //indices: k (bin), n (particle), a (coordinate)
 	vector<vector<double> > splineSumsD2; //indices: k (bin), n (particle)
+	int orderFD;
+	vector<double> factorsFD;
+	vector<vector<vector<double> > > splineSumsFDF;
+	vector<vector<vector<double> > > splineSumsFDB;
+
 
 	double halfLength;
 	double maxDistance;
-	int numberOfSpecialParameters;
+	int numberOfSpecialParametersStart;
+	int numberOfSpecialParametersEnd;
 	int numberOfStandardParameters;
 
 	int numOfOtherLocalOperators;
 	vector<double> otherLocalOperators;
-	int grBinCount;
-	int grBinStartIndex;
-	vector<double> grBins;
-	vector<double> grBinVolumes;
-	double grMaxDistance;
-	double grNodePointSpacing;
+
 	vector<vector<vector<double> > > kValues;
 	vector<double> kNorms;
 	int numOfkValues;
 
-	double outerSumNew;
 	vector<double> splineSumsNew; //indices: k (bin); for <O_k>
 	vector<double> sumOldPerBin;
 	vector<double> sumNewPerBin;
 	int changedParticleIndex;
 
-	vector<vector<double> > bcFactors; //factors according to the boundary conditions
+	int np1;
+	int np2;
+	int np3;
+	vector<vector<double> > bcFactorsStart; //factors according to the boundary conditions at origin
+	vector<vector<double> > bcFactorsEnd; //factors according to the boundary conditions at L/2
 
 	vector<double> nodes;
 	vector<vector<vector<double> > > splineWeights;
 
 	Observables::ObservableVsOnGridWithScaling pairDistribution;
 	Observables::ObservableVsOnGrid structureFactor;
-
-protected:
-	vector<double> scalingFactors;
 
 private:
 	double GetExternalPotential(vector<double>& r);
@@ -66,13 +66,14 @@ private:
 	void CalculateExpectationValues(vector<double>& O, vector<vector<vector<double> > >& sD, vector<vector<double> >& sD2, vector<double>& otherO, vector<double>& gr, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
 	void CalculateWavefunction(vector<double>& O, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
 
+	vector<double> CalculateWFChange(vector<vector<double> >& R, int changedParticleIndex, int coord, int steps);
+
 public:
 	void SetNodes(vector<double> n);
-	void SetGrBinCount(double n);
 
 //Implementation of IPhysicalSystem
 public:
-	NUBosonsBulkPB(vector<double>& params, string configDirectory);
+	Bosons1D0th(vector<double>& params, string configDirectory);
 
 	void InitSystem() override;
 

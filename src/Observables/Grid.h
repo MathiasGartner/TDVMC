@@ -22,6 +22,7 @@ public:
 	Grid();
 
 	void Init(double min, double max, double spacing);
+	void Init(vector<double> g);
 
 	int GetIndex(double value);
 };

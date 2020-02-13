@@ -13,6 +13,7 @@ extern string OUT_DIR;
 extern int N;           	    	//number of particles
 extern int DIM;     	         	//number of dimensions
 extern int N_PARAM;	        	  	//number of parameters of trial function
+extern int IMAGINARY_TIME;					//0: real time, 1: imaginary time
 
 extern double LBOX;				    //length of box
 extern double LBOX_R;				//reciprocal length of box

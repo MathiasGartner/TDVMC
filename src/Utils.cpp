@@ -891,6 +891,17 @@ vector<vector<vector<double> > > ReadKValuesFromJsonFile(string filePath)
 	return data;
 }
 
+void ReadDataFromFile(vector<double>& data, string filePath)
+{
+	ifstream file(filePath);
+	double value;
+	while (file >> value)
+	{
+		data.push_back(value);
+	}
+	file.close();
+}
+
 int get_cpu_id()
 {
 	//INFO: Get the the current process' stat file from the proc filesystem

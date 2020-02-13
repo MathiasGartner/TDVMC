@@ -156,5 +156,6 @@ void AppendDataToFile(double data, string filename);
 void AppendDataToFile(vector<double>& data, string filename);
 
 vector<vector<vector<double> > > ReadKValuesFromJsonFile(string filePath);
+void ReadDataFromFile(vector<double>& data, string filePath);
 
 int get_cpu_id();

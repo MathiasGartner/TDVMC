@@ -411,6 +411,7 @@ void NUBosonsBulk::CalculateExpectationValues(vector<double>& O, vector<vector<v
 				temp = (bcFactors[i][0] * sD[numberOfSplines - 3][n][a] + bcFactors[i][1] * sD[numberOfSplines - 2][n][a] + bcFactors[i][2] * sD[numberOfSplines - 1][n][a]);
 				vecKineticSumR1[a] += uR[N_PARAM - (numberOfSpecialParameters - i)] * temp;
 				vecKineticSumI1[a] += uI[N_PARAM - 1] * temp;
+				//TODO: error in imaginary part?????!!!!
 			}
 			temp = (bcFactors[i][0] * sD2[numberOfSplines - 3][n] + bcFactors[i][1] * sD2[numberOfSplines - 2][n] + bcFactors[i][2] * sD2[numberOfSplines - 1][n]);
 			kineticSumR2 += uR[N_PARAM - (numberOfSpecialParameters - i)] * temp;

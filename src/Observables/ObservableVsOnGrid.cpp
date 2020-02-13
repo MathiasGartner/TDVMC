@@ -27,6 +27,11 @@ void ObservableVsOnGrid::InitGrid(double min, double max, double spacing)
 	grid.Init(min, max, spacing);
 }
 
+void ObservableVsOnGrid::InitGrid(vector<double> g)
+{
+	this->grid.Init(g);
+}
+
 void ObservableVsOnGrid::InitObservables(vector<string> names)
 {
 	this->observablesV.resize(names.size());
@@ -41,6 +46,11 @@ void ObservableVsOnGrid::AddToHistogram(int observableIndex, double gridValue, d
 	int bin;
 	bin = this->grid.GetIndex(gridValue);
 	this->observablesV[observableIndex].values[bin] += value;
+}
+
+void ObservableVsOnGrid::SetValueAtGridIndex(int observableIndex, double gridIndex, double value)
+{
+	this->observablesV[observableIndex].values[gridIndex] = value;
 }
 
 IObservable& ObservableVsOnGrid::operator+=(const IObservable& oc)

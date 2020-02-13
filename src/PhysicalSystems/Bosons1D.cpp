@@ -1,11 +1,11 @@
-#include "NUBosonsBulkPB.h"
+#include "Bosons1D.h"
 
 #include "../SplineFactory.h"
 
 namespace PhysicalSystems
 {
 
-NUBosonsBulkPB::NUBosonsBulkPB(vector<double>& params, string configDirectory) :
+Bosons1D::Bosons1D(vector<double>& params, string configDirectory) :
 		IPhysicalSystem(params, configDirectory)
 {
 	this->USE_NORMALIZATION_AND_PHASE = true;
@@ -16,23 +16,21 @@ NUBosonsBulkPB::NUBosonsBulkPB(vector<double>& params, string configDirectory) :
 
 	halfLength = 0;
 	maxDistance = 0;
-	numberOfSpecialParameters = 0;
+	numberOfSpecialParametersStart = 0;
+	numberOfSpecialParametersEnd = 0;
 	numberOfStandardParameters = 0;
+	np1 = 0;
+	np2 = 0;
+	np3 = 0;
 
 	numOfOtherLocalOperators = 0;
-	grBinCount = 0;
-	grBinStartIndex = 0;
-	grMaxDistance = 0;
-	grNodePointSpacing = 0;
 	numOfkValues = 0;
 
-	outerSum = 0.0;
-	outerSumNew = 0.0;
 	exponentNew = 0;
 	changedParticleIndex = 0;
 }
 
-void NUBosonsBulkPB::SetNodes(vector<double> n)
+void Bosons1D::SetNodes(vector<double> n)
 {
 	this->nodes = n;
 	int periodicNodeCount = 3;
@@ -43,146 +41,66 @@ void NUBosonsBulkPB::SetNodes(vector<double> n)
 	}
 }
 
-void NUBosonsBulkPB::SetGrBinCount(double n)
-{
-	this->grBinCount = n;
-}
-
-void NUBosonsBulkPB::InitSystem()
+void Bosons1D::InitSystem()
 {
 	numOfOtherLocalOperators = 4; //INFO: potentialIntern, potentialInternComplex, potentialExtern, potentialExternComplex
 	otherLocalOperators.resize(numOfOtherLocalOperators);
-	if (grBinCount == 0)
-	{
-		grBinCount = 400;
-	}
-	grBinStartIndex = 9;
 	numOfkValues = 50;
-	numOfOtherExpectationValues = 9 + grBinCount;
+	numOfOtherExpectationValues = 9;
 	numOfAdditionalSystemProperties = numOfOtherExpectationValues;
-	//numOfAdditionalSystemProperties = numOfOtherExpectationValues + numOfkValues + numberOfSplines + numberOfSplines * N * DIM + numberOfSplines * N; //expectationValues + s(k) + splines + splinesD + splinesD2
 
 	//INFO: BC
-	//INFO: (N_PARAM + 2) for imaginary time with BC1.1;
-	//INFO: (N_PARAM + 1) for BC2.2
-	//INFO: N_PARAM + 2 - 2 for no BC and real time;
-	//INFO: +1 for ignoring first one
-	//numberOfSplines = N_PARAM + 2;//BC 1.1
-	numberOfSplines = N_PARAM + 3;//PB lt. pdf paper
-	//numberOfSplines = N_PARAM + 2; //PB 1.2
-	//numberOfSplines = N_PARAM + 3; //PB 1.1
-	//numberOfSplines = N_PARAM + 2;//BC 2.1
+	//numberOfSplines = N_PARAM + 1; //BC3.1D.CO.1
+	//numberOfSplines = N_PARAM + 2; //BC3.1D.CO.2
+	//numberOfSplines = N_PARAM + 3; //BC3.1D.CO.2 + BC3.1D.OR.1
+	numberOfSplines = nodes.size() - 3 - 1; //3rd order splines -(d+1)
 	halfLength = LBOX / 2.0;
 	maxDistance = nodes[nodes.size() - 4];
-	//maxDistance = halfLength;
 
-	//nodes.resize(numberOfSplines + 4);
-	//double baseSpacing = pow(maxDistance, 1.0/1.5) / (double) (N_PARAM - 2.0);
-	//nodes[0] = -baseSpacing * 2.0;
-	//nodes[1] = -baseSpacing;
-	//nodes[2] = -baseSpacing / 2.0;
-	//nodes[3] = baseSpacing / 2.0;
-	//nodes[4] = baseSpacing;
-	//nodes[5] = baseSpacing * 2.0;
-	//for (int i = 0; i < numberOfSplines + 4 - 3; i++)
-	//{
-	//	nodes[i + 6] = pow(i * baseSpacing, 1.5);
-	//}
 	if (nodes.empty())
 	{
-		for (int i = -3; i < N_PARAM + 3;  i++)
+		for (int i = -3; i < N_PARAM + 3; i++)
 		{
-			nodes.push_back((i * halfLength) / ((double)N_PARAM - 1));
+			nodes.push_back((i * halfLength) / ((double) N_PARAM - 1));
 		}
 	}
 	splineWeights = SplineFactory::GetWeights(nodes);
 
 	//cut off
-	//SplineFactory::SetBoundaryConditions1_1(nodes, bcFactors);
-	//SplineFactory::SetBoundaryConditions1_2(nodes, bcFactors);
-	//SplineFactory::SetBoundaryConditions2_1(nodes, bcFactors);
-	//SplineFactory::SetBoundaryConditions2_2(nodes, bcFactors);
-	numberOfSpecialParameters = bcFactors.size();
-	numberOfStandardParameters = N_PARAM - numberOfSpecialParameters;
+	SplineFactory::SetBoundaryConditions3_1D_OR_1(nodes, bcFactorsStart);
+	SplineFactory::SetBoundaryConditions3_1D_CO_2(nodes, bcFactorsEnd, maxDistance);
+	numberOfSpecialParametersStart = bcFactorsStart.size();
+	numberOfSpecialParametersEnd = bcFactorsEnd.size();
+	numberOfStandardParameters = N_PARAM - numberOfSpecialParametersStart - numberOfSpecialParametersEnd;
+	np1 = numberOfSpecialParametersStart;
+	np2 = np1 + numberOfStandardParameters;
+	np3 = np2 + numberOfSpecialParametersEnd;
+
+	if (N_PARAM != numberOfSplines - (3 - numberOfSpecialParametersStart) - (3 - numberOfSpecialParametersEnd))
+	{
+		cout << "!!! WRONG NUMBER OF PARAMETERS !!!" << endl;
+	}
 
 	wf = 0.0;
 	exponent = 0.0;
-	outerSum = 0.0;
-	splineSums.resize(numberOfSplines);
-	splineSumsD.resize(numberOfSplines);
-	for (auto &k : splineSumsD)
-	{
-		k.resize(N);
-		for (auto &n : k)
-		{
-			n.resize(DIM);
-		}
-	}
-	splineSumsD2.resize(numberOfSplines);
-	for (auto &k : splineSumsD2)
-	{
-		k.resize(N);
-	}
-
-	//TODO: calculate scaling factors according to the node structure
-	scalingFactors.resize(numberOfSplines);
-	for (int i = 0; i < numberOfSplines; i++)
-	{
-		//scalingFactors[i] = 1.0 / pow((i + 1), DIM - 1); //INFO: dV that is assigned to one spline scales with i^2 for 3D and i for 2D, 1 for 1D
-		scalingFactors[i] = 1.0;
-	}
+	InitVector(splineSums, numberOfSplines, 0.0);
+	InitVector(splineSumsD, numberOfSplines, N, DIM, 0.0);
+	InitVector(splineSumsD2, numberOfSplines, N, 0.0);
 
 	localEnergyR = 0;
 	localEnergyI = 0;
-	localOperators.resize(N_PARAM);
-	ClearVector(localOperators);
-	localOperatorsMatrix.resize(N_PARAM);
-	for (auto &row : localOperatorsMatrix)
-	{
-		row.resize(N_PARAM);
-	}
-	ClearVector(localOperatorsMatrix);
-	localOperatorlocalEnergyR.resize(N_PARAM);
-	ClearVector(localOperatorlocalEnergyR);
-	localOperatorlocalEnergyI.resize(N_PARAM);
-	ClearVector(localOperatorlocalEnergyI);
-	otherExpectationValues.resize(numOfOtherExpectationValues);
-	ClearVector(otherExpectationValues);
-	additionalSystemProperties.resize(numOfAdditionalSystemProperties);
-	ClearVector(additionalSystemProperties);
+	InitVector(localOperators, N_PARAM, 0.0);
+	InitVector(localOperatorsMatrix, N_PARAM, N_PARAM, 0.0);
+	InitVector(localOperatorlocalEnergyR, N_PARAM, 0.0);
+	InitVector(localOperatorlocalEnergyI, N_PARAM, 0.0);
+	InitVector(otherExpectationValues, numOfOtherExpectationValues, 0.0);
+	InitVector(additionalSystemProperties, numOfAdditionalSystemProperties, 0.0);
 
 	wfNew = 0.0;
 	exponentNew = 0.0;
-	splineSumsNew.resize(numberOfSplines);
-	sumOldPerBin.resize(numberOfSplines);
-	sumNewPerBin.resize(numberOfSplines);
-
-	grBins.resize(grBinCount);
-	ClearVector(grBins);
-	grMaxDistance = halfLength;
-	grNodePointSpacing = grMaxDistance / (double) grBinCount;
-
-	grBinVolumes.resize(grBinCount);
-	ClearVector(grBinVolumes);
-	for (int i = 0; i < grBinCount; i++)
-	{
-		if (DIM == 3)
-		{
-			grBinVolumes[i] = 4.0 * M_PI * pow(grNodePointSpacing * (i + 1), 3.0) / 3.0; //INFO: 3D sphere volume
-		}
-		else if (DIM == 2)
-		{
-			grBinVolumes[i] = M_PI * pow(grNodePointSpacing * (i + 1), 2.0); //INFO: 2D "sphere" volume
-		}
-		else if (DIM == 1)
-		{
-			grBinVolumes[i] = 2.0 * (grNodePointSpacing * (i + 1)); //INFO: 1D "sphere" volume
-		}
-	}
-	for (int i = grBinCount - 1; i > 0; i--)
-	{
-		grBinVolumes[i] = grBinVolumes[i] - grBinVolumes[i - 1];
-	}
+	InitVector(splineSumsNew, numberOfSplines, 0.0);
+	InitVector(sumOldPerBin, numberOfSplines, 0.0);
+	InitVector(sumNewPerBin, numberOfSplines, 0.0);
 
 	kValues = ReadKValuesFromJsonFile(this->configDirectory + "kVectors" + to_string(DIM) + "D.json");
 	ReadDataFromFile(kNorms, this->configDirectory + "kNorm" + to_string(DIM) + "D.csv");
@@ -206,32 +124,38 @@ void NUBosonsBulkPB::InitSystem()
 	//pairDistribution.InitGrid(0.0, halfLength, 0.05);
 	pairDistribution.InitGrid(0.0, nodes[nodes.size() - 4], nodes[nodes.size() - 4] / 100.0);
 	pairDistribution.InitScaling();
-	pairDistribution.InitObservables({"g_2(r_ij)"});
+	pairDistribution.InitObservables( { "g_2(r_ij)" });
 
 	structureFactor.name = "structureFactor";
 	structureFactor.InitGrid(kNorms);
-	structureFactor.InitObservables({"S(k)"});
+	structureFactor.InitObservables( { "S(k)" });
 
 	additionalObservables.Add(&pairDistribution);
 	additionalObservables.Add(&structureFactor);
 }
 
-void NUBosonsBulkPB::RefreshLocalOperators()
+void Bosons1D::RefreshLocalOperators()
 {
 	//INFO: BC
-	for (int i = 0; i < numberOfStandardParameters; i++)
+	for (int i = 0; i < np1; i++)
 	{
-		this->localOperators[i] = splineSums[i + 1];
+		this->localOperators[i] = (bcFactorsStart[i][0] * splineSums[0] + bcFactorsStart[i][1] * splineSums[1] + bcFactorsStart[i][2] * splineSums[2]);
 	}
-	this->localOperators[1] += splineSums[0];
-	this->localOperators[numberOfStandardParameters - 1] += splineSums[numberOfSplines - 2];
-	this->localOperators[numberOfStandardParameters - 1] += splineSums[numberOfSplines - 1];
-	//this->localOperators[numberOfStandardParameters - 2] += splineSums[numberOfSplines - 1];
-	//this->localOperators[numberOfStandardParameters - 1] += splineSums[numberOfSplines - 2] / (-2.0);
-	//this->localOperators[numberOfStandardParameters - 1] += splineSums[numberOfSplines - 1];
+	int spIdx = 3;
+	for (int i = np1; i < np2; i++)
+	{
+		this->localOperators[i] = splineSums[spIdx];
+		spIdx++;
+	}
+	int idx = 0;
+	for (int i = np2; i < np3; i++)
+	{
+		this->localOperators[i] = (bcFactorsEnd[idx][0] * splineSums[numberOfSplines - 3] + bcFactorsEnd[idx][1] * splineSums[numberOfSplines - 2] + bcFactorsEnd[idx][2] * splineSums[numberOfSplines - 1]);
+		idx++;
+	}
 }
 
-void NUBosonsBulkPB::CalculateLocalOperators(vector<vector<double> >& R)
+void Bosons1D::CalculateLocalOperators(vector<vector<double> >& R)
 {
 	int bin;
 	double rni;
@@ -239,7 +163,6 @@ void NUBosonsBulkPB::CalculateLocalOperators(vector<vector<double> >& R)
 	double rni3;
 	vector<double> vecrni(DIM);
 
-	outerSum = 0.0;
 	ClearVector(splineSums);
 
 	for (int n = 0; n < N; n++)
@@ -247,10 +170,6 @@ void NUBosonsBulkPB::CalculateLocalOperators(vector<vector<double> >& R)
 		for (int i = 0; i < n; i++)
 		{
 			rni = VectorDisplacementNIC_DIM(R[n], R[i], vecrni);
-			if (!(rni < maxDistance))
-			{
-				rni = 2 * maxDistance - rni;
-			}
 			if (rni < maxDistance)
 			{
 				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
@@ -265,18 +184,14 @@ void NUBosonsBulkPB::CalculateLocalOperators(vector<vector<double> >& R)
 			}
 			else
 			{
-				outerSum += 1.0;
+				cout << "!!!!" << endl;
 			}
 		}
-	}
-	for (int i = 0; i < numberOfSplines; i++)
-	{
-		splineSums[i] *= scalingFactors[i];
 	}
 	RefreshLocalOperators();
 }
 
-void NUBosonsBulkPB::CalculateOtherLocalOperators(vector<vector<double> >& R)
+void Bosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
 {
 	int s = 4;
 	vector<double> vecrni(DIM);
@@ -286,17 +201,13 @@ void NUBosonsBulkPB::CalculateOtherLocalOperators(vector<vector<double> >& R)
 	int bin;
 	double rni;
 	double rni2;
-	bool outsideL2 = false;
-
-	double grBinInterval;
-	int grBin;
 
 	double potentialExtern = 0;
 	double potentialExternComplex = 0;
 	double potentialIntern = 0;
 	double potentialInternComplex = 0;
 
-	//Gauss potential
+	//potential parameters (a -> width; b -> height)
 	double a = params[0];
 	double b = params[1];
 	if (params.size() > 2 && this->time >= params[2])
@@ -307,7 +218,6 @@ void NUBosonsBulkPB::CalculateOtherLocalOperators(vector<vector<double> >& R)
 
 	ClearVector(splineSumsD);
 	ClearVector(splineSumsD2);
-	ClearVector(grBins);
 	ClearVector(otherLocalOperators);
 
 	for (int n = 0; n < N; n++)
@@ -319,21 +229,6 @@ void NUBosonsBulkPB::CalculateOtherLocalOperators(vector<vector<double> >& R)
 		{
 			rni = VectorDisplacementNIC_DIM(R[n], R[i], vecrni);
 
-			//binning for g(r)
-			if (i < n && rni < grMaxDistance)
-			{
-				grBinInterval = rni / grNodePointSpacing;
-				grBin = int(grBinInterval);
-				//grBins[grBin] += 1.0 / (double)pow(grBin + 1, 2);
-				grBins[grBin] += 1.0 / grBinVolumes[grBin];
-			}
-
-			outsideL2 = false;
-			if (!(rni < maxDistance))
-			{
-				//outsideL2 = true;
-				rni = 2 * maxDistance - rni;
-			}
 			if (rni < maxDistance)
 			{
 				//internal potential energy
@@ -343,7 +238,7 @@ void NUBosonsBulkPB::CalculateOtherLocalOperators(vector<vector<double> >& R)
 					//double rnia = rni / a;
 					//potentialIntern += b * exp(-(rnia * rnia) / 2.0);
 
-					//square
+					//square well
 					if (rni < a)
 					{
 						potentialIntern += b;
@@ -355,6 +250,7 @@ void NUBosonsBulkPB::CalculateOtherLocalOperators(vector<vector<double> >& R)
 					//double rniR03 = rniR0 * rniR0 * rniR0;
 					//potentialIntern += b / (1 + rniR03 * rniR03);
 
+					//imaginary part
 					//double rniAbsorption = rni - 4.5;
 					//double absorptionFactor = 0.0;//-3e-6;
 					//if (rniAbsorption > 0)
@@ -384,6 +280,7 @@ void NUBosonsBulkPB::CalculateOtherLocalOperators(vector<vector<double> >& R)
 					{
 						evecrni[a] = vecrni[a] / rni;
 					}
+					bool outsideL2 = false;
 					double firstDerivativeFactor = outsideL2 ? -1.0 : 1.0;
 					for (int a = 0; a < DIM; a++)
 					{
@@ -395,16 +292,10 @@ void NUBosonsBulkPB::CalculateOtherLocalOperators(vector<vector<double> >& R)
 					double secondDerivativeFactor = DIM - 1.0; //INFO: at least correct for 2D and 3D (and 1D?)
 					for (int b = 0; b < s; b++)
 					{
-						splineSumsD2[bin - b][n] += tmp2[3 - b] + secondDerivativeFactor/ rni * tmp1[3 - b];
+						splineSumsD2[bin - b][n] += tmp2[3 - b] + secondDerivativeFactor / rni * tmp1[3 - b];
 					}
 				}
 			}
-		}
-
-		for (int f = 0; f < numberOfSplines; f++)
-		{
-			splineSumsD[f][n] *= scalingFactors[f];
-			splineSumsD2[f][n] *= scalingFactors[f];
 		}
 	}
 	otherLocalOperators[0] = potentialIntern;
@@ -413,19 +304,20 @@ void NUBosonsBulkPB::CalculateOtherLocalOperators(vector<vector<double> >& R)
 	otherLocalOperators[3] = potentialExternComplex;
 }
 
-vector<double> NUBosonsBulkPB::GetCenterOfMass(vector<vector<double> >& R)
+vector<double> Bosons1D::GetCenterOfMass(vector<vector<double> >& R)
 {
 	vector<double> com = { 0.0, 0.0, 0.0 };
 	return com;
 }
 
-double NUBosonsBulkPB::GetExternalPotential(vector<double>& r)
+double Bosons1D::GetExternalPotential(vector<double>& r)
 {
 	return 0;
 }
 
-void NUBosonsBulkPB::CalculateExpectationValues(vector<double>& O, vector<vector<vector<double> > >& sD, vector<vector<double> >& sD2, vector<double>& otherO, vector<double>& gr, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void Bosons1D::CalculateExpectationValues(vector<double>& O, vector<vector<vector<double> > >& sD, vector<vector<double> >& sD2, vector<double>& otherO, vector<double>& gr, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
+	double tmp = 0;
 	double kineticR = 0;
 	double kineticI = 0;
 	vector<double> vecKineticSumR1(DIM);
@@ -452,78 +344,45 @@ void NUBosonsBulkPB::CalculateExpectationValues(vector<double>& O, vector<vector
 			vecKineticSumI1[a] = 0.0;
 		}
 
-		for (int k = 0; k < numberOfStandardParameters; k++)
+		//INFO: BC
+		for (int i = 0; i < np1; i++)
 		{
 			for (int a = 0; a < DIM; a++)
 			{
-				vecKineticSumR1[a] += uR[k] * sD[k + 1][n][a];
-				vecKineticSumI1[a] += uI[k] * sD[k + 1][n][a];
+				tmp = (bcFactorsStart[i][0] * sD[0][n][a] + bcFactorsStart[i][1] * sD[1][n][a] + bcFactorsStart[i][2] * sD[2][n][a]);
+				vecKineticSumR1[a] += uR[i] * tmp;
+				vecKineticSumI1[a] += uI[i] * tmp;
 			}
-			kineticSumR2 += uR[k] * sD2[k + 1][n];
-			kineticSumI2 += uI[k] * sD2[k + 1][n];
-
-			if (n==7)
+			tmp = (bcFactorsStart[i][0] * sD2[0][n] + bcFactorsStart[i][1] * sD2[1][n] + bcFactorsStart[i][2] * sD2[2][n]);
+			kineticSumR2 += uR[i] * tmp;
+			kineticSumI2 += uI[i] * tmp;
+		}
+		int spIdx = 3;
+		for (int i = np1; i < np2; i++)
+		{
+			for (int a = 0; a < DIM; a++)
 			{
-				//cout << kineticSumR2 << endl;
+				vecKineticSumR1[a] += uR[i] * sD[spIdx][n][a];
+				vecKineticSumI1[a] += uI[i] * sD[spIdx][n][a];
 			}
+			kineticSumR2 += uR[i] * sD2[spIdx][n];
+			kineticSumI2 += uI[i] * sD2[spIdx][n];
+			spIdx++;
 		}
-		//INFO: BC
-		for (int a = 0; a < DIM; a++)
+		int idx = 0;
+		for (int i = np2; i < np3; i++)
 		{
-			vecKineticSumR1[a] += uR[1] * sD[0][n][a];
-			vecKineticSumI1[a] += uI[1] * sD[0][n][a];
+			for (int a = 0; a < DIM; a++)
+			{
+				tmp = (bcFactorsEnd[idx][0] * sD[numberOfSplines - 3][n][a] + bcFactorsEnd[idx][1] * sD[numberOfSplines - 2][n][a] + bcFactorsEnd[idx][2] * sD[numberOfSplines - 1][n][a]);
+				vecKineticSumR1[a] += uR[i] * tmp;
+				vecKineticSumI1[a] += uI[i] * tmp;
+			}
+			tmp = (bcFactorsEnd[idx][0] * sD2[numberOfSplines - 3][n] + bcFactorsEnd[idx][1] * sD2[numberOfSplines - 2][n] + bcFactorsEnd[idx][2] * sD2[numberOfSplines - 1][n]);
+			kineticSumR2 += uR[i] * tmp;
+			kineticSumI2 += uI[i] * tmp;
+			idx++;
 		}
-		kineticSumR2 += uR[1] * sD2[0][n];
-		kineticSumI2 += uI[1] * sD2[0][n];
-		if (n==7)
-		{
-			//cout << kineticSumR2 << endl;
-		}
-		for (int a = 0; a < DIM; a++)
-		{
-			vecKineticSumR1[a] += uR[N_PARAM - 1] * sD[numberOfSplines - 2][n][a];
-			vecKineticSumI1[a] += uI[N_PARAM - 1] * sD[numberOfSplines - 2][n][a];
-		}
-		kineticSumR2 += uR[N_PARAM - 1] * sD2[numberOfSplines - 2][n];
-		kineticSumI2 += uI[N_PARAM - 1] * sD2[numberOfSplines - 2][n];
-
-		if (n==7)
-		{
-			//cout << kineticSumR2 << endl;
-		}
-		for (int a = 0; a < DIM; a++)
-		{
-			vecKineticSumR1[a] += uR[N_PARAM - 1] * sD[numberOfSplines - 1][n][a];
-			vecKineticSumI1[a] += uI[N_PARAM - 1] * sD[numberOfSplines - 1][n][a];
-		}
-		kineticSumR2 += uR[N_PARAM - 1] * sD2[numberOfSplines - 1][n];
-		kineticSumI2 += uI[N_PARAM - 1] * sD2[numberOfSplines - 1][n];
-
-		if (n==7)
-		{
-			//cout << kineticSumR2 << endl;
-		}
-		//for (int a = 0; a < DIM; a++)
-		//{
-		//	vecKineticSumR1[a] += uR[N_PARAM - 2] * sD[numberOfSplines - 1][n][a];
-		//	vecKineticSumI1[a] += uI[N_PARAM - 2] * sD[numberOfSplines - 1][n][a];
-		//}
-		//kineticSumR2 += uR[N_PARAM - 2] * sD2[numberOfSplines - 1][n];
-		//kineticSumI2 += uI[N_PARAM - 2] * sD2[numberOfSplines - 1][n];
-		//for (int a = 0; a < DIM; a++)
-		//{
-		//	vecKineticSumR1[a] += uR[N_PARAM - 1] * sD[numberOfSplines - 2][n][a] / (-2.0);;
-		//	vecKineticSumI1[a] += uI[N_PARAM - 1] * sD[numberOfSplines - 2][n][a] / (-2.0);;
-		//}
-		//kineticSumR2 += uR[N_PARAM - 1] * sD2[numberOfSplines - 2][n] / (-2.0);;
-		//kineticSumI2 += uI[N_PARAM - 1] * sD2[numberOfSplines - 2][n] / (-2.0);;
-		//for (int a = 0; a < DIM; a++)
-		//{
-		//	vecKineticSumR1[a] += uR[N_PARAM - 1] * sD[numberOfSplines - 1][n][a];
-		//	vecKineticSumI1[a] += uI[N_PARAM - 1] * sD[numberOfSplines - 1][n][a];
-		//}
-		//kineticSumR2 += uR[N_PARAM - 1] * sD2[numberOfSplines - 1][n];
-		//kineticSumI2 += uI[N_PARAM - 1] * sD2[numberOfSplines - 1][n];
 
 		kineticSumR1I1 += 2.0 * VectorDotProduct_DIM(vecKineticSumR1, vecKineticSumI1);
 		kineticSumR1 += VectorNorm2_DIM(vecKineticSumR1);
@@ -573,28 +432,23 @@ void NUBosonsBulkPB::CalculateExpectationValues(vector<double>& O, vector<vector
 	otherExpectationValues[6] = kineticSumR2;
 	otherExpectationValues[7] = kineticSumI2;
 	otherExpectationValues[8] = kineticSumR1I1;
-	//otherExpectationValues[1] = kineticSumR1;
-	//otherExpectationValues[2] = kineticSumR2;
-	for (int i = 0; i < grBinCount; i++)
-	{
-		//otherExpectationValues[i + grBinStartIndex] = gr[i];
-	}
 }
 
-void NUBosonsBulkPB::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void Bosons1D::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	RefreshLocalOperators();
 	CalculateOtherLocalOperators(R);
-	CalculateExpectationValues(this->localOperators, this->splineSumsD, this->splineSumsD2, this->otherLocalOperators, this->grBins, uR, uI, phiR, phiI);
+	vector<double> dummy_grBins;
+	CalculateExpectationValues(this->localOperators, this->splineSumsD, this->splineSumsD2, this->otherLocalOperators, dummy_grBins, uR, uI, phiR, phiI);
 }
 
-void NUBosonsBulkPB::CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void Bosons1D::CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	CSDataBulkSplines* s = dynamic_cast<CSDataBulkSplines*>(sample);
 	CalculateExpectationValues(s->localOperators, s->splineSumsD, s->splineSumsD2, s->otherLocalOperators, s->grBins, uR, uI, phiR, phiI);
 }
 
-void NUBosonsBulkPB::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void Bosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	additionalObservables.ClearValues();
 	double rni;
@@ -638,7 +492,7 @@ void NUBosonsBulkPB::CalculateAdditionalSystemProperties(vector<vector<double> >
 	}
 }
 
-void NUBosonsBulkPB::CalculateWavefunction(vector<double>& O, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void Bosons1D::CalculateWavefunction(vector<double>& O, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	double sum = 0;
 
@@ -646,30 +500,25 @@ void NUBosonsBulkPB::CalculateWavefunction(vector<double>& O, vector<double>& uR
 	{
 		sum += uR[i] * O[i];
 	}
-	//INFO: BC
-	//TODO: does not work for ICorrelatedSamplingData
-	double boundaryValue = uR[N_PARAM - 1];//(uR[N_PARAM - 2] + 2.0 * uR[N_PARAM - 1]) / 3.0;
-	//boundaryValue = 0.0;
-	sum += boundaryValue * outerSum;
 
 	//cout << scientific << setprecision(16) << "sum:" << sum << endl;
 	exponent = sum;
 	wf = exp(exponent + phiR);
 }
 
-void NUBosonsBulkPB::CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void Bosons1D::CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	CalculateLocalOperators(R);
 	CalculateWavefunction(this->localOperators, uR, uI, phiR, phiI);
 }
 
-void NUBosonsBulkPB::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void Bosons1D::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	CSDataBulkSplines* s = dynamic_cast<CSDataBulkSplines*>(sample);
 	CalculateWavefunction(s->localOperators, uR, uI, phiR, phiI);
 }
 
-void NUBosonsBulkPB::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
+void Bosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
 	double sum = 0;
 	int bin;
@@ -678,8 +527,6 @@ void NUBosonsBulkPB::CalculateWFChange(vector<vector<double> >& R, vector<double
 	double rni3;
 	vector<double> vecrni(DIM);
 
-	double oldOuterSum = 0.0;
-	double newOuterSum = 0.0;
 	ClearVector(sumOldPerBin);
 	ClearVector(sumNewPerBin);
 	for (int i = 0; i < N; i++)
@@ -687,14 +534,14 @@ void NUBosonsBulkPB::CalculateWFChange(vector<vector<double> >& R, vector<double
 		if (i != changedParticleIndex)
 		{
 			rni = VectorDisplacementNIC_DIM(R[i], oldPosition, vecrni);
-			if (!(rni < maxDistance))
-			{
-				rni = 2 * maxDistance - rni;
-			}
 			if (rni < maxDistance)
 			{
 				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
 				bin = interval - nodes.begin() - 1;
+				if (bin >= numberOfSplines)
+				{
+					cout << "!!!!" << endl;
+				}
 				rni2 = rni * rni;
 				rni3 = rni2 * rni;
 
@@ -705,14 +552,9 @@ void NUBosonsBulkPB::CalculateWFChange(vector<vector<double> >& R, vector<double
 			}
 			else
 			{
-				//cout << "!!!" << endl;
-				oldOuterSum += 1.0;
+				cout << "!!!" << endl;
 			}
 			rni = VectorDisplacementNIC_DIM(R[i], R[changedParticleIndex], vecrni);
-			if (!(rni < maxDistance))
-			{
-				rni = 2 * maxDistance - rni;
-			}
 			if (rni < maxDistance)
 			{
 				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
@@ -727,42 +569,39 @@ void NUBosonsBulkPB::CalculateWFChange(vector<vector<double> >& R, vector<double
 			}
 			else
 			{
-				newOuterSum += 1.0;
+				cout << "!!!" << endl;
 			}
 		}
 	}
 
 	for (int i = 0; i < numberOfSplines; i++)
 	{
-		sumOldPerBin[i] *= scalingFactors[i];
-		sumNewPerBin[i] *= scalingFactors[i];
-	}
-	for (int i = 0; i < numberOfSplines; i++)
-	{
 		splineSumsNew[i] = max(0.0, splineSums[i] - sumOldPerBin[i] + sumNewPerBin[i]);
 	}
-	outerSumNew = max(0.0, outerSum - oldOuterSum + newOuterSum);
 
-	//INFO: BC
-	for (int i = 0; i < numberOfStandardParameters; i++)
+	//INFO: BCx
+	for (int i = 0; i < np1; i++)
 	{
-		sum += uR[i] * splineSumsNew[i + 1];
+		sum +=  uR[i] * (bcFactorsStart[i][0] * splineSumsNew[0] + bcFactorsStart[i][1] * splineSumsNew[1] + bcFactorsStart[i][2] * splineSumsNew[2]);
 	}
-	sum += uR[1] * splineSumsNew[0];
-	sum += uR[N_PARAM - 1] * splineSumsNew[numberOfSplines - 2];
-	sum += uR[N_PARAM - 1] * splineSumsNew[numberOfSplines - 1];
-	//sum += uR[N_PARAM - 2] * splineSumsNew[numberOfSplines - 1];
-	//sum += uR[N_PARAM - 1] * splineSumsNew[numberOfSplines - 2] / (-2.0);;
-	//sum += uR[N_PARAM - 1] * splineSumsNew[numberOfSplines - 1];
-	double boundaryValue = uR[N_PARAM - 1];//(uR[N_PARAM - 2] + 2.0 * uR[N_PARAM - 1]) / 3.0;
-	//boundaryValue = 0.0;
-	sum += boundaryValue * outerSumNew;
+	int spIdx = 3;
+	for (int i = np1; i < np2; i++)
+	{
+		sum +=  uR[i] * splineSumsNew[spIdx];
+		spIdx++;
+	}
+	int idx = 0;
+	for (int i = np2; i < np3; i++)
+	{
+		sum +=  uR[i] * (bcFactorsEnd[idx][0] * splineSumsNew[numberOfSplines - 3] + bcFactorsEnd[idx][1] * splineSumsNew[numberOfSplines - 2] + bcFactorsEnd[idx][2] * splineSumsNew[numberOfSplines - 1]);
+		idx++;
+	}
 
 	exponentNew = sum;
 	wfNew = exp(exponentNew + phiR);
 }
 
-double NUBosonsBulkPB::CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
+double Bosons1D::CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
 	CalculateWFChange(R, uR, uI, phiR, phiI, changedParticleIndex, oldPosition);
 	double wfQuotient = exp(2.0 * (exponentNew - exponent));
@@ -772,15 +611,14 @@ double NUBosonsBulkPB::CalculateWFQuotient(vector<vector<double> >& R, vector<do
 	return wfQuotient;
 }
 
-void NUBosonsBulkPB::AcceptMove()
+void Bosons1D::AcceptMove()
 {
 	wf = wfNew;
 	exponent = exponentNew;
 	splineSums = splineSumsNew;
-	outerSum = outerSumNew;
 }
 
-void NUBosonsBulkPB::InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data)
+void Bosons1D::InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data)
 {
 	for (unsigned int i = 0; i < data.size(); i++)
 	{
@@ -788,13 +626,12 @@ void NUBosonsBulkPB::InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>
 	}
 }
 
-void NUBosonsBulkPB::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
+void Bosons1D::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
 {
 	CSDataBulkSplines* d = dynamic_cast<CSDataBulkSplines*>(data);
 	d->splineSumsD = this->splineSumsD;
 	d->splineSumsD2 = this->splineSumsD2;
 	d->otherLocalOperators = this->otherLocalOperators;
-	d->grBins = this->grBins;
 }
 
 }
