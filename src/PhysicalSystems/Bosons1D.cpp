@@ -139,7 +139,7 @@ void Bosons1D::InitSystem()
 	additionalObservables.Add(&structureFactor);
 
 	//Precalculate spline values:
-	int preCalcBins = 100;
+	int preCalcBins = 100000;
 	double rni, rni2, rni3;
 	InitVector(nodeDiffs, nodes.size() - 1, 0.0);
 	InitVector(binSizePerNode, nodes.size() - 1, 0.0);
@@ -441,14 +441,6 @@ void Bosons1D::CalculateExpectationValues(vector<double>& O, vector<vector<vecto
 		kineticSumR1I1 += 2.0 * VectorDotProduct_DIM(vecKineticSumR1, vecKineticSumI1);
 		kineticSumR1 += VectorNorm2_DIM(vecKineticSumR1);
 		kineticSumI1 += VectorNorm2_DIM(vecKineticSumI1);
-
-		if (n == 7)
-		{
-			//cout << sD2[0][n] << " " << sD2[1][n] << " " << sD2[2][n] << endl;
-			//cout << sD2[numberOfSplines - 3][n] << " " << sD2[numberOfSplines - 2][n] << " " << sD2[numberOfSplines - 1][n] << endl;
-		}
-
-		//cout << scientific << setprecision(16) << "kineticSumR2[n=" << n << ":" << kineticSumR2 << endl << endl;
 	}
 
 	kineticR = -(kineticSumR1 - kineticSumI1 + kineticSumR2) * HBAR2_2M;

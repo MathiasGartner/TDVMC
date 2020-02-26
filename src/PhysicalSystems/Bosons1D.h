@@ -55,6 +55,7 @@ private:
 	vector<double> binSizePerNode;
 	vector<double> binSizePerNode_R;
 	vector<vector<vector<double> > > preCalcSplineValues;
+	//double preCalcSplineValues[103][4][100000];
 	bool usePreCalcSplineValues;
 
 	Observables::ObservableVsOnGridWithScaling pairDistribution;

@@ -3993,7 +3993,8 @@ int main(int argc, char **argv)
 		else if (SYSTEM_TYPE == "Bosons1D")
 		{
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/SW1D.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/SW1D_Carleo.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/SW2D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/SW1D_Carleo.config";
 		}
 		else if (SYSTEM_TYPE == "Bosons1D0th")
 		{
