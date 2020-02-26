@@ -51,6 +51,12 @@ private:
 	vector<double> nodes;
 	vector<vector<vector<double> > > splineWeights;
 
+	vector<double> nodeDiffs;
+	vector<double> binSizePerNode;
+	vector<double> binSizePerNode_R;
+	vector<vector<vector<double> > > preCalcSplineValues;
+	bool usePreCalcSplineValues;
+
 	Observables::ObservableVsOnGridWithScaling pairDistribution;
 	Observables::ObservableVsOnGrid structureFactor;
 

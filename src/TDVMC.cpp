@@ -3085,7 +3085,7 @@ int mainMPI(int argc, char** argv)
 			int tmpN = N;
 			N = 2;
 			InitVector(tmpR, 2, DIM, 0.0);
-			tmpR[1][0] = -11;//-6.0025;
+			tmpR[1][0] = -11*4;//-6.0025;
 			for (int i = 0; i < 4000; i++)
 			{
 				sys->CalculateWavefunction(tmpR, uR, uI, phiR, phiI);
@@ -3093,7 +3093,7 @@ int mainMPI(int argc, char** argv)
 				auto values = sys->GetOtherExpectationValues();
 				values.push_back(tmpR[1][0]);
 				kineticValues.push_back(values);
-				tmpR[1][0] += 0.005;
+				tmpR[1][0] += 0.005*4;
 			}
 			N = tmpN;
 			string name = "values";
@@ -3953,14 +3953,14 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BulkSplines";
 		//SYSTEM_TYPE = "BulkSplinesScaled";
 		//SYSTEM_TYPE = "HeDrop";
-		//SYSTEM_TYPE = "Bosons1D";
+		SYSTEM_TYPE = "Bosons1D";
 		//SYSTEM_TYPE = "Bosons1D0th";
 		//SYSTEM_TYPE = "Bosons1D4th";
 		//SYSTEM_TYPE = "Bosons1DSp";
 		//SYSTEM_TYPE = "BosonCluster";
 		//SYSTEM_TYPE = "BosonClusterWithLog";
 		//SYSTEM_TYPE = "BosonClusterWithLogParam";
-		SYSTEM_TYPE = "BosonsDiscrete";
+		//SYSTEM_TYPE = "BosonsDiscrete";
 		//SYSTEM_TYPE = "BosonMixtureCluster_4thorder";
 		//SYSTEM_TYPE = "BosonMixtureCluster";
 		//SYSTEM_TYPE = "NUBosonsBulk";
@@ -3992,7 +3992,8 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "Bosons1D")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/SW1D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/SW1D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/SW1D_Carleo.config";
 		}
 		else if (SYSTEM_TYPE == "Bosons1D0th")
 		{

@@ -676,6 +676,15 @@ void InitVector(vector<vector<vector<double> > >& v, int size1, int size2, int s
 	}
 }
 
+void InitVector(vector<vector<vector<vector<double> > > >& v, int size1, int size2, int size3, int size4, double initialValue)
+{
+	v.resize(size1);
+	for (auto& i : v)
+	{
+		InitVector(i, size2, size3, size4, initialValue);
+	}
+}
+
 void SetFileFormat(ofstream& f)
 {
 	f.precision(exportPrecisionSc);

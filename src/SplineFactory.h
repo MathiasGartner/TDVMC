@@ -34,9 +34,14 @@ void SetBoundaryConditions1_MM_1_4thorder(vector<double> n, vector<vector<double
 void SetBoundaryConditions1_EXP_2_4thorder(vector<double> n, vector<vector<double> >& bcs, double rc);
 
 //for 1D systems with NURBS, 3rd order
-void SetBoundaryConditions3_1D_OR_1(vector<double> n, vector<vector<double> >& bcs);
-void SetBoundaryConditions3_1D_CO_1(vector<double> n, vector<vector<double> >& bcs, double rc);
-void SetBoundaryConditions3_1D_CO_2(vector<double> n, vector<vector<double> >& bcs, double rc);
+void SetBoundaryConditions3_1D_OR_1(vector<double> n, vector<vector<double> >& bcs, bool uniform = false);
+void SetBoundaryConditions3_1D_OR_2(vector<double> n, vector<vector<double> >& bcs, bool uniform = false);
+void SetBoundaryConditions3_1D_OR_3(vector<double> n, vector<vector<double> >& bcs, bool uniform = false);
+void SetBoundaryConditions3_1D_OR_4(vector<double> n, vector<vector<double> >& bcs, bool uniform = false);
+void SetBoundaryConditions3_1D_CO_1(vector<double> n, vector<vector<double> >& bcs, double rc, bool uniform = false);
+void SetBoundaryConditions3_1D_CO_2(vector<double> n, vector<vector<double> >& bcs, double rc, bool uniform = false);
+void SetBoundaryConditions3_1D_CO_3(vector<double> n, vector<vector<double> >& bcs, double rc, bool uniform = false);
+void SetBoundaryConditions3_1D_CO_4(vector<double> n, vector<vector<double> >& bcs, double rc, bool uniform = false);
 
 //for 1D systems with NURBS, 4th order
 void SetBoundaryConditions4_1D_OR_1(vector<double> n, vector<vector<double> >& bcs);

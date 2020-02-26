@@ -12,6 +12,8 @@ Bosons1D::Bosons1D(vector<double>& params, string configDirectory) :
 	this->USE_NIC = true;
 	this->USE_MOVE_COM_TO_ZERO = false;
 
+	usePreCalcSplineValues = false;
+
 	numberOfSplines = 0;
 
 	halfLength = 0;
@@ -67,8 +69,8 @@ void Bosons1D::InitSystem()
 	splineWeights = SplineFactory::GetWeights(nodes);
 
 	//cut off
-	SplineFactory::SetBoundaryConditions3_1D_OR_1(nodes, bcFactorsStart);
-	SplineFactory::SetBoundaryConditions3_1D_CO_2(nodes, bcFactorsEnd, maxDistance);
+	SplineFactory::SetBoundaryConditions3_1D_OR_2(nodes, bcFactorsStart, true);
+	SplineFactory::SetBoundaryConditions3_1D_CO_2(nodes, bcFactorsEnd, maxDistance, true);
 	numberOfSpecialParametersStart = bcFactorsStart.size();
 	numberOfSpecialParametersEnd = bcFactorsEnd.size();
 	numberOfStandardParameters = N_PARAM - numberOfSpecialParametersStart - numberOfSpecialParametersEnd;
@@ -76,9 +78,12 @@ void Bosons1D::InitSystem()
 	np2 = np1 + numberOfStandardParameters;
 	np3 = np2 + numberOfSpecialParametersEnd;
 
-	if (N_PARAM != numberOfSplines - (3 - numberOfSpecialParametersStart) - (3 - numberOfSpecialParametersEnd))
+	int requiredParams = numberOfSplines - (3 - numberOfSpecialParametersStart) - (3 - numberOfSpecialParametersEnd);
+	if (N_PARAM != requiredParams)
 	{
 		cout << "!!! WRONG NUMBER OF PARAMETERS !!!" << endl;
+		cout << "!!! need " << requiredParams << "parameters, got " << N_PARAM << " !!!" << endl;
+		exit(0);
 	}
 
 	wf = 0.0;
@@ -132,6 +137,34 @@ void Bosons1D::InitSystem()
 
 	additionalObservables.Add(&pairDistribution);
 	additionalObservables.Add(&structureFactor);
+
+	//Precalculate spline values:
+	int preCalcBins = 100;
+	double rni, rni2, rni3;
+	InitVector(nodeDiffs, nodes.size() - 1, 0.0);
+	InitVector(binSizePerNode, nodes.size() - 1, 0.0);
+	InitVector(binSizePerNode_R, nodes.size() - 1, 0.0);
+	for (unsigned int n = 0; n < nodes.size() - 1; n++)
+	{
+		nodeDiffs[n] = nodes[n + 1] - nodes[n];
+		binSizePerNode[n] = nodeDiffs[n] / preCalcBins;
+		binSizePerNode_R[n] = 1.0 / binSizePerNode[n];
+	}
+	InitVector(preCalcSplineValues, splineWeights.size(), splineWeights[0].size(), preCalcBins, 0.0);
+	for (unsigned int n = 3; n < nodes.size() - 4; n++)
+	{
+		rni = nodes[n] + binSizePerNode[n] / 2.0;
+		for (int i = 0; i < preCalcBins; i++)
+		{
+			rni2 = rni * rni;
+			rni3 = rni2 * rni;
+			for (int p = 0; p < 4; p++)
+			{
+				preCalcSplineValues[n - p][p][i] = splineWeights[n - p][p][0] + splineWeights[n - p][p][1] * rni + splineWeights[n - p][p][2] * rni2 + splineWeights[n - p][p][3] * rni3;
+			}
+			rni += binSizePerNode[n];
+		}
+	}
 }
 
 void Bosons1D::RefreshLocalOperators()
@@ -177,9 +210,20 @@ void Bosons1D::CalculateLocalOperators(vector<vector<double> >& R)
 				rni2 = rni * rni;
 				rni3 = rni2 * rni;
 
-				for (int p = 0; p < 4; p++)
+				if (usePreCalcSplineValues)
 				{
-					splineSums[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rni + splineWeights[bin - p][p][2] * rni2 + splineWeights[bin - p][p][3] * rni3;
+					int rniBin = (rni - nodes[bin]) * binSizePerNode_R[bin + 3];
+					for (int p = 0; p < 4; p++)
+					{
+						splineSums[bin - p] += preCalcSplineValues[bin - p][p][rniBin];
+					}
+				}
+				else
+				{
+					for (int p = 0; p < 4; p++)
+					{
+						splineSums[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rni + splineWeights[bin - p][p][2] * rni2 + splineWeights[bin - p][p][3] * rni3;
+					}
 				}
 			}
 			else
@@ -188,6 +232,16 @@ void Bosons1D::CalculateLocalOperators(vector<vector<double> >& R)
 			}
 		}
 	}
+	//INFO: with preCalcsplineValues
+	//double sum = 0;
+	//double sum2 = 0;
+	//for (unsigned int i = 0; i < splineSums.size(); i++)
+	//{
+	//	cout << (splineSums[i] - splineSumsPreCalc[i]) << "(" << splineSums[i] << " - " << splineSumsPreCalc[i] << ")" << endl;
+	//	sum += (splineSums[i] - splineSumsPreCalc[i]);
+	//	sum2 += sqrt((splineSums[i] - splineSumsPreCalc[i]) * (splineSums[i] - splineSumsPreCalc[i]));
+	//}
+	//cout << "sum=" << sum << ", sum2=" << sum2 << endl;
 	RefreshLocalOperators();
 }
 
@@ -397,8 +451,8 @@ void Bosons1D::CalculateExpectationValues(vector<double>& O, vector<vector<vecto
 		//cout << scientific << setprecision(16) << "kineticSumR2[n=" << n << ":" << kineticSumR2 << endl << endl;
 	}
 
-	kineticR = -(kineticSumR1 - kineticSumI1 + kineticSumR2);
-	kineticI = -(kineticSumR1I1 + kineticSumI2);
+	kineticR = -(kineticSumR1 - kineticSumI1 + kineticSumR2) * HBAR2_2M;
+	kineticI = -(kineticSumR1I1 + kineticSumI2) * HBAR2_2M;
 
 	localEnergyR = kineticR + otherO[0] + otherO[2];
 	localEnergyI = kineticI + otherO[1];
@@ -545,9 +599,20 @@ void Bosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR,
 				rni2 = rni * rni;
 				rni3 = rni2 * rni;
 
-				for (int p = 0; p < 4; p++)
+				if (usePreCalcSplineValues)
 				{
-					sumOldPerBin[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rni + splineWeights[bin - p][p][2] * rni2 + splineWeights[bin - p][p][3] * rni3;
+					int rniBin = (rni - nodes[bin]) * binSizePerNode_R[bin + 3];
+					for (int p = 0; p < 4; p++)
+					{
+						sumOldPerBin[bin - p] += preCalcSplineValues[bin - p][p][rniBin];
+					}
+				}
+				else
+				{
+					for (int p = 0; p < 4; p++)
+					{
+						sumOldPerBin[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rni + splineWeights[bin - p][p][2] * rni2 + splineWeights[bin - p][p][3] * rni3;
+					}
 				}
 			}
 			else
@@ -562,9 +627,20 @@ void Bosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR,
 				rni2 = rni * rni;
 				rni3 = rni2 * rni;
 
-				for (int p = 0; p < 4; p++)
+				if (usePreCalcSplineValues)
 				{
-					sumNewPerBin[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rni + splineWeights[bin - p][p][2] * rni2 + splineWeights[bin - p][p][3] * rni3;
+					int rniBin = (rni - nodes[bin]) * binSizePerNode_R[bin + 3];
+					for (int p = 0; p < 4; p++)
+					{
+						sumNewPerBin[bin - p] += preCalcSplineValues[bin - p][p][rniBin];
+					}
+				}
+				else
+				{
+					for (int p = 0; p < 4; p++)
+					{
+						sumNewPerBin[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rni + splineWeights[bin - p][p][2] * rni2 + splineWeights[bin - p][p][3] * rni3;
+					}
 				}
 			}
 			else
@@ -582,18 +658,18 @@ void Bosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR,
 	//INFO: BCx
 	for (int i = 0; i < np1; i++)
 	{
-		sum +=  uR[i] * (bcFactorsStart[i][0] * splineSumsNew[0] + bcFactorsStart[i][1] * splineSumsNew[1] + bcFactorsStart[i][2] * splineSumsNew[2]);
+		sum += uR[i] * (bcFactorsStart[i][0] * splineSumsNew[0] + bcFactorsStart[i][1] * splineSumsNew[1] + bcFactorsStart[i][2] * splineSumsNew[2]);
 	}
 	int spIdx = 3;
 	for (int i = np1; i < np2; i++)
 	{
-		sum +=  uR[i] * splineSumsNew[spIdx];
+		sum += uR[i] * splineSumsNew[spIdx];
 		spIdx++;
 	}
 	int idx = 0;
 	for (int i = np2; i < np3; i++)
 	{
-		sum +=  uR[i] * (bcFactorsEnd[idx][0] * splineSumsNew[numberOfSplines - 3] + bcFactorsEnd[idx][1] * splineSumsNew[numberOfSplines - 2] + bcFactorsEnd[idx][2] * splineSumsNew[numberOfSplines - 1]);
+		sum += uR[i] * (bcFactorsEnd[idx][0] * splineSumsNew[numberOfSplines - 3] + bcFactorsEnd[idx][1] * splineSumsNew[numberOfSplines - 2] + bcFactorsEnd[idx][2] * splineSumsNew[numberOfSplines - 1]);
 		idx++;
 	}
 

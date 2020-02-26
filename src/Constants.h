@@ -7,7 +7,9 @@
 using namespace std;
 
 //const double HBAR2_2M = 6.0612686;  //hbar^2/2m for 4He droplets
-const double HBAR2_2M = 6.06359;  //hbar^2/2m for X_4 cluster from split
+//const double HBAR2_2M = 6.06359;  //hbar^2/2m for X_4 cluster from split
+//const double HBAR2_2M = 0.5;  //hbar^2/2m for model systems
+const double HBAR2_2M = 1.0;  //hbar^2/2m for model systems
 
 extern string OUT_DIR;
 extern int N;           	    	//number of particles

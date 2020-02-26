@@ -32,7 +32,7 @@ vector<vector<vector<double> > > GetWeights(vector<double> n, int splineOrder)
 
 vector<vector<vector<double> > > GetWeights0(vector<double> n)
 {
-	vector < vector<vector<double> > > weights; //INFO: indices (s, p, c): s...spline, p...part of spline, c...polynomial coefficients
+	vector<vector<vector<double> > > weights; //INFO: indices (s, p, c): s...spline, p...part of spline, c...polynomial coefficients
 
 	int nOrder = 0;
 	int nParts;
@@ -53,7 +53,7 @@ vector<vector<vector<double> > > GetWeights0(vector<double> n)
 
 vector<vector<vector<double> > > GetWeights3(vector<double> n)
 {
-	vector < vector<vector<double> > > weights; //INFO: indices (s, p, c): s...spline, p...part of spline, c...polynomial coefficients
+	vector<vector<vector<double> > > weights; //INFO: indices (s, p, c): s...spline, p...part of spline, c...polynomial coefficients
 
 	int nOrder = 3;
 	int nParts;
@@ -102,7 +102,7 @@ vector<vector<vector<double> > > GetWeights3(vector<double> n)
 
 vector<vector<vector<double> > > GetWeights4(vector<double> n)
 {
-	vector < vector<vector<double> > > weights; //INFO: indices (s, p, c): s...spline, p...part of spline, c...polynomial coefficients
+	vector<vector<vector<double> > > weights; //INFO: indices (s, p, c): s...spline, p...part of spline, c...polynomial coefficients
 
 	int nOrder = 4;
 	int nParts;
@@ -374,67 +374,284 @@ void SetBoundaryConditions1_EXP_2_4thorder(vector<double> n, vector<vector<doubl
 	bcs.push_back(bc);
 }
 
-void SetBoundaryConditions3_1D_CO_1(vector<double> n, vector<vector<double> >& bcs, double rc)
+void SetBoundaryConditions3_1D_OR_1(vector<double> n, vector<vector<double> >& bcs, bool uniform)
 {
+	//no bc
 	vector<double> bc(3);
 
-	int i = n.size() - 6;
+	if (uniform)
+	{
+		bc[0] = 1.0;
+		bc[1] = 0.0;
+		bc[2] = 0.0;
+		bcs.push_back(bc);
 
-	//-3rd spline: -3rd spline, -2nd spline, last spline
-	bc[0] = 1.0;
-	bc[1] = 0.0;
-	bc[2] = ((n[i + 3] - n[i + 4]) * (n[i + 2] - n[i + 5])) / ((n[i + 2] - n[i + 3]) * (n[i + 1] - n[i + 4]));
-	bcs.push_back(bc);
+		bc[0] = 0.0;
+		bc[1] = 1.0;
+		bc[2] = 0.0;
+		bcs.push_back(bc);
 
-	//-2nd spline: -3rd spline, -2nd spline, last spline
-	bc[0] = 0.0;
-	bc[1] = 1.0;
-	bc[2] = (n[i + 1] * (n[i + 2] - n[i + 3]) - n[i + 2] * n[i + 3] + n[i + 3] * n[i + 4] + n[i + 3] * n[i + 5] - n[i + 4] * n[i + 5]) / ((n[i + 2] - n[i + 3]) * (n[i + 1] - n[i + 4]));
-	bcs.push_back(bc);
+		bc[0] = 0.0;
+		bc[1] = 0.0;
+		bc[2] = 1.0;
+		bcs.push_back(bc);
+	}
+	else
+	{
+		int i = n.size() - 6;
+
+		//first param: 1st spline, 2nd spline, 3rd spline
+		bc[0] = 1.0;
+		bc[1] = 0.0;
+		bc[2] = 0.0;
+		bcs.push_back(bc);
+
+		//second param: 1st spline, 2nd spline, 3rd spline
+		bc[0] = 0.0;
+		bc[1] = 1.0;
+		bc[2] = 0.0;
+		bcs.push_back(bc);
+
+		//thirdparam: 1st spline, 2nd spline, 3rd spline
+		bc[0] = 0.0;
+		bc[1] = 0.0;
+		bc[2] = 1.0;
+		bcs.push_back(bc);
+	}
 }
 
-void SetBoundaryConditions3_1D_OR_1(vector<double> n, vector<vector<double> >& bcs)
+void SetBoundaryConditions3_1D_OR_2(vector<double> n, vector<vector<double> >& bcs, bool uniform)
 {
+	//first derivatie = 0
 	vector<double> bc(3);
 
-	int i = n.size() - 6;
+	if (uniform)
+	{
+		bc[0] = 0.0;
+		bc[1] = 1.0;
+		bc[2] = 0.0;
+		bcs.push_back(bc);
 
-	//first param: 1st spline, 2nd spline, 3rd spline
-	bc[0] = -1.0;
-	bc[1] = 0.0;
-	bc[2] = 1.0;
-	bcs.push_back(bc);
+		bc[0] = 1.0;
+		bc[1] = 0.0;
+		bc[2] = 1.0;
+		bcs.push_back(bc);
+	}
+	else
+	{
+		int i = n.size() - 6;
 
-	//second param: 1st spline, 2nd spline, 3rd spline
-	bc[0] = 2.0;
-	bc[1] = 1.0;
-	bc[2] = 0.0;
-	bcs.push_back(bc);
+		//first param: 1st spline, 2nd spline, 3rd spline
+		bc[0] = 0.0;
+		bc[1] = 1.0;
+		bc[2] = 0.0;
+		bcs.push_back(bc);
 
-	//second param: 1st spline, 2nd spline, 3rd spline
-	bc[0] = 0.0;
-	bc[1] = 0.0;
-	bc[2] = 1.0;
-	//bcs.push_back(bc);
+		//second param: 1st spline, 2nd spline, 3rd spline
+		bc[0] = 1.0;
+		bc[1] = 0.0;
+		bc[2] = 1.0;
+		bcs.push_back(bc);
+	}
 }
 
-void SetBoundaryConditions3_1D_CO_2(vector<double> n, vector<vector<double> >& bcs, double rc)
+void SetBoundaryConditions3_1D_OR_3(vector<double> n, vector<vector<double> >& bcs, bool uniform)
 {
+	//second derivative = 0
 	vector<double> bc(3);
 
-	int i = n.size() - 6;
+	if (uniform)
+	{
+		bc[0] = -1.0;
+		bc[1] = 0.0;
+		bc[2] = 1.0;
+		bcs.push_back(bc);
 
-	//-3rd spline: -3rd spline, -2nd spline, last spline
-	bc[0] = 1.0;
-	bc[1] = 1.0;
-	bc[2] = 1.0;
-	bcs.push_back(bc);
+		bc[0] = 2.0;
+		bc[1] = 1.0;
+		bc[2] = 0.0;
+		bcs.push_back(bc);
+	}
+	else
+	{
+		int i = n.size() - 6;
 
-	//-2nd spline: -3rd spline, -2nd spline, last spline
-	bc[0] = 0.0;
-	bc[1] = 1.0;
-	bc[2] = 0.0;
-	//bcs.push_back(bc);
+		//first param: 1st spline, 2nd spline, 3rd spline
+		bc[0] = -1.0;
+		bc[1] = 0.0;
+		bc[2] = 1.0;
+		bcs.push_back(bc);
+
+		//second param: 1st spline, 2nd spline, 3rd spline
+		bc[0] = 2.0;
+		bc[1] = 1.0;
+		bc[2] = 0.0;
+		bcs.push_back(bc);
+	}
+}
+
+void SetBoundaryConditions3_1D_OR_4(vector<double> n, vector<vector<double> >& bcs, bool uniform)
+{
+	//first derivatie = 0, second derivative = 0
+	vector<double> bc(3);
+
+	if (uniform)
+	{
+		bc[0] = 1.0;
+		bc[1] = 1.0;
+		bc[2] = 1.0;
+		bcs.push_back(bc);
+	}
+	else
+	{
+		int i = n.size() - 6;
+
+		//first param: 1st spline, 2nd spline, 3rd spline
+		bc[0] = 1.0;
+		bc[1] = 1.0;
+		bc[2] = 1.0;
+		bcs.push_back(bc);
+	}
+}
+
+void SetBoundaryConditions3_1D_CO_1(vector<double> n, vector<vector<double> >& bcs, double rc, bool uniform)
+{
+	//first derivatie = 0
+	vector<double> bc(3);
+
+	if (uniform)
+	{
+		bc[0] = 1.0;
+		bc[1] = 0.0;
+		bc[2] = 0.0;
+		bcs.push_back(bc);
+
+		bc[0] = 0.0;
+		bc[1] = 1.0;
+		bc[2] = 0.0;
+		bcs.push_back(bc);
+
+		bc[0] = 0.0;
+		bc[1] = 0.0;
+		bc[2] = 1.0;
+		bcs.push_back(bc);
+	}
+	else
+	{
+		int i = n.size() - 6;
+
+		//-3rd spline: -3rd spline, -2nd spline, last spline
+		bc[0] = 1.0;
+		bc[1] = 0.0;
+		bc[2] = 0.0;
+		bcs.push_back(bc);
+
+		//-2nd spline: -3rd spline, -2nd spline, last spline
+		bc[0] = 0.0;
+		bc[1] = 1.0;
+		bc[2] = 0.0;
+		bcs.push_back(bc);
+
+		//-2nd spline: -3rd spline, -2nd spline, last spline
+		bc[0] = 0.0;
+		bc[1] = 0.0;
+		bc[2] = 1.0;
+		bcs.push_back(bc);
+	}
+}
+
+void SetBoundaryConditions3_1D_CO_2(vector<double> n, vector<vector<double> >& bcs, double rc, bool uniform)
+{
+	//first derivatie = 0
+	vector<double> bc(3);
+
+	if (uniform)
+	{
+		bc[0] = 1.0;
+		bc[1] = 0.0;
+		bc[2] = 1.0;
+		bcs.push_back(bc);
+
+		bc[0] = 0.0;
+		bc[1] = 1.0;
+		bc[2] = 0.0;
+		bcs.push_back(bc);
+	}
+	else
+	{
+		int i = n.size() - 6;
+
+		//-3rd spline: -3rd spline, -2nd spline, last spline
+		bc[0] = 1.0;
+		bc[1] = 0.0;
+		bc[2] = ((n[i + 3] - n[i + 4]) * (n[i + 2] - n[i + 5])) / ((n[i + 2] - n[i + 3]) * (n[i + 1] - n[i + 4]));
+		bcs.push_back(bc);
+
+		//-2nd spline: -3rd spline, -2nd spline, last spline
+		bc[0] = 0.0;
+		bc[1] = 1.0;
+		bc[2] = (n[i + 1] * (n[i + 2] - n[i + 3]) - n[i + 2] * n[i + 3] + n[i + 3] * n[i + 4] + n[i + 3] * n[i + 5] - n[i + 4] * n[i + 5]) / ((n[i + 2] - n[i + 3]) * (n[i + 1] - n[i + 4]));
+		bcs.push_back(bc);
+	}
+}
+
+void SetBoundaryConditions3_1D_CO_3(vector<double> n, vector<vector<double> >& bcs, double rc, bool uniform)
+{
+	//first derivatie = 0
+	vector<double> bc(3);
+
+	if (uniform)
+	{
+		bc[0] = 1.0;
+		bc[1] = 0.0;
+		bc[2] = -1.0;
+		bcs.push_back(bc);
+
+		bc[0] = 0.0;
+		bc[1] = 1.0;
+		bc[2] = 2.0;
+		bcs.push_back(bc);
+	}
+	else
+	{
+		int i = n.size() - 6;
+
+		//-3rd spline: -3rd spline, -2nd spline, last spline
+		bc[0] = 1.0;
+		bc[1] = 0.0;
+		bc[2] = -1.0;
+		bcs.push_back(bc);
+
+		//-2nd spline: -3rd spline, -2nd spline, last spline
+		bc[0] = 0.0;
+		bc[1] = 1.0;
+		bc[2] = 2.0;
+		bcs.push_back(bc);
+	}
+}
+
+void SetBoundaryConditions3_1D_CO_4(vector<double> n, vector<vector<double> >& bcs, double rc, bool uniform)
+{
+	//first derivatie = 0, second derivative = 0
+	vector<double> bc(3);
+
+	if (uniform)
+	{
+		bc[0] = 1.0;
+		bc[1] = 1.0;
+		bc[2] = 1.0;
+		bcs.push_back(bc);
+	}
+	else
+	{
+		int i = n.size() - 6;
+
+		//-3rd spline: -3rd spline, -2nd spline, last spline
+		bc[0] = 1.0;
+		bc[1] = 1.0;
+		bc[2] = 1.0;
+		bcs.push_back(bc);
+	}
 }
 
 void SetBoundaryConditions4_1D_OR_1(vector<double> n, vector<vector<double> >& bcs)

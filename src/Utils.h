@@ -140,6 +140,7 @@ void InitVector(vector<long long>& v, int size, long long initialValue);
 void InitVector(vector<double>& v, int size, double initialValue);
 void InitVector(vector<vector<double> >& v, int size1, int size2, double initialValue);
 void InitVector(vector<vector<vector<double> > >& v, int size1, int size2, int size3, double initialValue);
+void InitVector(vector<vector<vector<vector<double> > > >& v, int size1, int size2, int size3, int size4, double initialValue);
 
 void SetFileFormat(ofstream& f);
 void WriteLineToFile(ofstream& f, double data);

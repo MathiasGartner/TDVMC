@@ -62,7 +62,7 @@ void BosonsDiscrete::InitSystem()
 		}
 	}
 
-	if (N_PARAM != numberOfSplines - 3)
+	if (N_PARAM != numberOfSplines - 0)
 	{
 		cout << "!!! WRONG NUMBER OF PARAMETERS !!!" << endl;
 	}
@@ -72,8 +72,10 @@ void BosonsDiscrete::InitSystem()
 	InitVector(splineSums, numberOfSplines, 0.0);
 	//InitVector(splineSumsD, numberOfSplines, N, DIM, 0.0);
 	//InitVector(splineSumsD2, numberOfSplines, N, 0.0);
-	orderFD = 5;
-	factorsFD = { -1.0/12.0, 4.0/3.0, -5.0/2.0, 4.0/3.0, -1.0/12.0 };
+	//orderFD = 5;
+	//factorsFD = { -1.0/12.0, 4.0/3.0, -5.0/2.0, 4.0/3.0, -1.0/12.0 };
+	orderFD = 1;
+	factorsFD = { 1.0, -2.0, 1.0 };
 	InitVector(splineSumsFDF, N, orderFD, numberOfSplines, 0.0);
 	InitVector(splineSumsFDB, N, orderFD, numberOfSplines, 0.0);
 
@@ -231,6 +233,8 @@ void BosonsDiscrete::CalculateExpectationValues(vector<vector<double> >& R, vect
 	double kineticI = 0;
 	double kineticSumR = 0;
 	double kineticSumI = 0;
+	double kineticSumR_FirstD = 0;
+	double kineticSumI_FirstD = 0;
 
 	//potential parameters (a -> width; b -> height)
 	double a = params[0];
@@ -275,34 +279,39 @@ void BosonsDiscrete::CalculateExpectationValues(vector<vector<double> >& R, vect
 		}
 
 		auto fdf = splineSumsFDF[n];
-		auto fdb = splineSumsFDF[n];
+		auto fdb = splineSumsFDB[n];
 		for (unsigned int f = 0; f < fdf.size(); f++)
 		{
-			fdf[f][1] += fdf[f][0];
-			fdf[f][N_PARAM - 1] += fdf[f][numberOfSplines - 2];
-			fdf[f][N_PARAM - 1] += fdf[f][numberOfSplines - 1];
-			fdf[f].erase(fdf[f].begin());
-			fdf[f].pop_back();
-			fdf[f].pop_back();
-			fdb[f][1] += fdb[f][0];
-			fdb[f][N_PARAM - 1] += fdb[f][numberOfSplines - 2];
-			fdb[f][N_PARAM - 1] += fdb[f][numberOfSplines - 1];
-			fdb[f].erase(fdb[f].begin());
-			fdb[f].pop_back();
-			fdb[f].pop_back();
+			//fdf[f][1] += fdf[f][0];
+			//fdf[f][numberOfSplines - 2] += fdf[f][numberOfSplines - 1];
+			//fdf[f].erase(fdf[f].begin());
+			//fdf[f].pop_back();
+			//fdb[f][1] += fdb[f][0];
+			//fdb[f][numberOfSplines - 2] += fdb[f][numberOfSplines - 1];
+			//fdb[f].erase(fdb[f].begin());
+			//fdb[f].pop_back();
 		}
 
-
-		kineticSumR +=  - 1.0 / 12.0 * exp(VectorDotProduct(uR, fdb[1]))
-						+ 4.0 / 3.0 * exp(VectorDotProduct(uR, fdb[0]))
-						- 5.0 / 2.0
-						+ 4.0 / 3.0 * exp(VectorDotProduct(uR, fdf[0]))
-						- 1.0 / 12.0 * exp(VectorDotProduct(uR, fdf[1]));
-		kineticSumI +=  - 1.0 / 12.0 * exp(VectorDotProduct(uI, fdb[1]))
-						+ 4.0 / 3.0 * exp(VectorDotProduct(uI, fdb[0]))
-						- 5.0 / 2.0
-						+ 4.0 / 3.0 * exp(VectorDotProduct(uI, fdf[0]))
-						- 1.0 / 12.0 * exp(VectorDotProduct(uI, fdf[1]));
+		kineticSumR +=  + 1.0 * exp(VectorDotProduct(uR, fdb[0]))
+					  	- 2.0
+						+ 1.0 * exp(VectorDotProduct(uR, fdf[0]));
+		kineticSumI +=  + 1.0 * exp(VectorDotProduct(uI, fdb[0]))
+					  	- 2.0
+						+ 1.0 * exp(VectorDotProduct(uI, fdf[0]));
+		kineticSumR_FirstD +=  - 1.0 / 2.0 * exp(VectorDotProduct(uR, fdb[0]))
+					  			+ 1.0 / 2.0 * exp(VectorDotProduct(uR, fdf[0]));
+		kineticSumI_FirstD +=  - 1.0 / 2.0 * exp(VectorDotProduct(uI, fdb[0]))
+								+ 1.0 / 2.0 * exp(VectorDotProduct(uI, fdf[0]));
+		//kineticSumR +=  - 1.0 / 12.0 * exp(VectorDotProduct(uR, fdb[1]))
+		//				+ 4.0 / 3.0 * exp(VectorDotProduct(uR, fdb[0]))
+		//				- 5.0 / 2.0
+		//				+ 4.0 / 3.0 * exp(VectorDotProduct(uR, fdf[0]))
+		//				- 1.0 / 12.0 * exp(VectorDotProduct(uR, fdf[1]));
+		//kineticSumI +=  - 1.0 / 12.0 * exp(VectorDotProduct(uI, fdb[1]))
+		//				+ 4.0 / 3.0 * exp(VectorDotProduct(uI, fdb[0]))
+		//				- 5.0 / 2.0
+		//				+ 4.0 / 3.0 * exp(VectorDotProduct(uI, fdf[0]))
+		//				- 1.0 / 12.0 * exp(VectorDotProduct(uI, fdf[1]));
 	}
 	otherLocalOperators[0] = potentialIntern;
 	otherLocalOperators[1] = potentialInternComplex;
@@ -343,11 +352,12 @@ void BosonsDiscrete::CalculateExpectationValues(vector<vector<double> >& R, vect
 
 	for (int i = 0; i < N_PARAM; i++)
 	{
-		this->localOperators[i] = splineSums[i + 1];
+		//this->localOperators[i] = splineSums[i + 1];
+		this->localOperators[i] = splineSums[i];
 	}
-	this->localOperators[1] += splineSums[0];
-	this->localOperators[N_PARAM - 1] += splineSums[numberOfSplines - 2];
-	this->localOperators[N_PARAM - 1] += splineSums[numberOfSplines - 1];
+	//this->localOperators[0] += splineSums[0];
+	//this->localOperators[N_PARAM - 1] += splineSums[numberOfSplines - 2];
+	//this->localOperators[N_PARAM - 1] += splineSums[numberOfSplines - 1];
 
 	for (int k = 0; k < N_PARAM; k++)
 	{
@@ -363,13 +373,11 @@ void BosonsDiscrete::CalculateExpectationValues(vector<vector<double> >& R, vect
 	otherExpectationValues[1] = otherLocalOperators[0];
 	otherExpectationValues[2] = wf;
 	otherExpectationValues[3] = exponent;
-	//otherExpectationValues[4] = kineticSumR1;
-	//otherExpectationValues[5] = kineticSumI1;
+	otherExpectationValues[4] = kineticSumR_FirstD;
+	otherExpectationValues[5] = kineticSumI_FirstD;
 	//otherExpectationValues[6] = kineticSumR2;
 	//otherExpectationValues[7] = kineticSumI2;
 	//otherExpectationValues[8] = kineticSumR1I1;
-	otherExpectationValues[4] = kineticR;
-	otherExpectationValues[5] = kineticI;
 
 }
 
@@ -453,11 +461,12 @@ void BosonsDiscrete::CalculateWavefunction(vector<vector<double> >& R, vector<do
 
 	for (int i = 0; i < N_PARAM; i++)
 	{
-		sum += uR[i] * splineSums[i + 1];
+		//sum += uR[i] * splineSums[i + 1];
+		sum += uR[i] * splineSums[i];
 	}
-	sum += uR[0] * splineSums[0];
-	sum += uR[N_PARAM - 1] * splineSums[numberOfSplines - 2];
-	sum += uR[N_PARAM - 1] * splineSums[numberOfSplines - 1];
+	//sum += uR[0] * splineSums[0];
+	//sum += uR[N_PARAM - 1] * splineSums[numberOfSplines - 2];
+	//sum += uR[N_PARAM - 1] * splineSums[numberOfSplines - 1];
 
 	//cout << scientific << setprecision(16) << "sum:" << sum << endl;
 	exponent = sum;
@@ -577,11 +586,12 @@ void BosonsDiscrete::CalculateWFChange(vector<vector<double> >& R, vector<double
 
 	for (int i = 0; i < N_PARAM; i++)
 	{
-		sum += uR[i] * splineSumsNew[i + 1];
+		//sum += uR[i] * splineSumsNew[i + 1];
+		sum += uR[i] * splineSumsNew[i];
 	}
-	sum += uR[0] * splineSumsNew[0];
-	sum += uR[N_PARAM - 1] * splineSumsNew[numberOfSplines - 2];
-	sum += uR[N_PARAM - 1] * splineSumsNew[numberOfSplines - 1];
+	//sum += uR[0] * splineSumsNew[0];
+	//sum += uR[N_PARAM - 1] * splineSumsNew[numberOfSplines - 2];
+	//sum += uR[N_PARAM - 1] * splineSumsNew[numberOfSplines - 1];
 
 	exponentNew = sum;
 	wfNew = exp(exponentNew + phiR);
