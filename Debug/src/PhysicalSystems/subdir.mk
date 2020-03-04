@@ -24,6 +24,7 @@ CPP_SRCS += \
 ../src/PhysicalSystems/GaussianWavepacket.cpp \
 ../src/PhysicalSystems/HeBulk.cpp \
 ../src/PhysicalSystems/HeDrop.cpp \
+../src/PhysicalSystems/InhBosons1D.cpp \
 ../src/PhysicalSystems/NUBosonsBulk.cpp \
 ../src/PhysicalSystems/NUBosonsBulkPB.cpp \
 ../src/PhysicalSystems/NUBosonsBulkPBBox.cpp \
@@ -51,6 +52,7 @@ OBJS += \
 ./src/PhysicalSystems/GaussianWavepacket.o \
 ./src/PhysicalSystems/HeBulk.o \
 ./src/PhysicalSystems/HeDrop.o \
+./src/PhysicalSystems/InhBosons1D.o \
 ./src/PhysicalSystems/NUBosonsBulk.o \
 ./src/PhysicalSystems/NUBosonsBulkPB.o \
 ./src/PhysicalSystems/NUBosonsBulkPBBox.o \
@@ -78,6 +80,7 @@ CPP_DEPS += \
 ./src/PhysicalSystems/GaussianWavepacket.d \
 ./src/PhysicalSystems/HeBulk.d \
 ./src/PhysicalSystems/HeDrop.d \
+./src/PhysicalSystems/InhBosons1D.d \
 ./src/PhysicalSystems/NUBosonsBulk.d \
 ./src/PhysicalSystems/NUBosonsBulkPB.d \
 ./src/PhysicalSystems/NUBosonsBulkPBBox.d \

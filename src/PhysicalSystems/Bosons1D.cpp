@@ -26,6 +26,7 @@ Bosons1D::Bosons1D(vector<double>& params, string configDirectory) :
 	np3 = 0;
 
 	numOfOtherLocalOperators = 0;
+	numOfPairDistributionValues = 0;
 	numOfkValues = 0;
 
 	exponentNew = 0;
@@ -41,6 +42,11 @@ void Bosons1D::SetNodes(vector<double> n)
 		this->nodes.insert(this->nodes.begin(), -n[i + 1]);
 		this->nodes.push_back(2.0 * n[n.size() - 1] - n[n.size() - 2 - i]);
 	}
+}
+
+void Bosons1D::SetPairDistributionBinCount(double n)
+{
+	this->numOfPairDistributionValues = n;
 }
 
 void Bosons1D::InitSystem()
@@ -127,7 +133,7 @@ void Bosons1D::InitSystem()
 
 	pairDistribution.name = "pairDistribution";
 	//pairDistribution.InitGrid(0.0, halfLength, 0.05);
-	pairDistribution.InitGrid(0.0, nodes[nodes.size() - 4], nodes[nodes.size() - 4] / 100.0);
+	pairDistribution.InitGrid(0.0, nodes[nodes.size() - 4], nodes[nodes.size() - 4] / numOfPairDistributionValues);
 	pairDistribution.InitScaling();
 	pairDistribution.InitObservables( { "g_2(r_ij)" });
 
@@ -289,14 +295,14 @@ void Bosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
 				if (i < n)
 				{
 					//Gauss
-					//double rnia = rni / a;
-					//potentialIntern += b * exp(-(rnia * rnia) / 2.0);
+					double rnia = rni / a;
+					potentialIntern += b * exp(-(rnia * rnia) / 2.0);
 
 					//square well
-					if (rni < a)
-					{
-						potentialIntern += b;
-					}
+					//if (rni < a)
+					//{
+					//	potentialIntern += b;
+					//}
 
 					//Rydberg U_0 / (1 + (r/R_0)^6))
 					//R_0 = a, U_0 = b;

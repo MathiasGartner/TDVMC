@@ -32,6 +32,7 @@
 #include "PhysicalSystems/GaussianWavepacket.h"
 #include "PhysicalSystems/HeBulk.h"
 #include "PhysicalSystems/HeDrop.h"
+#include "PhysicalSystems/InhBosons1D.h"
 #include "PhysicalSystems/NUBosonsBulk.h"
 #include "PhysicalSystems/NUBosonsBulkPB.h"
 #include "PhysicalSystems/NUBosonsBulkPBBox.h"
@@ -1481,7 +1482,8 @@ void BuildSystemOfEquationsForParametersIncludePhi(vector<vector<double> >& matr
 	{
 		if (IMAGINARY_TIME == 0)
 		{
-			energiesReal[i] = localOperatorlocalEnergyI[i];
+			//energiesReal[i] = localOperatorlocalEnergyI[i];
+			energiesReal[i] = localOperatorlocalEnergyI[i] - localEnergyI * localOperators[i];
 			energiesImag[i] = -localOperatorlocalEnergyR[i] + localEnergyR * localOperators[i];
 		}
 		else
@@ -1684,6 +1686,8 @@ void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double 
 	//	WriteDataToFile(matrix, "Omatrix", "Omatrix");
 	//	WriteDataToFile(energiesReal, "BBenergiesRealO", "BBenergiesRealO");
 	//	WriteDataToFile(energiesImag, "BBenergiesImagO", "BBenergiesImagO");
+	//	vector<vector<double> > tmpData = { localOperators, localOperators * localEnergyR, localOperators * localEnergyI, localOperatorlocalEnergyR, localOperatorlocalEnergyI, energiesReal, energiesImag };
+	//	WriteDataToFileTransposed(tmpData, "BB_EO", "<O>, <E^R><O>, <E^I><O>, <E^R O>, <E^I O>, +<E^I O>-<E^I><O>, -<E^R O>+<E^R><O> (<E^R>=" + to_string(localEnergyR) + ", <E^I>=" + to_string(localEnergyI) + ")");
 	//}
 
 	if (LINEAR_EQUATION_SOLVER_TYPE == 0) //Cholesky
@@ -1719,7 +1723,7 @@ void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double 
 		//WriteDataToFile(matrix, "BBcholesky", "BBcholesky");
 		//WriteDataToFile(uDotR, "BBuDotR", "BBuDotR");
 	}
-	else if (LINEAR_EQUATION_SOLVER_TYPE == 1) //SVD
+	else if (LINEAR_EQUATION_SOLVER_TYPE == 1) //SVD or FullPivHouseholderQR
 	{
 		Eigen::MatrixXd e_matrix(matrix.size(), matrix.size());
 		for (unsigned int i = 0; i < matrix.size(); i++)
@@ -2744,6 +2748,7 @@ bool InitializePhysicalSystem()
 		{
 			dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->SetNodes(NURBS_GRID);
 		}
+		dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->SetPairDistributionBinCount(GR_BIN_COUNT);
 	}
 	else if (SYSTEM_TYPE == "Bosons1D0th")
 	{
@@ -2831,6 +2836,15 @@ bool InitializePhysicalSystem()
 		}
 		dynamic_cast<PhysicalSystems::BosonMixtureCluster*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
 		dynamic_cast<PhysicalSystems::BosonMixtureCluster*>(sys)->SetParticleType(PARTICLE_TYPES);
+	}
+	else if (SYSTEM_TYPE == "InhBosons1D")
+	{
+		sys = new PhysicalSystems::InhBosons1D(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PhysicalSystems::InhBosons1D*>(sys)->SetNodesSPF(NURBS_GRID);
+			dynamic_cast<PhysicalSystems::InhBosons1D*>(sys)->SetNodesPC(NURBS_GRID);
+		}
 	}
 	else if (SYSTEM_TYPE == "NUBosonsBulk")
 	{
@@ -3085,7 +3099,7 @@ int mainMPI(int argc, char** argv)
 			int tmpN = N;
 			N = 2;
 			InitVector(tmpR, 2, DIM, 0.0);
-			tmpR[1][0] = -11*4;//-6.0025;
+			tmpR[1][0] = -11 * 4;			//-6.0025;
 			for (int i = 0; i < 4000; i++)
 			{
 				sys->CalculateWavefunction(tmpR, uR, uI, phiR, phiI);
@@ -3093,7 +3107,7 @@ int mainMPI(int argc, char** argv)
 				auto values = sys->GetOtherExpectationValues();
 				values.push_back(tmpR[1][0]);
 				kineticValues.push_back(values);
-				tmpR[1][0] += 0.005*4;
+				tmpR[1][0] += 0.005 * 4;
 			}
 			N = tmpN;
 			string name = "values";
@@ -3242,6 +3256,21 @@ int mainMPI(int argc, char** argv)
 						AppendDataToFile(o->observablesV[0].values, "sk");
 					}
 				}
+				else if (auto s = dynamic_cast<PhysicalSystems::InhBosons1D*>(sys))
+				{
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "rho");
+					}
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "gr");
+					}
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "sk");
+					}
+				}
 				else if (auto s = dynamic_cast<PhysicalSystems::NUBosonsBulkPB*>(sys))
 				{
 					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
@@ -3365,8 +3394,7 @@ int mainMPI(int argc, char** argv)
 				cout << "t=" << currentTime << endl;
 				cout << "Acceptance AVG: " << (avgAcceptances / (nTrials / 100.0)) << "% (" << avgAcceptances << "/" << nTrials << ")" << endl;
 				//cout << "localEnergyR=" << localEnergyR << " (" << otherExpectationValues[0] << " + " << otherExpectationValues[1] << ")" << endl;
-				cout << "localEnergyR/N=" << localEnergyR / (double) N << " (" << otherExpectationValues[0] / (double) N << "(kin) + " << otherExpectationValues[1] / (double) N << " (pot) + " <<
-						"(Er=" << otherExpectationValues[4] << " + " << otherExpectationValues[6] <<
+				cout << "localEnergyR/N=" << localEnergyR / (double) N << " (" << otherExpectationValues[0] / (double) N << "(kin) + " << otherExpectationValues[1] / (double) N << " (pot) + " << "(Er=" << otherExpectationValues[4] << " + " << otherExpectationValues[6] <<
 				//otherExpectationValues[2] / (double) N << " + " <<
 				//otherExpectationValues[3] / (double) N << ")" <<
 						endl;
@@ -3953,7 +3981,7 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BulkSplines";
 		//SYSTEM_TYPE = "BulkSplinesScaled";
 		//SYSTEM_TYPE = "HeDrop";
-		SYSTEM_TYPE = "Bosons1D";
+		//SYSTEM_TYPE = "Bosons1D";
 		//SYSTEM_TYPE = "Bosons1D0th";
 		//SYSTEM_TYPE = "Bosons1D4th";
 		//SYSTEM_TYPE = "Bosons1DSp";
@@ -3963,8 +3991,9 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BosonsDiscrete";
 		//SYSTEM_TYPE = "BosonMixtureCluster_4thorder";
 		//SYSTEM_TYPE = "BosonMixtureCluster";
+		//SYSTEM_TYPE = "InhBosons1D";
 		//SYSTEM_TYPE = "NUBosonsBulk";
-		//SYSTEM_TYPE = "NUBosonsBulkPB";
+		SYSTEM_TYPE = "NUBosonsBulkPB";
 		//SYSTEM_TYPE = "NUBosonsBulkPBBox";
 		//SYSTEM_TYPE = "NUBosonsBulkPBBoxAndRadial";
 		//SYSTEM_TYPE = "NUBosonsBulkPBWhitehead";
@@ -4045,19 +4074,25 @@ int main(int argc, char **argv)
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/He4He4Cs.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/He3He4Cs.config";
 		}
+		else if (SYSTEM_TYPE == "InhBosons1D")
+		{
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhSW1D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/InhSW1D10.config";
+		}
 		else if (SYSTEM_TYPE == "NUBosonsBulk")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulk1D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulk1D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulk2D.config";
 		}
 		else if (SYSTEM_TYPE == "NUBosonsBulkPB")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB1D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB1D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB1DLarge.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB2D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPB3D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/Rydberg2D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/SW1D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/Test2D.config";
 		}
 		else if (SYSTEM_TYPE == "NUBosonsBulkPBBox")
 		{

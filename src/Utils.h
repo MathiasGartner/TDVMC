@@ -50,6 +50,8 @@ bool CopyFile(string filePathSource, string filePathNew);
 
 string PrintArrayValues(double* r, int length);
 
+int GetBinIndex(vector<double>& list, double value);
+
 vector<double> VectorAbs(vector<double> v);
 
 extern double (*VectorDotProduct_DIM)(vector<double>&, vector<double>&);
@@ -149,6 +151,7 @@ void WriteLineToFile(ofstream& f, vector<double>& data);
 void WriteDataToFile(double data, string filename, string header);
 void WriteDataToFile(vector<double>& data, string filename, string header, int everyNth = 1);
 void WriteDataToFile(vector<vector<double> >& data, string filename, string header, int everyNth = 1, bool writeHeader = true);
+void WriteDataToFileTransposed(vector<vector<double> >& data, string filename, string header, int everyNth = 1, bool writeHeader = true);
 void WriteDataToFile(vector<vector<vector<double> > >& data, string filename, string header);
 
 void WriteDataToFile(Observables::ObservableCollection& data, string filename);

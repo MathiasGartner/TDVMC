@@ -28,4 +28,5 @@ src \
 src/Observables \
 src/PhysicalSystems \
 src/Potentials \
+src/WFParts \
 

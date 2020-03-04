@@ -4,6 +4,9 @@
 
 #include "../Observables/ObservableVsOnGridWithScaling.h"
 
+#include "../WFParts/PairCorrelation.h"
+#include "../WFParts/SingleParticleFunction.h"
+
 #include "../Constants.h"
 #include "../CSDataBulkSplines.h"
 #include "../MathOperators.h"
@@ -12,53 +15,28 @@
 #include <iostream>
 
 using namespace std;
+using namespace WFParts;
 
 namespace PhysicalSystems
 {
 
-class Bosons1D: public IPhysicalSystem
+class InhBosons1D: public IPhysicalSystem
 {
 private:
-	int numberOfSplines;
-	vector<double> splineSums; //indices: k (bin); for <O_k>
-	vector<vector<vector<double> > > splineSumsD; //indices: k (bin), n (particle), a (coordinate)
-	vector<vector<double> > splineSumsD2; //indices: k (bin), n (particle)
+	SingleParticleFunction spf;
+	PairCorrelation pc;
 
 	double halfLength;
 	double maxDistance;
-	int numberOfSpecialParametersStart;
-	int numberOfSpecialParametersEnd;
-	int numberOfStandardParameters;
 
 	int numOfOtherLocalOperators;
 	vector<double> otherLocalOperators;
 
-	int numOfPairDistributionValues;
 	vector<vector<vector<double> > > kValues;
 	vector<double> kNorms;
 	int numOfkValues;
 
-	vector<double> splineSumsNew; //indices: k (bin); for <O_k>
-	vector<double> sumOldPerBin;
-	vector<double> sumNewPerBin;
-	int changedParticleIndex; //TODO: is this needed?
-
-	int np1;
-	int np2;
-	int np3;
-	vector<vector<double> > bcFactorsStart; //factors according to the boundary conditions at origin
-	vector<vector<double> > bcFactorsEnd; //factors according to the boundary conditions at L/2
-
-	vector<double> nodes;
-	vector<vector<vector<double> > > splineWeights;
-
-	vector<double> nodeDiffs;
-	vector<double> binSizePerNode;
-	vector<double> binSizePerNode_R;
-	vector<vector<vector<double> > > preCalcSplineValues;
-	//double preCalcSplineValues[103][4][100000];
-	bool usePreCalcSplineValues;
-
+	Observables::ObservableVsOnGridWithScaling density;
 	Observables::ObservableVsOnGridWithScaling pairDistribution;
 	Observables::ObservableVsOnGrid structureFactor;
 
@@ -66,16 +44,17 @@ private:
 	double GetExternalPotential(vector<double>& r);
 	void RefreshLocalOperators();
 	void CalculateLocalOperators(vector<vector<double> >& R);
-	void CalculateExpectationValues(vector<double>& O, vector<vector<vector<double> > >& sD, vector<vector<double> >& sD2, vector<double>& otherO, vector<double>& gr, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
+	void CalculateExpectationValues(vector<double>& O, vector<vector<vector<double> > >& spf_sD, vector<vector<double> >& spf_sD2, vector<vector<vector<double> > >& pc_sD, vector<vector<double> >& pc_sD2, vector<double>& otherO, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
 	void CalculateWavefunction(vector<double>& O, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
+	void ExtendNodes(vector<double>& n);
 
 public:
-	void SetNodes(vector<double> n);
-	void SetPairDistributionBinCount(double n);
+	void SetNodesSPF(vector<double> n);
+	void SetNodesPC(vector<double> n);
 
 //Implementation of IPhysicalSystem
 public:
-	Bosons1D(vector<double>& params, string configDirectory);
+	InhBosons1D(vector<double>& params, string configDirectory);
 
 	void InitSystem() override;
 

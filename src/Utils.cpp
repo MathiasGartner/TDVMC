@@ -31,6 +31,12 @@ string PrintArrayValues(double* r, int length)
 	return s;
 }
 
+//returns the index i for which list[i] <= value < list[i+1] holds
+int GetBinIndex(vector<double>& list, double value)
+{
+	return lower_bound(list.begin(), list.end(), value) - list.begin() - 1;
+}
+
 vector<double> VectorAbs(vector<double> v)
 {
 	for (unsigned int i = 0; i < v.size(); i++)
@@ -745,6 +751,27 @@ void WriteDataToFile(vector<vector<double> >& data, string filename, string head
 	for (unsigned int i = everyNth - 1; i < data.size(); i += everyNth)
 	{
 		WriteLineToFile(file, data[i]);
+	}
+	file.close();
+}
+
+void WriteDataToFileTransposed(vector<vector<double> >& data, string filename, string header, int everyNth, bool writeHeader)
+{
+	ofstream file;
+	//cout << OUT_DIR << filename << fileExtension << endl;
+	file.open(OUT_DIR + filename + fileExtension, ios::out);
+	SetFileFormat(file);
+	if (writeHeader)
+	{
+		file << header << endl;
+	}
+	for (unsigned int j = 0; j < data[0].size(); j++)
+	{
+		for (unsigned int i = everyNth - 1; i < data.size(); i += everyNth)
+		{
+			file << setw(colWidth) << data[i][j];
+		}
+		file << endl;
 	}
 	file.close();
 }
