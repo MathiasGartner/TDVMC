@@ -77,6 +77,7 @@ string OUTPUT_DIRECTORY;		//from config file
 string configDirectory;
 string configFilePath;
 string OUT_DIR;					//directory name generated from parameter settings
+string OUT_DIR_SUFFIX;			//string that is appended to the output-directory
 int N;           	    		//number of particles
 double LBOX;
 double LBOX_R;
@@ -120,7 +121,7 @@ vector<double> NURBS_GRID;
 vector<int> PARTICLE_TYPES;
 vector<double> SYSTEM_PARAMS;
 
-string requiredConfigVersion = "0.21";
+string requiredConfigVersion = "0.22";
 int numOfProcesses = 1;
 int rootRank = 0;
 int processRank = 0;
@@ -359,6 +360,7 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("CONFIG_VERSION", &CONFIG_VERSION, ConfigItemType::STRING));
 	configItems.push_back(ConfigItem("SYSTEM_TYPE", &SYSTEM_TYPE, ConfigItemType::STRING));
 	configItems.push_back(ConfigItem("OUTPUT_DIRECTORY", &OUTPUT_DIRECTORY, ConfigItemType::STRING));
+	configItems.push_back(ConfigItem("OUT_DIR_SUFFIX", &OUT_DIR_SUFFIX, ConfigItemType::STRING));
 	configItems.push_back(ConfigItem("N", &N, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("LBOX", &LBOX, ConfigItemType::DOUBLE));
 	configItems.push_back(ConfigItem("DIM", &DIM, ConfigItemType::INT));
@@ -523,14 +525,18 @@ void CreateOutputDirectory()
 {
 	//INFO: append config options to output directory path, create the directory and copy the config file
 	int tmp;
-	ostringstream strs;
+	ostringstream strs; //INFO: the only reason for this is that strs.str() gives to correct formatting as it is currently used in the Mathematica-Notebooks for data analysis.
+	string dir;
 	strs << "step=" << MC_NSTEPS << "_therm=" << MC_NTHERMSTEPS << "_time=" << TIMESTEP;
 	//strs << (IMAGINARY_TIME == 1 ? "GS_" : "QU_") << DIM << "D_" << "N=" << N << "_step=" << MC_NSTEPS << "_therm=" << MC_NTHERMSTEPS << "_time=" << TIMESTEP;
-	OUT_DIR = OUTPUT_DIRECTORY + strs.str() + "/";
+	OUT_DIR = OUTPUT_DIRECTORY + strs.str() + OUT_DIR_SUFFIX + "/";
+	//dir = "step=" + to_string(MC_NSTEPS) + "_therm=" + to_string(MC_NTHERMSTEPS) + "_time=" + to_string(TIMESTEP);
+	//OUT_DIR = OUTPUT_DIRECTORY + dir + OUT_DIR_SUFFIX + "/";
 	tmp = system(("rm -rf " + OUT_DIR).c_str());
-	tmp = system(("mkdir " + OUT_DIR).c_str());
-	CopyFile(configFilePath, OUT_DIR + "vmc.config");
 	cout << tmp << endl;
+	tmp = system(("mkdir " + OUT_DIR).c_str());
+	cout << tmp << endl;
+	CopyFile(configFilePath, OUT_DIR + "vmc.config");
 }
 
 void WriteParticleInputFile(string fileName, vector<vector<double> >& R)
@@ -563,8 +569,9 @@ void Init()
 	}
 	else
 	{
-		//cout << "init with:" << (processRank + 1) << endl;
+		cout << "init with:" << (processRank + 1) << endl;
 		generator = mt19937_64(processRank + 1);
+		Log("first random number: " + to_string(random01()));
 		//cout << generator << endl;
 		//generator = default_random_engine(processRank + 1);
 		distParticleIndex = uniform_int_distribution<int>(0, N - 1);
@@ -3091,7 +3098,7 @@ int mainMPI(int argc, char** argv)
 			WriteDataToFile(wfValues, name + nameEnd, name + nameEnd);
 			//WriteDataToFile(wfValues, "wfValuesHeNa", "wfValuesHeNa");
 		}
-		bool saveToKineticFile = false;
+		bool saveToKineticFile = true;
 		if (saveToKineticFile)
 		{
 			vector<vector<double> > tmpR;
@@ -3099,7 +3106,7 @@ int mainMPI(int argc, char** argv)
 			int tmpN = N;
 			N = 2;
 			InitVector(tmpR, 2, DIM, 0.0);
-			tmpR[1][0] = -11 * 4;			//-6.0025;
+			tmpR[1][0] = -50.0;			//-6.0025;
 			for (int i = 0; i < 4000; i++)
 			{
 				sys->CalculateWavefunction(tmpR, uR, uI, phiR, phiI);
@@ -3107,7 +3114,7 @@ int mainMPI(int argc, char** argv)
 				auto values = sys->GetOtherExpectationValues();
 				values.push_back(tmpR[1][0]);
 				kineticValues.push_back(values);
-				tmpR[1][0] += 0.005 * 4;
+				tmpR[1][0] += 0.025;
 			}
 			N = tmpN;
 			string name = "values";
@@ -3981,7 +3988,7 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BulkSplines";
 		//SYSTEM_TYPE = "BulkSplinesScaled";
 		//SYSTEM_TYPE = "HeDrop";
-		//SYSTEM_TYPE = "Bosons1D";
+		SYSTEM_TYPE = "Bosons1D";
 		//SYSTEM_TYPE = "Bosons1D0th";
 		//SYSTEM_TYPE = "Bosons1D4th";
 		//SYSTEM_TYPE = "Bosons1DSp";
@@ -3993,7 +4000,7 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BosonMixtureCluster";
 		//SYSTEM_TYPE = "InhBosons1D";
 		//SYSTEM_TYPE = "NUBosonsBulk";
-		SYSTEM_TYPE = "NUBosonsBulkPB";
+		//SYSTEM_TYPE = "NUBosonsBulkPB";
 		//SYSTEM_TYPE = "NUBosonsBulkPBBox";
 		//SYSTEM_TYPE = "NUBosonsBulkPBBoxAndRadial";
 		//SYSTEM_TYPE = "NUBosonsBulkPBWhitehead";
@@ -4021,8 +4028,8 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "Bosons1D")
 		{
-			//configFilePath = "/home/gartner/Sources/TDVMC/config/SW1D.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/SW2D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/B1D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/SW2D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/SW1D_Carleo.config";
 		}
 		else if (SYSTEM_TYPE == "Bosons1D0th")

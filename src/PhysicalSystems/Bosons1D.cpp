@@ -88,7 +88,7 @@ void Bosons1D::InitSystem()
 	if (N_PARAM != requiredParams)
 	{
 		cout << "!!! WRONG NUMBER OF PARAMETERS !!!" << endl;
-		cout << "!!! need " << requiredParams << "parameters, got " << N_PARAM << " !!!" << endl;
+		cout << "!!! need " << requiredParams << " parameters, got " << N_PARAM << " !!!" << endl;
 		exit(0);
 	}
 
@@ -145,6 +145,7 @@ void Bosons1D::InitSystem()
 	additionalObservables.Add(&structureFactor);
 
 	//Precalculate spline values:
+	/*
 	int preCalcBins = 100000;
 	double rni, rni2, rni3;
 	InitVector(nodeDiffs, nodes.size() - 1, 0.0);
@@ -171,6 +172,7 @@ void Bosons1D::InitSystem()
 			rni += binSizePerNode[n];
 		}
 	}
+	*/
 }
 
 void Bosons1D::RefreshLocalOperators()
@@ -209,7 +211,7 @@ void Bosons1D::CalculateLocalOperators(vector<vector<double> >& R)
 		for (int i = 0; i < n; i++)
 		{
 			rni = VectorDisplacementNIC_DIM(R[n], R[i], vecrni);
-			if (rni < maxDistance)
+			if (rni <= maxDistance)
 			{
 				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
 				bin = interval - nodes.begin() - 1;
@@ -289,20 +291,20 @@ void Bosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
 		{
 			rni = VectorDisplacementNIC_DIM(R[n], R[i], vecrni);
 
-			if (rni < maxDistance)
+			if (rni <= maxDistance)
 			{
 				//internal potential energy
 				if (i < n)
 				{
 					//Gauss
-					double rnia = rni / a;
-					potentialIntern += b * exp(-(rnia * rnia) / 2.0);
+					//double rnia = rni / a;
+					//potentialIntern += b * exp(-(rnia * rnia) / 2.0);
 
 					//square well
-					//if (rni < a)
-					//{
-					//	potentialIntern += b;
-					//}
+					if (rni < a)
+					{
+						potentialIntern += b;
+					}
 
 					//Rydberg U_0 / (1 + (r/R_0)^6))
 					//R_0 = a, U_0 = b;
@@ -507,6 +509,7 @@ void Bosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R, v
 	vector<double> vecrni(DIM);
 
 	//pairDistribution
+	double weight = 1.0 / ((double)N / 2.0);
 	for (int i = 0; i < N; i++)
 	{
 		for (int j = 0; j < i; j++)
@@ -514,7 +517,8 @@ void Bosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R, v
 			rni = VectorDisplacementNIC_DIM(R[i], R[j], vecrni);
 			if (rni < pairDistribution.grid.max)
 			{
-				pairDistribution.AddToHistogram(0, rni, 1.0);
+				//pairDistribution.AddToHistogram(0, rni, 1.0);
+				pairDistribution.AddToHistogram(0, rni, weight);
 			}
 		}
 	}
@@ -586,7 +590,7 @@ void Bosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR,
 		if (i != changedParticleIndex)
 		{
 			rni = VectorDisplacementNIC_DIM(R[i], oldPosition, vecrni);
-			if (rni < maxDistance)
+			if (rni <= maxDistance)
 			{
 				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
 				bin = interval - nodes.begin() - 1;
@@ -618,7 +622,7 @@ void Bosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR,
 				cout << "!!!" << endl;
 			}
 			rni = VectorDisplacementNIC_DIM(R[i], R[changedParticleIndex], vecrni);
-			if (rni < maxDistance)
+			if (rni <= maxDistance)
 			{
 				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
 				bin = interval - nodes.begin() - 1;
