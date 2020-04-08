@@ -151,7 +151,7 @@ void BosonMixtureCluster::InitSystem()
 		cfd.nodes -= 0.7;
 		cfd.rijSplit = cfd.nodes[standardIndexrijSplit];
 		cfd.rijTail = cfd.nodes[cfd.nodes.size() - standardIndexrijTail];
-		cfd.splineWeights = SplineFactory::GetWeights_4thorder(cfd.nodes);
+		cfd.splineWeights = SplineFactory::GetWeights4(cfd.nodes);
 		SplineFactory::SetBoundaryConditions1_MM_1_4thorder(cfd.nodes, cfd.bcFactors, cfd.rijSplit, cfd.mcMillanFactor);
 		SplineFactory::SetBoundaryConditions1_EXP_2_4thorder(cfd.nodes, cfd.bcFactors, cfd.rijTail);
 		cfd.Init();
@@ -179,7 +179,7 @@ void BosonMixtureCluster::InitSystem()
 		cfd.nodes -= 0.7;
 		cfd.rijSplit = cfd.nodes[standardIndexrijSplit];
 		cfd.rijTail = cfd.nodes[cfd.nodes.size() - standardIndexrijTail];
-		cfd.splineWeights = SplineFactory::GetWeights_4thorder(cfd.nodes);
+		cfd.splineWeights = SplineFactory::GetWeights4(cfd.nodes);
 		SplineFactory::SetBoundaryConditions1_MM_1_4thorder(cfd.nodes, cfd.bcFactors, cfd.rijSplit, cfd.mcMillanFactor);
 		SplineFactory::SetBoundaryConditions1_EXP_2_4thorder(cfd.nodes, cfd.bcFactors, cfd.rijTail);
 		cfd.Init();
@@ -199,7 +199,7 @@ void BosonMixtureCluster::InitSystem()
 		cfd.nodes += 1.3;
 		cfd.rijSplit = cfd.nodes[standardIndexrijSplit];
 		cfd.rijTail = cfd.nodes[cfd.nodes.size() - standardIndexrijTail];
-		cfd.splineWeights = SplineFactory::GetWeights_4thorder(cfd.nodes);
+		cfd.splineWeights = SplineFactory::GetWeights4(cfd.nodes);
 		SplineFactory::SetBoundaryConditions1_MM_1_4thorder(cfd.nodes, cfd.bcFactors, cfd.rijSplit, cfd.mcMillanFactor);
 		SplineFactory::SetBoundaryConditions1_EXP_2_4thorder(cfd.nodes, cfd.bcFactors, cfd.rijTail);
 		cfd.Init();
@@ -214,7 +214,7 @@ void BosonMixtureCluster::InitSystem()
 		cfd.nodes += 2.1;
 		cfd.rijSplit = cfd.nodes[standardIndexrijSplit];
 		cfd.rijTail = cfd.nodes[cfd.nodes.size() - standardIndexrijTail];
-		cfd.splineWeights = SplineFactory::GetWeights_4thorder(cfd.nodes);
+		cfd.splineWeights = SplineFactory::GetWeights4(cfd.nodes);
 		SplineFactory::SetBoundaryConditions1_MM_1_4thorder(cfd.nodes, cfd.bcFactors, cfd.rijSplit, cfd.mcMillanFactor);
 		SplineFactory::SetBoundaryConditions1_EXP_2_4thorder(cfd.nodes, cfd.bcFactors, cfd.rijTail);
 		cfd.Init();
@@ -229,7 +229,7 @@ void BosonMixtureCluster::InitSystem()
 		cfd.nodes += 2.1;
 		cfd.rijSplit = cfd.nodes[standardIndexrijSplit];
 		cfd.rijTail = cfd.nodes[cfd.nodes.size() - standardIndexrijTail];
-		cfd.splineWeights = SplineFactory::GetWeights_4thorder(cfd.nodes);
+		cfd.splineWeights = SplineFactory::GetWeights4(cfd.nodes);
 		SplineFactory::SetBoundaryConditions1_MM_1_4thorder(cfd.nodes, cfd.bcFactors, cfd.rijSplit, cfd.mcMillanFactor);
 		SplineFactory::SetBoundaryConditions1_EXP_2_4thorder(cfd.nodes, cfd.bcFactors, cfd.rijTail);
 		cfd.Init();
@@ -1017,7 +1017,7 @@ void BosonMixtureCluster::CalculateWFChange(vector<vector<double> >& R, vector<d
 				rni3 = rni2 * rni;
 				rni4 = rni2 * rni2;
 
-				for (int p = 0; p < 4; p++)
+				for (int p = 0; p < 5; p++)
 				{
 					cfd.sumNewPerBin[bin - p] += cfd.splineWeights[bin - p][p][0] + cfd.splineWeights[bin - p][p][1] * rni + cfd.splineWeights[bin - p][p][2] * rni2 + cfd.splineWeights[bin - p][p][3] * rni3 + cfd.splineWeights[bin - p][p][4] * rni4;
 				}

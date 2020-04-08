@@ -8,6 +8,7 @@ CPP_SRCS += \
 ../src/PhysicalSystems/BosonClusterWithLog.cpp \
 ../src/PhysicalSystems/BosonClusterWithLogParam.cpp \
 ../src/PhysicalSystems/BosonMixtureCluster.cpp \
+../src/PhysicalSystems/BosonMixtureCluster4.cpp \
 ../src/PhysicalSystems/BosonMixtureCluster_4thorder.cpp \
 ../src/PhysicalSystems/Bosons1D.cpp \
 ../src/PhysicalSystems/Bosons1D0th.cpp \
@@ -36,6 +37,7 @@ OBJS += \
 ./src/PhysicalSystems/BosonClusterWithLog.o \
 ./src/PhysicalSystems/BosonClusterWithLogParam.o \
 ./src/PhysicalSystems/BosonMixtureCluster.o \
+./src/PhysicalSystems/BosonMixtureCluster4.o \
 ./src/PhysicalSystems/BosonMixtureCluster_4thorder.o \
 ./src/PhysicalSystems/Bosons1D.o \
 ./src/PhysicalSystems/Bosons1D0th.o \
@@ -64,6 +66,7 @@ CPP_DEPS += \
 ./src/PhysicalSystems/BosonClusterWithLog.d \
 ./src/PhysicalSystems/BosonClusterWithLogParam.d \
 ./src/PhysicalSystems/BosonMixtureCluster.d \
+./src/PhysicalSystems/BosonMixtureCluster4.d \
 ./src/PhysicalSystems/BosonMixtureCluster_4thorder.d \
 ./src/PhysicalSystems/Bosons1D.d \
 ./src/PhysicalSystems/Bosons1D0th.d \
