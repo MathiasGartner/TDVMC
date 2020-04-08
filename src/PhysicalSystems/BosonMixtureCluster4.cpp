@@ -6,6 +6,8 @@
 #include "../Potentials/LJ_He_He.h"
 #include "../SplineFactory.h"
 
+//TEST
+
 using namespace std;
 
 namespace PhysicalSystems
