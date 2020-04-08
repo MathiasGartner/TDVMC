@@ -7,6 +7,8 @@ Debug/src/PhysicalSystems/*.d
 Debug/src/PhysicalSystems/*.o
 Debug/src/Potentials/*.d
 Debug/src/Potentials/*.o
+Debug/src/WFParts/*.d
+Debug/src/WFParts/*.o
 Debug/resources/*.d
 Debug/resources/*.o
 Release/TDVMC
@@ -18,6 +20,8 @@ Release/src/PhysicalSystems/*.d
 Release/src/PhysicalSystems/*.o
 Release/src/Potentials/*.d
 Release/src/Potentials/*.o
+Release/src/WFParts/*.d
+Release/src/WFParts/*.o
 Release/resources/*.d
 Release/resources/*.o
 resources/armadillo
