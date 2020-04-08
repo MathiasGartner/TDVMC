@@ -62,6 +62,8 @@ private:
 	Observables::ObservableVsOnGridWithScaling pairDistribution;
 	Observables::ObservableVsOnGrid structureFactor;
 
+	int particleStartIndexForReducedSampling;
+
 private:
 	double GetExternalPotential(vector<double>& r);
 	void RefreshLocalOperators();
@@ -72,6 +74,7 @@ private:
 public:
 	void SetNodes(vector<double> n);
 	void SetPairDistributionBinCount(double n);
+	void SetParticleStartIndexForReducedSampling(int n);
 
 //Implementation of IPhysicalSystem
 public:

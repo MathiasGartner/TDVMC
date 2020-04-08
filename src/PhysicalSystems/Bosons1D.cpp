@@ -31,6 +31,8 @@ Bosons1D::Bosons1D(vector<double>& params, string configDirectory) :
 
 	exponentNew = 0;
 	changedParticleIndex = 0;
+
+	particleStartIndexForReducedSampling = 0;
 }
 
 void Bosons1D::SetNodes(vector<double> n)
@@ -47,6 +49,11 @@ void Bosons1D::SetNodes(vector<double> n)
 void Bosons1D::SetPairDistributionBinCount(double n)
 {
 	this->numOfPairDistributionValues = n;
+}
+
+void Bosons1D::SetParticleStartIndexForReducedSampling(int n)
+{
+	this->particleStartIndexForReducedSampling = n;
 }
 
 void Bosons1D::InitSystem()
@@ -206,9 +213,9 @@ void Bosons1D::CalculateLocalOperators(vector<vector<double> >& R)
 
 	ClearVector(splineSums);
 
-	for (int n = 0; n < N; n++)
+	for (int n = particleStartIndexForReducedSampling; n < N; n++)
 	{
-		for (int i = 0; i < n; i++)
+		for (int i = particleStartIndexForReducedSampling; i < n; i++)
 		{
 			rni = VectorDisplacementNIC_DIM(R[n], R[i], vecrni);
 			if (rni <= maxDistance)
@@ -585,7 +592,7 @@ void Bosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR,
 
 	ClearVector(sumOldPerBin);
 	ClearVector(sumNewPerBin);
-	for (int i = 0; i < N; i++)
+	for (int i = particleStartIndexForReducedSampling; i < N; i++)
 	{
 		if (i != changedParticleIndex)
 		{

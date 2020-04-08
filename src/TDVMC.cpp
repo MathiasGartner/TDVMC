@@ -173,6 +173,7 @@ mt19937_64 generator;
 //default_random_engine generator;
 uniform_real_distribution<double> distUniform(0.0, 1.0);
 uniform_int_distribution<int> distParticleIndex;
+uniform_int_distribution<int> distParticleIndex1;
 normal_distribution<double> distNormal(0.0, 1.0);
 
 ////////////////////
@@ -575,6 +576,7 @@ void Init()
 		//cout << generator << endl;
 		//generator = default_random_engine(processRank + 1);
 		distParticleIndex = uniform_int_distribution<int>(0, N - 1);
+		distParticleIndex1 = uniform_int_distribution<int>(1, N - 1);
 		//Log("uniform: " + to_string(random01()) + " normal: " + to_string(randomNormal()));
 		srand(processRank + 1);
 	}
@@ -842,6 +844,53 @@ void MoveCenterOfMassToZero(vector<vector<double> >& R)
 	}
 }
 
+void DoReducedMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+	double p;
+	bool sampleOkay = true;
+	int randomParticle = distParticleIndex1(generator); //INFO: do not choose the first particle
+	vector<double> oldPosition(R[randomParticle]);
+	for (int i = 0; i < DIM; i++)
+	{
+		R[randomParticle][i] += randomNormal(MC_STEP);
+	}
+	double wfQuotient = sys->CalculateWFQuotient(R, uR, uI, phiR, phiI, randomParticle, oldPosition);
+	if (!isfinite(wfQuotient) || !isfinite(sys->GetExponentNew()) || !isfinite(sys->GetExponent()))
+	{
+		sampleOkay = false;
+		if (!isfinite(wfQuotient) && sys->GetExponentNew() > 0 && sys->GetExponent() == 0) //INFO: this can happen when a new timestep is startet and the wavefunction is zero for the first particle configuration
+		{
+			sampleOkay = true;
+			wfQuotient = 1; //INFO: accept by 100%
+		}
+	}
+
+	p = random01();
+	if (!sampleOkay || wfQuotient < p)
+	{
+		for (int i = 0; i < DIM; i++)
+		{
+			R[randomParticle][i] = oldPosition[i];
+		}
+	}
+	else
+	{
+		sys->AcceptMove();
+		nAcceptances++;
+		nAcceptancesPP[randomParticle]++;
+	}
+	nTrials++;
+	nTrialsPP[randomParticle]++;
+}
+
+void DoReducedMetropolisSteps(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int n)
+{
+	for (int i = 0; i < n; i++)
+	{
+		DoReducedMetropolisStep(R, uR, uI, phiR, phiI);
+	}
+}
+
 void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	//INFO: no performance increase for dimension-dependent functions measureable on asterix
@@ -900,6 +949,14 @@ void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<dou
 	}
 	nTrials++;
 	nTrialsPP[randomParticle]++;
+}
+
+void DoMetropolisSteps(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int n)
+{
+	for (int i = 0; i < n; i++)
+	{
+		DoMetropolisStep(R, uR, uI, phiR, phiI);
+	}
 }
 
 //////////////////////////////////////////
@@ -3098,7 +3155,7 @@ int mainMPI(int argc, char** argv)
 			WriteDataToFile(wfValues, name + nameEnd, name + nameEnd);
 			//WriteDataToFile(wfValues, "wfValuesHeNa", "wfValuesHeNa");
 		}
-		bool saveToKineticFile = true;
+		bool saveToKineticFile = false;
 		if (saveToKineticFile)
 		{
 			vector<vector<double> > tmpR;
@@ -3124,6 +3181,18 @@ int mainMPI(int argc, char** argv)
 			//{
 			//	WriteDataToFile(s->test, "test", "test");
 			//}
+		}
+	}
+	bool calcOBDM = false;
+	if (calcOBDM)
+	{
+		vector<vector<double> > values;
+		dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->SetParticleStartIndexForReducedSampling(1);
+		sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
+		DoReducedMetropolisSteps(R, uR, uI, phiR, phiI, 100000);
+		for (int i = 0; i < 10000; i++)
+		{
+			DoReducedMetropolisSteps(R, uR, uI, phiR, phiI, 100);
 		}
 	}
 
