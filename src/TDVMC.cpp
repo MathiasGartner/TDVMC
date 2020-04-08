@@ -3183,7 +3183,7 @@ int mainMPI(int argc, char** argv)
 			//}
 		}
 	}
-	bool calcOBDM = false;
+	bool calcOBDM = true;
 	if (calcOBDM)
 	{
 		vector<vector<double> > values;
