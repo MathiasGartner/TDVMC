@@ -78,6 +78,7 @@ string configDirectory;
 string configFilePath;
 string OUT_DIR;					//directory name generated from parameter settings
 string OUT_DIR_SUFFIX;			//string that is appended to the output-directory
+string OUT_DIR_NAME;			//if not empty, exactly this name is used as output directory
 int N;           	    		//number of particles
 double LBOX;
 double LBOX_R;
@@ -362,6 +363,7 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("SYSTEM_TYPE", &SYSTEM_TYPE, ConfigItemType::STRING));
 	configItems.push_back(ConfigItem("OUTPUT_DIRECTORY", &OUTPUT_DIRECTORY, ConfigItemType::STRING));
 	configItems.push_back(ConfigItem("OUT_DIR_SUFFIX", &OUT_DIR_SUFFIX, ConfigItemType::STRING));
+	configItems.push_back(ConfigItem("OUT_DIR_NAME", &OUT_DIR_NAME, ConfigItemType::STRING));
 	configItems.push_back(ConfigItem("N", &N, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("LBOX", &LBOX, ConfigItemType::DOUBLE));
 	configItems.push_back(ConfigItem("DIM", &DIM, ConfigItemType::INT));
@@ -526,11 +528,18 @@ void CreateOutputDirectory()
 {
 	//INFO: append config options to output directory path, create the directory and copy the config file
 	int tmp;
-	ostringstream strs; //INFO: the only reason for this is that strs.str() gives to correct formatting as it is currently used in the Mathematica-Notebooks for data analysis.
-	string dir;
-	strs << "step=" << MC_NSTEPS << "_therm=" << MC_NTHERMSTEPS << "_time=" << TIMESTEP;
-	//strs << (IMAGINARY_TIME == 1 ? "GS_" : "QU_") << DIM << "D_" << "N=" << N << "_step=" << MC_NSTEPS << "_therm=" << MC_NTHERMSTEPS << "_time=" << TIMESTEP;
-	OUT_DIR = OUTPUT_DIRECTORY + strs.str() + OUT_DIR_SUFFIX + "/";
+	if (OUT_DIR_NAME != "")
+	{
+		OUT_DIR = OUTPUT_DIRECTORY + OUT_DIR_NAME + "/";
+	}
+	else
+	{
+		ostringstream strs; //INFO: the only reason for this is that strs.str() gives to correct formatting as it is currently used in the Mathematica-Notebooks for data analysis.
+		string dir;
+		strs << "step=" << MC_NSTEPS << "_therm=" << MC_NTHERMSTEPS << "_time=" << TIMESTEP;
+		//strs << (IMAGINARY_TIME == 1 ? "GS_" : "QU_") << DIM << "D_" << "N=" << N << "_step=" << MC_NSTEPS << "_therm=" << MC_NTHERMSTEPS << "_time=" << TIMESTEP;
+		OUT_DIR = OUTPUT_DIRECTORY + strs.str() + OUT_DIR_SUFFIX + "/";
+	}
 	//dir = "step=" + to_string(MC_NSTEPS) + "_therm=" + to_string(MC_NTHERMSTEPS) + "_time=" + to_string(TIMESTEP);
 	//OUT_DIR = OUTPUT_DIRECTORY + dir + OUT_DIR_SUFFIX + "/";
 	tmp = system(("rm -rf " + OUT_DIR).c_str());

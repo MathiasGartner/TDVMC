@@ -152,34 +152,35 @@ void Bosons1D::InitSystem()
 	additionalObservables.Add(&structureFactor);
 
 	//Precalculate spline values:
-	/*
-	int preCalcBins = 100000;
-	double rni, rni2, rni3;
-	InitVector(nodeDiffs, nodes.size() - 1, 0.0);
-	InitVector(binSizePerNode, nodes.size() - 1, 0.0);
-	InitVector(binSizePerNode_R, nodes.size() - 1, 0.0);
-	for (unsigned int n = 0; n < nodes.size() - 1; n++)
+	if (usePreCalcSplineValues)
 	{
-		nodeDiffs[n] = nodes[n + 1] - nodes[n];
-		binSizePerNode[n] = nodeDiffs[n] / preCalcBins;
-		binSizePerNode_R[n] = 1.0 / binSizePerNode[n];
-	}
-	InitVector(preCalcSplineValues, splineWeights.size(), splineWeights[0].size(), preCalcBins, 0.0);
-	for (unsigned int n = 3; n < nodes.size() - 4; n++)
-	{
-		rni = nodes[n] + binSizePerNode[n] / 2.0;
-		for (int i = 0; i < preCalcBins; i++)
+		int preCalcBins = 2000;
+		double rni, rni2, rni3;
+		InitVector(nodeDiffs, nodes.size() - 1, 0.0);
+		InitVector(binSizePerNode, nodes.size() - 1, 0.0);
+		InitVector(binSizePerNode_R, nodes.size() - 1, 0.0);
+		for (unsigned int n = 0; n < nodes.size() - 1; n++)
 		{
-			rni2 = rni * rni;
-			rni3 = rni2 * rni;
-			for (int p = 0; p < 4; p++)
+			nodeDiffs[n] = nodes[n + 1] - nodes[n];
+			binSizePerNode[n] = nodeDiffs[n] / preCalcBins;
+			binSizePerNode_R[n] = 1.0 / binSizePerNode[n];
+		}
+		InitVector(preCalcSplineValues, splineWeights.size(), splineWeights[0].size(), preCalcBins, 0.0);
+		for (unsigned int n = 3; n < nodes.size() - 4; n++)
+		{
+			rni = nodes[n] + binSizePerNode[n] / 2.0;
+			for (int i = 0; i < preCalcBins; i++)
 			{
-				preCalcSplineValues[n - p][p][i] = splineWeights[n - p][p][0] + splineWeights[n - p][p][1] * rni + splineWeights[n - p][p][2] * rni2 + splineWeights[n - p][p][3] * rni3;
+				rni2 = rni * rni;
+				rni3 = rni2 * rni;
+				for (int p = 0; p < 4; p++)
+				{
+					preCalcSplineValues[n - p][p][i] = splineWeights[n - p][p][0] + splineWeights[n - p][p][1] * rni + splineWeights[n - p][p][2] * rni2 + splineWeights[n - p][p][3] * rni3;
+				}
+				rni += binSizePerNode[n];
 			}
-			rni += binSizePerNode[n];
 		}
 	}
-	*/
 }
 
 void Bosons1D::RefreshLocalOperators()
