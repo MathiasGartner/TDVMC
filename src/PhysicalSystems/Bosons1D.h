@@ -76,6 +76,8 @@ public:
 	void SetPairDistributionBinCount(double n);
 	void SetParticleStartIndexForReducedSampling(int n);
 
+	double CalculateOBDMKernel(vector<double>& r, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
+
 //Implementation of IPhysicalSystem
 public:
 	Bosons1D(vector<double>& params, string configDirectory);

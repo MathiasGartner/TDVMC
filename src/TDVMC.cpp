@@ -3198,10 +3198,44 @@ int mainMPI(int argc, char** argv)
 		vector<vector<double> > values;
 		dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->SetParticleStartIndexForReducedSampling(1);
 		sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
-		DoReducedMetropolisSteps(R, uR, uI, phiR, phiI, 100000);
-		for (int i = 0; i < 10000; i++)
+		R[0][0] = 0.0;
+		vector<double> r = { 0 };
+		vector<double> obdms;
+		int rSteps = 10;
+		double rStep = 1.0;
+		int obdm_mcsteps = 100000;
+		InitVector(obdms, rSteps, 0.0);
+		DoReducedMetropolisSteps(R, uR, uI, phiR, phiI, 10000);
+		for (int s = 0; s < rSteps; s++)
 		{
-			DoReducedMetropolisSteps(R, uR, uI, phiR, phiI, 100);
+			if (processRank == rootRank)
+			{
+				cout << "s=" << s << endl;
+			}
+			r[0] = (s+1) * rStep;
+			for (int i = 0; i < obdm_mcsteps; i++)
+			{
+				double obdm = dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->CalculateOBDMKernel(r, R, uR, uI, phiR, phiI);
+				obdms[s] += obdm / obdm_mcsteps;
+				DoReducedMetropolisSteps(R, uR, uI, phiR, phiI, 100);
+			}
+			if (processRank == rootRank)
+			{
+				//cout << obdms[s] << endl;
+			}
+		}
+		MPIMethods::ReduceToAverage(obdms);
+		MPIMethods::Barrier();
+		if (processRank == rootRank)
+		{
+			for(double d : obdms)
+			{
+				cout << d << endl;
+			}
+		}
+		if (processRank == rootRank)
+		{
+			WriteDataToFile(obdms, "OBDM", "rho(r-r')");
 		}
 	}
 
@@ -4106,9 +4140,10 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "Bosons1D")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/B1D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/B1D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/SW2D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/SW1D_Carleo.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/obdm_test.config";
 		}
 		else if (SYSTEM_TYPE == "Bosons1D0th")
 		{

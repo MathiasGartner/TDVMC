@@ -56,6 +56,83 @@ void Bosons1D::SetParticleStartIndexForReducedSampling(int n)
 	this->particleStartIndexForReducedSampling = n;
 }
 
+double Bosons1D::CalculateOBDMKernel(vector<double>& r, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+	double result = 0.0;
+
+	vector<vector<double> > firstParticleR = {R[0], r};
+	vector<double> sumParts;
+	InitVector(sumParts, 2, 0.0);
+
+	vector<double> tmpSplineSums;
+	vector<double> tmpLocalOperators;
+
+	for (int part = 0; part < 1; part++)
+	{
+		//according to Bosons1D::CalculateLocalOperators(vector<vector<double> >& R)
+		int bin;
+		double rni;
+		double rni2;
+		double rni3;
+		vector<double> vecrni(DIM);
+
+		InitVector(tmpSplineSums, this->splineSums.size(), 0.0);
+		InitVector(tmpLocalOperators, this->localOperators.size(), 0.0);
+
+		for (int n = particleStartIndexForReducedSampling; n < N; n++)
+		{
+			rni = VectorDisplacementNIC_DIM(R[n], firstParticleR[part], vecrni);
+			if (rni <= maxDistance)
+			{
+				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
+				bin = interval - nodes.begin() - 1;
+				rni2 = rni * rni;
+				rni3 = rni2 * rni;
+
+				for (int p = 0; p < 4; p++)
+				{
+					tmpSplineSums[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rni + splineWeights[bin - p][p][2] * rni2 + splineWeights[bin - p][p][3] * rni3;
+				}
+			}
+			else
+			{
+				cout << "!!!!" << endl;
+			}
+		}
+
+		//according to Bosons1D::RefreshLocalOperators()
+		//INFO: BC
+		for (int i = 0; i < np1; i++)
+		{
+			tmpLocalOperators[i] = (bcFactorsStart[i][0] * tmpSplineSums[0] + bcFactorsStart[i][1] * tmpSplineSums[1] + bcFactorsStart[i][2] * tmpSplineSums[2]);
+		}
+		int spIdx = 3;
+		for (int i = np1; i < np2; i++)
+		{
+			tmpLocalOperators[i] = tmpSplineSums[spIdx];
+			spIdx++;
+		}
+		int idx = 0;
+		for (int i = np2; i < np3; i++)
+		{
+			tmpLocalOperators[i] = (bcFactorsEnd[idx][0] * tmpSplineSums[numberOfSplines - 3] + bcFactorsEnd[idx][1] * tmpSplineSums[numberOfSplines - 2] + bcFactorsEnd[idx][2] * tmpSplineSums[numberOfSplines - 1]);
+			idx++;
+		}
+
+		//according to Bosons1D::CalculateWavefunction(vector<double>& O, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+		for (int i = 0; i < N_PARAM; i++)
+		{
+			sumParts[part] += uR[i] * tmpLocalOperators[i];
+		}
+	}
+
+	//result = exp(sumParts[0] + sumParts[1] + 2.0 * phiR);
+	//result = sumParts[0] + sumParts[1];
+	result = sumParts[0];
+
+	return result;
+}
+
 void Bosons1D::InitSystem()
 {
 	numOfOtherLocalOperators = 4; //INFO: potentialIntern, potentialInternComplex, potentialExtern, potentialExternComplex
