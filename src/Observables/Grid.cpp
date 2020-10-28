@@ -27,6 +27,7 @@ void Grid::Init(double min, double max, double spacing)
 		grid[i] = val;
 		val += this->spacing;
 	}
+	this->InitGridCenterPoints();
 }
 
 void Grid::Init(vector<double> g)
@@ -36,6 +37,16 @@ void Grid::Init(vector<double> g)
 	this->spacing = 0;
 	this->count = g.size();
 	this->grid = g;
+}
+
+void Grid::InitGridCenterPoints()
+{
+	InitVector(this->gridCenterPoints, this->count, 0.0);
+	for (int i = 0; i <= this->count - 2; i++)
+	{
+		this->gridCenterPoints[i] = (this->grid[i + 1] + this->grid[i]) / 2.0;
+	}
+	this->gridCenterPoints[this->count - 1] = (this->max + this->grid[this->count - 1]) / 2.0;
 }
 
 int Grid::GetIndex(double value)

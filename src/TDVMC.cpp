@@ -125,6 +125,7 @@ vector<double> SYSTEM_PARAMS;
 string requiredConfigVersion = "0.22";
 int numOfProcesses = 1;
 int rootRank = 0;
+bool isRootRank = false;
 int processRank = 0;
 long long nAcceptances = 0;
 long long nTrials = 0;
@@ -486,7 +487,7 @@ void BroadcastConfigItem(ConfigItem& ci)
 	{
 		int size = ci.variableArrInt->size();
 		MPIMethods::BroadcastValue(&size);
-		if (processRank != rootRank)
+		if (!isRootRank)
 		{
 			ci.variableArrInt->resize(size);
 		}
@@ -496,7 +497,7 @@ void BroadcastConfigItem(ConfigItem& ci)
 	{
 		int size = ci.variableArrDouble->size();
 		MPIMethods::BroadcastValue(&size);
-		if (processRank != rootRank)
+		if (!isRootRank)
 		{
 			ci.variableArrDouble->resize(size);
 		}
@@ -720,7 +721,7 @@ bool LoadLastPositionsFromFile(string filename, vector<vector<double> >& R)
 void InitCoordinateConfiguration(vector<vector<double> >& R)
 {
 	int fileFound = 0;
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		string filename = "coords/particleconfiguration_" + to_string(N) + "_" + to_string(DIM) + "D_" + to_string(processRank);
 		if (LoadLastPositionsFromFile(filename, R))
@@ -737,7 +738,7 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 	}
 	else
 	{
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			cout << "LBOX=" << LBOX << endl;
 		}
@@ -1070,7 +1071,7 @@ void UpdateSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR
 	//}
 	////Log("nrOfUpdatedSamples: " + to_string(nrOfUpdatedSamples) + "(" + to_string((double)nrOfUpdatedSamples / count * 100.0) + "%)");
 	//double avgNrOfUpdatedSamples = MPIMethods::ReduceToAverage(&nrOfUpdatedSamples);
-	//if (processRank == rootRank)
+	//if (isRootRank)
 	//{
 	//	Log("nrOfUpdatedSamples: " + to_string(avgNrOfUpdatedSamples) + "(" + to_string(avgNrOfUpdatedSamples / count * 100.0) + "%)");
 	//}
@@ -1104,7 +1105,7 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 
 	sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
 
-	if (processRank == rootRank && !intermediateStep)
+	if (isRootRank && !intermediateStep)
 	{
 		cout << "exponent=" << sys->GetExponent() << "\t\twf=" << sys->GetWf() << "\t\tphiR=" << phiR << endl;
 	}
@@ -1156,13 +1157,13 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 		if ((10 * i) % MC_NSTEPS == 0)
 		{
 			//cout << (i / (double)MC_NSTEPS * 100.0) << "%" << endl;
-			if (processRank == rootRank && !intermediateStep)
+			if (isRootRank && !intermediateStep)
 			{
 				cout << "." << flush;
 			}
 		}
 	}
-	if (processRank == rootRank && !intermediateStep)
+	if (isRootRank && !intermediateStep)
 	{
 		cout << endl;
 	}
@@ -1174,7 +1175,7 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 	//localOperatorsMatrix = Mean(singlelocalOperatorsMatrix);
 	//localOperatorlocalEnergyR = Mean(singlelocalOperatorlocalEnergyR);
 	//localOperatorlocalEnergyI = Mean(singlelocalOperatorlocalEnergyI);
-	if (processRank == rootRank && !intermediateStep)
+	if (isRootRank && !intermediateStep)
 	{
 		//WriteDataToFile(singlelocalEnergyR, "singlelocalEnergyR" + to_string(t), "singlelocalEnergyR");
 		//Sys::WriteLocalOperatorsToFile(to_string(t));
@@ -1182,7 +1183,7 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 		//WriteParticlesToFile(R, to_string(t));
 	}
 
-	if (processRank == rootRank && !intermediateStep)
+	if (isRootRank && !intermediateStep)
 	{
 		cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
 		for (int i = 0; i < N; i++)
@@ -1207,7 +1208,7 @@ void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>&
 	dblDuration = (double) t.duration();
 	//INFO: sometimes error **MPI Error, rank:0, function:MPI_REDUCE, Message truncated on receive**
 	vector<double> timings = MPIMethods::ReduceToMinMaxMean(dblDuration);
-	if (processRank == rootRank && !intermediateStep)
+	if (isRootRank && !intermediateStep)
 	{
 		Log("duration: min = " + to_string(timings[0]) + " ms");
 		Log("          max = " + to_string(timings[1]) + " ms");
@@ -1228,7 +1229,7 @@ void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>&
 	//BulkOnlySplines* s = dynamic_cast<BulkOnlySplines*>(sys);
 	//vector<vector<double> > localKineticEnergiesD1 = Mean(s->allLocalKineticEnergiesD1);
 	//vector<double> localKineticEnergiesD2 = Mean(s->allLocalKineticEnergiesD2);
-	//if (processRank == rootRank)
+	//if (isRootRank)
 	//{
 	//	WriteDataToFile(s->allER1, "BB_allER1", to_string(Mean(s->allER1)));
 	//	WriteDataToFile(s->allER2, "BB_allER2", to_string(Mean(s->allER2)));
@@ -1249,7 +1250,7 @@ void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>&
 	//MPIMethods::ReduceToAverage(os2);
 	////MPIMethods::ReduceToAverage(localKineticEnergiesD1);
 	////MPIMethods::ReduceToAverage(localKineticEnergiesD2);
-	//if (processRank == rootRank)
+	//if (isRootRank)
 	//{
 	//	WriteDataToFile(localKineticEnergiesD1, "BB_localKineticEnergiesD1", "test", 1);
 	//	WriteDataToFile(localKineticEnergiesD2, "BB_localKineticEnergiesD2", to_string(Sum(localKineticEnergiesD2)), 1);
@@ -1306,7 +1307,7 @@ void UpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingData*>& sa
 		if ((10 * i) % count == 0)
 		{
 			//cout << (i / (double)MC_NSTEPS * 100.0) << "%" << endl;
-			if (processRank == rootRank && !intermediateStep)
+			if (isRootRank && !intermediateStep)
 			{
 				cout << "." << flush;
 				//cout << weight << endl;
@@ -1314,7 +1315,7 @@ void UpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingData*>& sa
 		}
 	}
 
-	//if (processRank == rootRank && sys->GetStep() > 1 && !intermediateStep)
+	//if (isRootRank && sys->GetStep() > 1 && !intermediateStep)
 	//{
 	//	WriteDataToFile(weights, "__Test_weights", "phiR=" + to_string(phiR));
 	//	WriteDataToFile(los, "__Test_los", "los");
@@ -1322,7 +1323,7 @@ void UpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingData*>& sa
 	//}
 
 	//double inverseWeightMean = dblCount / weightSum;
-	//if (processRank == rootRank && !intermediateStep)
+	//if (isRootRank && !intermediateStep)
 	//{
 	//	cout << "mean: " << (1.0/inverseWeightMean) << endl;
 	//}
@@ -1334,7 +1335,7 @@ void UpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingData*>& sa
 	//localOperatorlocalEnergyI *= inverseWeightMean;
 	//otherExpectationValues *= inverseWeightMean;
 
-	if (processRank == rootRank && !intermediateStep)
+	if (isRootRank && !intermediateStep)
 	{
 		cout << endl;
 	}
@@ -1351,7 +1352,7 @@ void ParallelUpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingDa
 	//t.stop();
 	//dblDuration = (double) t.duration();
 	//vector<double> timings = MPIMethods::ReduceToMinMaxMean(dblDuration);
-	//if (processRank == rootRank)
+	//if (isRootRank)
 	//{
 	//	Log("duration: min = " + to_string(timings[0]) + " ms");
 	//	Log("          max = " + to_string(timings[1]) + " ms");
@@ -1402,7 +1403,7 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
 		if ((100 * i) % MC_NADDITIONALSTEPS == 0)
 		{
 			//cout << (i / (double)MC_NSTEPS * 100.0) << "%" << endl;
-			if (processRank == rootRank)
+			if (isRootRank)
 			{
 				//cout << "." << flush;
 				percent++;
@@ -1411,11 +1412,11 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
 			}
 		}
 	}
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		cout << endl;
 	}
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
 		for (int i = 0; i < N; i++)
@@ -1455,7 +1456,7 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
  if ((100 * i) % MC_NADDITIONALSTEPS == 0)
  {
  //cout << (i / (double)MC_NSTEPS * 100.0) << "%" << endl;
- if (processRank == rootRank)
+ if (isRootRank)
  {
  //cout << "." << flush;
  percent++;
@@ -1463,11 +1464,11 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
  }
  }
  }
- if (processRank == rootRank)
+ if (isRootRank)
  {
  cout << endl;
  }
- if (processRank == rootRank)
+ if (isRootRank)
  {
  cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
  }
@@ -1842,7 +1843,7 @@ void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double 
 
 void CalculateNextParametersEuler(double dt, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		vector<double> uDotR;
 		vector<double> uDotI;
@@ -1883,7 +1884,7 @@ void CalculateNextParametersPC(double dt, vector<vector<double> >& R, vector<dou
 	ClearVector(tmpUR);
 	ClearVector(tmpUI);
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		SolveForParametersDot(uDotR, uDotI, &phiDotR, &phiDotI);
 
@@ -1901,7 +1902,7 @@ void CalculateNextParametersPC(double dt, vector<vector<double> >& R, vector<dou
 		//BroadcastValue(&tmpPhiI);
 		BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
 		ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			SolveForParametersDot(nextUDotR, nextUDotI, &nextPhiDotR, &nextPhiDotI);
 
@@ -1940,7 +1941,7 @@ void CalculateNextParametersPCReuseSamples(double dt, vector<double>& uR, vector
 	ClearVector(tmpUR);
 	ClearVector(tmpUI);
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		SolveForParametersDot(uDotR, uDotI, &phiDotR, &phiDotI);
 
@@ -1958,7 +1959,7 @@ void CalculateNextParametersPCReuseSamples(double dt, vector<double>& uR, vector
 		//BroadcastValue(&tmpPhiI);
 		BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
 		ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			SolveForParametersDot(nextUDotR, nextUDotI, &nextPhiDotR, &nextPhiDotI);
 
@@ -1996,7 +1997,7 @@ void CalculateNextParametersRK4(double dt, vector<vector<double> >& R, vector<do
 	phiDotR.resize(4);
 	phiDotI.resize(4);
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		SolveForParametersDot(uDotR[0], uDotI[0], &(phiDotR[0]), &(phiDotI[0]));
 
@@ -2008,7 +2009,7 @@ void CalculateNextParametersRK4(double dt, vector<vector<double> >& R, vector<do
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
 	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		SolveForParametersDot(uDotR[1], uDotI[1], &(phiDotR[1]), &(phiDotI[1]));
 
@@ -2020,7 +2021,7 @@ void CalculateNextParametersRK4(double dt, vector<vector<double> >& R, vector<do
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
 	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		SolveForParametersDot(uDotR[2], uDotI[2], &(phiDotR[2]), &(phiDotI[2]));
 
@@ -2032,7 +2033,7 @@ void CalculateNextParametersRK4(double dt, vector<vector<double> >& R, vector<do
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
 	ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		SolveForParametersDot(uDotR[3], uDotI[3], &(phiDotR[3]), &(phiDotI[3]));
 
@@ -2064,7 +2065,7 @@ void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vecto
 	phiDotR.resize(4);
 	phiDotI.resize(4);
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		SolveForParametersDot(uDotR[0], uDotI[0], &(phiDotR[0]), &(phiDotI[0]));
 
@@ -2076,7 +2077,7 @@ void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vecto
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
 	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		SolveForParametersDot(uDotR[1], uDotI[1], &(phiDotR[1]), &(phiDotI[1]));
 
@@ -2088,7 +2089,7 @@ void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vecto
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
 	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		SolveForParametersDot(uDotR[2], uDotI[2], &(phiDotR[2]), &(phiDotI[2]));
 
@@ -2100,7 +2101,7 @@ void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vecto
 	BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
 	ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		SolveForParametersDot(uDotR[3], uDotI[3], &(phiDotR[3]), &(phiDotI[3]));
 
@@ -2141,7 +2142,7 @@ void CalculateNextParametersImplicitEuler(double dt, vector<double>& uR, vector<
 		JI[i].resize(N_PARAM);
 	}
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		SolveForParametersDot(uDotR, uDotI, &phiDotR, &phiDotI);
 
@@ -2180,7 +2181,7 @@ void CalculateNextParametersImplicitEuler(double dt, vector<double>& uR, vector<
 	{
 		iterations++;
 		ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR_n, uI_n, phiR_n, phiI_n, true);
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			SolveForParametersDot(uDotR_n, uDotI_n, &phiDotR_n, &phiDotI_n);
 		}
@@ -2194,7 +2195,7 @@ void CalculateNextParametersImplicitEuler(double dt, vector<double>& uR, vector<
 			double dUR = delta * uR[i]; // * directionR[i];
 			uR_n[i] += dUR;
 			ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR_n, uI_n, phiR_n, phiI_n, true);
-			if (processRank == rootRank)
+			if (isRootRank)
 			{
 				SolveForParametersDot(uDotR_n_delta, uDotI_n_delta, &phiDotR_n_delta, &phiDotI_n_delta);
 				JR[i] = (uDotR_n_delta - uDotR_n) * dt / dUR * (-1.0);
@@ -2205,7 +2206,7 @@ void CalculateNextParametersImplicitEuler(double dt, vector<double>& uR, vector<
 			double dUI = delta * uI[i]; // * directionI[i];
 			uI_n[i] += dUI;
 			ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR_n, uI_n, phiR_n, phiI_n, true);
-			if (processRank == rootRank)
+			if (isRootRank)
 			{
 				SolveForParametersDot(uDotR_n_delta, uDotI_n_delta, &phiDotR_n_delta, &phiDotI_n_delta);
 				JI[i] = (uDotI_n_delta - uDotI_n) * dt / dUI * (-1.0);
@@ -2213,7 +2214,7 @@ void CalculateNextParametersImplicitEuler(double dt, vector<double>& uR, vector<
 			}
 			uI_n[i] -= dUI;
 		}
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			vector<double> delta_uR(N_PARAM);
 			vector<double> delta_uI(N_PARAM);
@@ -2267,7 +2268,7 @@ void CalculateNextParametersImplicitEuler(double dt, vector<double>& uR, vector<
 		BroadcastNewParameters(uR_n, uI_n, &phiR_n, &phiI_n);
 	}
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		//TODO: check calculation of phiR and phII (but should not affect results since phiR is set in NormalizeWavefunction() and phiI is only global phase factor...)
 		vector<double> final_uDotR;
@@ -2316,7 +2317,7 @@ void CalculateNextParametersCrankNicolson(double dt, vector<double>& uR, vector<
 		JI[i].resize(N_PARAM);
 	}
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		SolveForParametersDot(uDotR, uDotI, &phiDotR, &phiDotI);
 
@@ -2355,7 +2356,7 @@ void CalculateNextParametersCrankNicolson(double dt, vector<double>& uR, vector<
 	{
 		iterations++;
 		ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR_n, uI_n, phiR_n, phiI_n, true);
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			SolveForParametersDot(uDotR_n, uDotI_n, &phiDotR_n, &phiDotI_n);
 		}
@@ -2369,7 +2370,7 @@ void CalculateNextParametersCrankNicolson(double dt, vector<double>& uR, vector<
 			double dUR = delta * uR[i]; // * directionR[i];
 			uR_n[i] += dUR;
 			ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR_n, uI_n, phiR_n, phiI_n, true);
-			if (processRank == rootRank)
+			if (isRootRank)
 			{
 				SolveForParametersDot(uDotR_n_delta, uDotI_n_delta, &phiDotR_n_delta, &phiDotI_n_delta);
 				JR[i] = (uDotR_n_delta - uDotR_n) * dt / dUR * (-1.0);
@@ -2380,7 +2381,7 @@ void CalculateNextParametersCrankNicolson(double dt, vector<double>& uR, vector<
 			double dUI = delta * uI[i]; // * directionI[i];
 			uI_n[i] += dUI;
 			ParallelUpdateExpectationValuesForGivenSamples(correlatedSamplingData, uR_n, uI_n, phiR_n, phiI_n, true);
-			if (processRank == rootRank)
+			if (isRootRank)
 			{
 				SolveForParametersDot(uDotR_n_delta, uDotI_n_delta, &phiDotR_n_delta, &phiDotI_n_delta);
 				JI[i] = (uDotI_n_delta - uDotI_n) * dt / dUI * (-1.0);
@@ -2388,7 +2389,7 @@ void CalculateNextParametersCrankNicolson(double dt, vector<double>& uR, vector<
 			}
 			uI_n[i] -= dUI;
 		}
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			vector<double> delta_uR(N_PARAM);
 			vector<double> delta_uI(N_PARAM);
@@ -2442,7 +2443,7 @@ void CalculateNextParametersCrankNicolson(double dt, vector<double>& uR, vector<
 		BroadcastNewParameters(uR_n, uI_n, &phiR_n, &phiI_n);
 	}
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		//TODO: check calculation of phiR and phII (but should not affect results since phiR is set in NormalizeWavefunction() and phiI is only global phase factor...)
 		vector<double> final_uDotR;
@@ -2463,7 +2464,7 @@ void CalculateNextParametersCrankNicolson(double dt, vector<double>& uR, vector<
 void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
 	Timer t;
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		t.start();
 	}
@@ -2513,7 +2514,7 @@ void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<doubl
 		}
 	}
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		t.stop();
 		Log("DGL duration = " + to_string(t.duration()) + " ms");
@@ -2753,7 +2754,7 @@ void PerformSystemParameterChange()
 void SetBackNSteps(int n, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int& step, double dynTimeStep)
 {
 	//TODO: also check for urListDiff, correlated sampling, ...
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		for (int i = 0; i < n; i++)
 		{
@@ -2966,7 +2967,7 @@ bool InitializePhysicalSystem()
 	}
 	else
 	{
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			Log("System type \"" + SYSTEM_TYPE + "\" not available.", ERROR);
 		}
@@ -2992,10 +2993,12 @@ int mainMPI(int argc, char** argv)
 	MPI_Comm_rank(MPI_COMM_WORLD, &processRank);
 	MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
 	MPI_Get_processor_name(processName, &processNameLength);
+	isRootRank = processRank == rootRank;
 
 	MPIMethods::numOfProcesses = numOfProcesses;
 	MPIMethods::processRank = processRank;
 	MPIMethods::rootRank = rootRank;
+	MPIMethods::isRootRank = isRootRank;
 
 	MPIMethods::GetCPUAllocation(true);
 
@@ -3004,7 +3007,7 @@ int mainMPI(int argc, char** argv)
 	////////////////////////////////////////
 
 	RegisterAllConfigItems();
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		Log("Master process started...");
 		cout << "read config from path=\"" << configFilePath << "\"" << endl;
@@ -3047,7 +3050,7 @@ int mainMPI(int argc, char** argv)
 	/////////////////////////////
 
 	Init();
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		//cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
 		//cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
@@ -3069,11 +3072,11 @@ int mainMPI(int argc, char** argv)
 	}
 
 	InitCoordinateConfiguration(R);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		WriteParticleInputFile("particleconfiguration", R);
 	}
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		for (int i = 0; i < N_PARAM; i++)
 		{
@@ -3085,7 +3088,7 @@ int mainMPI(int argc, char** argv)
 		//PrintData(uR);
 		//PrintData(uI);
 
-		if (processRank == rootRank)		// && USE_ADJUST_PARAMETERS == true)
+		if (isRootRank)		// && USE_ADJUST_PARAMETERS == true)
 		{
 			//AdjustParameters(uR, uI, &phiR, &phiI);
 		}
@@ -3104,13 +3107,13 @@ int mainMPI(int argc, char** argv)
 	sys->InitSystem();
 	PostSystemInit();
 	//Write grid files for observables
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		if (auto s = dynamic_cast<PhysicalSystems::Bosons1D*>(sys))
 		{
 			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
 			{
-				WriteDataToFile(o->grid.grid, "gr_grid", o->grid.name);
+				WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
 			}
 			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
 			{
@@ -3119,7 +3122,7 @@ int mainMPI(int argc, char** argv)
 		}
 	}
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		string tabs = "\t\t\t\t\t\t";
 		bool samplesToFile = false;
@@ -3228,7 +3231,7 @@ int mainMPI(int argc, char** argv)
 		DoMetropolisSteps(R, uR, uI, phiR, phiI, 10000);
 		for (int i = 0; i < obdm_mcsteps; i++)
 		{
-			if (processRank == rootRank && i % 100 == 0)
+			if (isRootRank && i % 100 == 0)
 			{
 				cout << i << endl;
 			}
@@ -3256,7 +3259,7 @@ int mainMPI(int argc, char** argv)
 		/*
 		 for (int s = 0; s < rSteps; s++)
 		 {
-		 if (processRank == rootRank)
+		 if (isRootRank)
 		 {
 		 cout << "s=" << s << endl;
 		 }
@@ -3275,7 +3278,7 @@ int mainMPI(int argc, char** argv)
 		 //DoReducedMetropolisSteps(R, uR, uI, phiR, phiI, 100);
 		 DoMetropolisSteps(R, uR, uI, phiR, phiI, 100);
 		 }
-		 if (processRank == rootRank)
+		 if (isRootRank)
 		 {
 		 //cout << obdms[s] << endl;
 		 }
@@ -3283,14 +3286,14 @@ int mainMPI(int argc, char** argv)
 		 */
 		MPIMethods::ReduceToAverage(obdms);
 		MPIMethods::Barrier();
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			for (double d : obdms)
 			{
 				cout << exp(d) << endl;
 			}
 		}
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			WriteDataToFile(obdms, "OBDM", "rho(r-r')");
 		}
@@ -3321,7 +3324,7 @@ int mainMPI(int argc, char** argv)
 	sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
 	for (currentTime = 0; currentTime <= TOTALTIME; currentTime += dynTimestep)
 	{
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			t.start();
 		}
@@ -3333,13 +3336,12 @@ int mainMPI(int argc, char** argv)
 		ClearVector(nAcceptancesPP);
 		ClearVector(nTrialsPP);
 
-		step++;
 		sys->SetTime(currentTime);
 		sys->SetStep(step);
 		times.push_back(currentTime);
 
 		BroadcastNewParameters(uR, uI, &phiR, &phiI);
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			if (uRList.size() > 0)
 			{
@@ -3372,14 +3374,14 @@ int mainMPI(int argc, char** argv)
 		/// calculate additional system properties ///
 		/// for visualization of dynamic data      ///
 		//////////////////////////////////////////////
-		if (CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP > 0 && (step % CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP == 0 || step == 1))
+		if (CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP > 0 && step % CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP == 0)
 		{
-			if (processRank == rootRank)
+			if (isRootRank)
 			{
 				AppendDataToFile(currentTime, "times");
 			}
 			ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
-			if (processRank == rootRank)
+			if (isRootRank)
 			{
 				if (auto s = dynamic_cast<PhysicalSystems::Bosons1D*>(sys))
 				{
@@ -3485,7 +3487,7 @@ int mainMPI(int argc, char** argv)
 			MC_NSTEPS *= nrOfAcceptParameterTrials;
 			AlignCoordinates(R);
 
-			if (step < 2 || UPDATE_SAMPLES_EVERY_NTH_STEP == 0)
+			if (step == 0 || UPDATE_SAMPLES_EVERY_NTH_STEP == 0)
 			{
 				ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
 				//if (ODE_SOLVER_TYPE == 4 || ODE_SOLVER_TYPE == 6)
@@ -3512,7 +3514,7 @@ int mainMPI(int argc, char** argv)
 
 				//bool update = NeedToUpdateSamples(mcSamples, uR, uI, phiR, phiI);
 				//vector<bool> allUpdateValues = MPIMethods::CollectValues(update);
-				//if (processRank == rootRank)
+				//if (isRootRank)
 				//{
 				//	PrintData(allUpdateValues);
 				//}
@@ -3537,7 +3539,7 @@ int mainMPI(int argc, char** argv)
 				//}
 				//else
 				//{
-				//	if (processRank == rootRank)
+				//	if (isRootRank)
 				//	{
 				//		Log("reuse samples!", WARNING);
 				//	}
@@ -3559,7 +3561,7 @@ int mainMPI(int argc, char** argv)
 			//ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
 
 			double avgAcceptances = MPIMethods::ReduceToAverage(&nAcceptances);
-			if (processRank == rootRank)
+			if (isRootRank)
 			{
 				if (WRITE_SINGLE_FILES == 1 && step % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
 				{
@@ -3591,7 +3593,7 @@ int mainMPI(int argc, char** argv)
 			if (sys->USE_NORMALIZATION_AND_PHASE)
 			{
 				CalculateNextParameters(dynTimestep, R, uR, uI, &phiR, &phiI);
-				if (processRank == rootRank && USE_NORMALIZE_WF == 1)
+				if (isRootRank && USE_NORMALIZE_WF == 1)
 				{
 					//NormalizeWavefunction(sys->GetWf(), &phiR);
 					NormalizeWavefunction(sys->GetExponent(), &phiR);
@@ -3603,13 +3605,13 @@ int mainMPI(int argc, char** argv)
 			{
 				CalculateNextParameters(dynTimestep, R, uR, uI);
 			}
-			if (processRank == rootRank && USE_ADJUST_PARAMETERS == 1)
+			if (isRootRank && USE_ADJUST_PARAMETERS == 1)
 			{
 				AdjustParameters(uR, uI, &phiR, &phiI);
 			}
 			if (USE_PARAMETER_ACCEPTANCE_CHECK == 1)
 			{
-				if (processRank == rootRank)
+				if (isRootRank)
 				{
 					acceptNewParams = AcceptNewParams(uR, uI, phiR, phiI, dynTimestep) ? 1 : 0;
 					if (acceptNewParams != 1)
@@ -3620,7 +3622,7 @@ int mainMPI(int argc, char** argv)
 				MPIMethods::BroadcastValue(&acceptNewParams);
 				if (acceptNewParams != 1)
 				{
-					if (processRank == rootRank)
+					if (isRootRank)
 					{
 						AllLocalEnergyR.pop_back();
 						AllLocalEnergyI.pop_back();
@@ -3646,7 +3648,7 @@ int mainMPI(int argc, char** argv)
 		/// parameters are accepted ///
 		/// write data to file      ///
 		///////////////////////////////
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			// Write current parameters
 			if (WRITE_SINGLE_FILES == 1 && step % WRITE_EVERY_NTH_STEP_TO_FILE == 0)
@@ -3677,7 +3679,7 @@ int mainMPI(int argc, char** argv)
 		int cancel = 0;
 		int configChanged = 0;
 		int setBack = 0;
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			//cout << "#" << localEnergyR << " - " << std::fpclassify(localEnergyR) << endl;
 			if (step % WRITE_EVERY_NTH_STEP_TO_FILE == 0 && FileExist("./stop")) //TODO: do not do this in every timestep. maybe every 30 seconds?
@@ -3741,7 +3743,7 @@ int mainMPI(int argc, char** argv)
 		}
 		if (setBack != 0)
 		{
-			if (processRank == rootRank)
+			if (isRootRank)
 			{
 				Log("SetBackNSteps", ERROR);
 			}
@@ -3749,14 +3751,16 @@ int mainMPI(int argc, char** argv)
 			setBack = 0;
 		}
 
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			t.stop();
 			Log("duration for full timestep: " + to_string(t.duration()) + " ms");
 		}
+
+		step++;
 	}
 
-	//if (processRank == rootRank)
+	//if (isRootRank)
 	//{
 	//	PrintData(uR);
 	//	PrintData(uI);
@@ -3764,7 +3768,7 @@ int mainMPI(int argc, char** argv)
 	//cout << "phiR=" << phiR << ", phiI=" << phiI << endl;
 
 	// Write data of whole simulation to files
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		Log("Write last files ...");
 		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER");
@@ -3785,7 +3789,7 @@ int mainMPI(int argc, char** argv)
 	}
 
 	// Write random number gnerator states to file
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		int tmp = 0;
 		tmp = system(("mkdir " + OUT_DIR + "random").c_str());
@@ -3793,7 +3797,7 @@ int mainMPI(int argc, char** argv)
 	}
 	MPIMethods::Barrier(); // wait for main process to create directory
 	WriteRandomGeneratorStatesToFile("random/state");
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
 		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
@@ -3810,7 +3814,7 @@ int mainMPI(int argc, char** argv)
 	ClearVector(nTrialsPP);
 	if (USE_MEAN_FOR_FINAL_PARAMETERS == 1)
 	{
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			vector<double> finaluR = Mean(uRList);
 			vector<double> finaluI = Mean(uIList);
@@ -3827,7 +3831,7 @@ int mainMPI(int argc, char** argv)
 	BroadcastNewParameters(uR, uI, &phiR, &phiI);
 	AlignCoordinates(R);
 	ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		//WriteDataToFile(additionalSystemProperties, "AdditionalSystemProperties", "g(r), ...");
 		//WriteDataToFile(AllAdditionalSystemProperties, "AllAdditionalSystemProperties", "g(r), ...");
@@ -3836,7 +3840,7 @@ int mainMPI(int argc, char** argv)
 
 	// Write config file for successive simulations
 	AlignCoordinates(R);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		int tmp = 0;
 		tmp = system(("mkdir " + OUT_DIR + "coords").c_str());
@@ -3844,7 +3848,7 @@ int mainMPI(int argc, char** argv)
 	}
 	MPIMethods::Barrier();
 	WriteParticleInputFile("coords/particleconfiguration_" + to_string(N) + "_" + to_string(DIM) + "D_" + to_string(processRank), R);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		MC_NSTEPS = mc_nsteps_original;
 		WriteParticleInputFile("AAFinish_particleconfiguration_" + to_string(N) + "_" + to_string(DIM) + "D", R);
@@ -3899,10 +3903,12 @@ int startVMCSamplerMPI(int argc, char** argv)
 	MPI_Comm_rank(MPI_COMM_WORLD, &processRank);
 	MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
 	MPI_Get_processor_name(processName, &processNameLength);
+	isRootRank = processRank == rootRank;
 
 	MPIMethods::numOfProcesses = numOfProcesses;
 	MPIMethods::processRank = processRank;
 	MPIMethods::rootRank = rootRank;
+	MPIMethods::isRootRank = isRootRank;
 
 	MPIMethods::GetCPUAllocation(false);
 
@@ -3911,7 +3917,7 @@ int startVMCSamplerMPI(int argc, char** argv)
 	////////////////////////////////////////
 
 	RegisterAllConfigItems();
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		Log("Master process started...");
 
@@ -3968,11 +3974,11 @@ int startVMCSamplerMPI(int argc, char** argv)
 	}
 
 	InitCoordinateConfiguration(R);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		WriteParticleInputFile("particleconfiguration", R);
 	}
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		for (int i = 0; i < N_PARAM; i++)
 		{
@@ -3984,7 +3990,7 @@ int startVMCSamplerMPI(int argc, char** argv)
 		//PrintData(uR);
 		//PrintData(uI);
 
-		if (processRank == rootRank)		// && USE_ADJUST_PARAMETERS == true)
+		if (isRootRank)		// && USE_ADJUST_PARAMETERS == true)
 		{
 			//AdjustParameters(uR, uI, &phiR, &phiI);
 		}
@@ -4001,7 +4007,7 @@ int startVMCSamplerMPI(int argc, char** argv)
 	////////////////////////
 
 	Timer t;
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		t.start();
 	}
@@ -4024,25 +4030,25 @@ int startVMCSamplerMPI(int argc, char** argv)
 			ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
 
 			int step = i;
-			if (processRank == rootRank)
+			if (isRootRank)
 			{
 				WriteDataToFile(otherExpectationValues, "otherExpectationValues" + to_string(step), "Ekin, Ekin_cor, Epot, Epot_corr, wf, g(r)_1, ..., g(r)_100");
 			}
 
-			if (processRank == rootRank)
+			if (isRootRank)
 			{
 				energies.push_back(uR);
 				energies[energies.size() - 1].push_back(localEnergyR / (double) N);
 			}
 
-			if (processRank == rootRank)
+			if (isRootRank)
 			{
 				cout << i << ":" << JoinVector(uR) << endl;
 				cout << "localEnergyR/N=" << localEnergyR / (double) N << " (" << otherExpectationValues[0] / (double) N << " + " << otherExpectationValues[1] / (double) N << " + " << endl;
 				cout << t.interval() << "ms " << endl;
 			}
 
-			if (processRank == rootRank)
+			if (isRootRank)
 			{
 				AppendDataToFile(energies.back(), "energies");
 			}
@@ -4052,7 +4058,7 @@ int startVMCSamplerMPI(int argc, char** argv)
 		uR[1] += steps[1];
 	}
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		WriteDataToFile(energies, "energies", "a, energy");
 	}
@@ -4065,7 +4071,7 @@ int startVMCSamplerMPI(int argc, char** argv)
 
 	AlignCoordinates(R);
 	ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		WriteDataToFile(additionalSystemProperties, "AdditionalSystemProperties", "g(r), ...");
 		WriteDataToFile(AllAdditionalSystemProperties, "AllAdditionalSystemProperties", "g(r), ...");
@@ -4292,7 +4298,7 @@ int main(int argc, char **argv)
 			configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPBWhitehead2D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/NUBosonsBulkPBWhitehead3D.config";
 		}
-		//if (processRank == rootRank) //INFO: no processRank assigned so far. this is done in mainMPI or startVMCSamplerMPI
+		//if (isRootRank) //INFO: no processRank assigned so far. this is done in mainMPI or startVMCSamplerMPI
 		//{
 		//	Log("configFilePath: " + configFilePath);
 		//}

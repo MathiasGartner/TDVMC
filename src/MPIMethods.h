@@ -18,6 +18,7 @@ namespace MPIMethods
 int numOfProcesses;
 int processRank;
 int rootRank;
+bool isRootRank;
 
 void Barrier()
 {
@@ -90,7 +91,7 @@ vector<double> ReduceToMinMaxMean(double data)
 	MPI_Reduce(&own, &min, 1, MPI_DOUBLE, MPI_MIN, rootRank, MPI_COMM_WORLD);
 	MPI_Reduce(&own, &max, 1, MPI_DOUBLE, MPI_MAX, rootRank, MPI_COMM_WORLD);
 	MPI_Reduce(&own, &sum, 1, MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		result =
 		{	min, max, sum / (double)numOfProcesses};
@@ -135,7 +136,7 @@ void ReduceToAverage(double* data)
 
 	ownValues = *data;
 	MPI_Reduce(&ownValues, &reducedValues, 1, MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		*data = reducedValues / (double) numOfProcesses;
 	}
@@ -149,7 +150,7 @@ double ReduceToAverage(int* data)
 
 	ownValues = *data;
 	MPI_Reduce(&ownValues, &reducedValues, 1, MPI_INT, MPI_SUM, rootRank, MPI_COMM_WORLD);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		average = reducedValues / (double) numOfProcesses;
 		*data = average;
@@ -165,7 +166,7 @@ double ReduceToAverage(long long* data)
 
 	ownValues = *data;
 	MPI_Reduce(&ownValues, &reducedValues, 1, MPI_LONG_LONG_INT, MPI_SUM, rootRank, MPI_COMM_WORLD);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		average = reducedValues / (double) numOfProcesses;
 		*data = average;
@@ -177,7 +178,7 @@ void ReduceToAverage(double* data, int count)
 {
 	double* reducedValues = new double[count];
 	MPI_Reduce(data, reducedValues, count, MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		for (int i = 0; i < count; i++)
 		{
@@ -193,7 +194,7 @@ void ReduceToAverage(vector<double>& data)
 
 	MPI_Reduce(data.data(), reducedValues, data.size(), MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
 	//INFO: only root process holds the average values from all processes.
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		for (unsigned int i = 0; i < data.size(); i++)
 		{
@@ -211,7 +212,7 @@ void ReduceToAverage(Observables::Observable& data)
 
 	ownValues = data.value;
 	MPI_Reduce(&ownValues, &reducedValues, 1, MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		data.value = reducedValues / (double) numOfProcesses;
 	}
@@ -223,7 +224,7 @@ void ReduceToAverage(Observables::ObservableV& data)
 
 	MPI_Reduce(data.values.data(), reducedValues, data.values.size(), MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
 	//INFO: only root process holds the average values from all processes.
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		for (unsigned int i = 0; i < data.values.size(); i++)
 		{
@@ -245,7 +246,7 @@ void ReduceToAverage(Observables::ObservableVsOnGrid& data)
 			//TODO: just use ReduceToAverage(data.observablesV[j]); ??
 			MPI_Reduce(data.observablesV[j].values.data(), reducedValues, data.observablesV[j].values.size(), MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
 			//INFO: only root process holds the average values from all processes.
-			if (processRank == rootRank)
+			if (isRootRank)
 			{
 				for (unsigned int i = 0; i < data.grid.count; i++)
 				{
@@ -269,7 +270,7 @@ void ReduceToAverage(Observables::ObservableVsOnMultiGrid& data)
 			//TODO: just use ReduceToAverage(data.observablesV[j]); ??
 			MPI_Reduce(data.observablesV[j].values.data(), reducedValues, data.observablesV[j].values.size(), MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
 			//INFO: only root process holds the average values from all processes.
-			if (processRank == rootRank)
+			if (isRootRank)
 			{
 				for (int i = 0; i < data.totalGridPoints; i++)
 				{
@@ -316,7 +317,7 @@ void ReduceToAverage(Observables::ObservableCollection& data)
 //
 //	MPI_Reduce(data.data(), reducedValues.data(), data.size(), MPI_DOUBLE, MPI_SUM, rootRank, MPI_COMM_WORLD);
 //	//INFO: only root process holds the average values from all processes.
-//	if (processRank == rootRank)
+//	if (isRootRank)
 //	{
 //		for (unsigned int i = 0; i < data.size(); i++)
 //		{
@@ -350,7 +351,7 @@ void ReduceToAverage(vector<vector<double> >& data)
 			combinedValues[i] = data[i / size2][i % size2];
 		}
 		ReduceToAverage(combinedValues);
-		if (processRank == rootRank)
+		if (isRootRank)
 		{
 			for (int i = 0; i < totalSize; i++)
 			{
@@ -366,7 +367,7 @@ map<int, int> GatherHistogram(int data)
 	map<int, int> histogram;
 
 	MPI_Gather(&data, 1, MPI_INT, gatheredValues.data(), 1, MPI_INT, rootRank, MPI_COMM_WORLD);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		for (int i = 0; i < numOfProcesses; i++)
 		{

@@ -14,6 +14,7 @@ namespace Test
 
 int numOfProcesses = 1;
 int rootRank = 0;
+bool isRootRank = false;
 int processRank = 0;
 
 void CreateRandomArray(double* arr, int n)
@@ -66,7 +67,7 @@ void CreateRandomVector2D(vector<vector<double> >& v, int n, int randType)
 
 void PrintTimings(vector<double> timings, string message)
 {
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		cout << message << endl;
 		cout << "duration: min = " << to_string(timings[0]) << " ms" << endl;
@@ -87,7 +88,7 @@ void TestMPIData()
 
 	//Broadcast string test
 	str = "test";
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		str = "broadcast!";
 	}
@@ -96,14 +97,14 @@ void TestMPIData()
 	{
 		cout << "ERROR Broadcast string on process " << to_string(processRank) << "!!" << endl;
 	}
-	else if (processRank == rootRank)
+	else if (isRootRank)
 	{
 		cout << "Broadcast string done" << endl;
 	}
 
 	//Broadcast int test
 	intValue = 1;
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		intValue = 3;
 	}
@@ -112,14 +113,14 @@ void TestMPIData()
 	{
 		cout << "ERROR Broadcast int on process " << to_string(processRank) << "!!" << endl;
 	}
-	else if (processRank == rootRank)
+	else if (isRootRank)
 	{
 		cout << "Broadcast int done" << endl;
 	}
 
 	//Broadcast double test
 	value = 1.0;
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		value = 3.3;
 	}
@@ -128,14 +129,14 @@ void TestMPIData()
 	{
 		cout << "ERROR on process " << to_string(processRank) << "!!" << endl;
 	}
-	else if (processRank == rootRank)
+	else if (isRootRank)
 	{
 		cout << "Broadcast double done" << endl;
 	}
 
 	//Broadcast double array test
 	data[0] = 1.0; data[1] = 2.0; data[2] = 3.0;
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		data[0] = 1.1; data[1] = 2.2; data[2] = 3.3;
 	}
@@ -146,14 +147,14 @@ void TestMPIData()
 	{
 		cout << "ERROR on process " << to_string(processRank) << "!!" << endl;
 	}
-	else if (processRank == rootRank)
+	else if (isRootRank)
 	{
 		cout << "Broadcast double array done" << endl;
 	}
 
 	//Broadcast double vector test
 	v = {1.0, 2.0, 3.0};
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		v = {1.1, 2.2, 3.3};
 	}
@@ -164,14 +165,14 @@ void TestMPIData()
 	{
 		cout << "ERROR on process " << to_string(processRank) << "!!" << endl;
 	}
-	else if (processRank == rootRank)
+	else if (isRootRank)
 	{
 		cout << "Broadcast double vector done" << endl;
 	}
 
 	//Broadcast double 2D vector test
 	v2 = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}};
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		v2 = {{1.1, 2.2, 3.3}, {4.4, 5.5, 6.6}};
 	}
@@ -185,7 +186,7 @@ void TestMPIData()
 	{
 		cout << "ERROR on process " << to_string(processRank) << "!!" << endl;
 	}
-	else if (processRank == rootRank)
+	else if (isRootRank)
 	{
 		cout << "Broadcast double 2D vector done" << endl;
 	}
@@ -193,7 +194,7 @@ void TestMPIData()
 	//ReduceToMinMaxMean test
 	value = processRank * 2.0;
 	v = MPIMethods::ReduceToMinMaxMean(value);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		if (v[0] != 0.0 ||
 			v[1] != 2.0 * (numOfProcesses - 1) ||
@@ -207,7 +208,7 @@ void TestMPIData()
 	//ReduceToAverage double test
 	value = processRank * 2.0;
 	MPIMethods::ReduceToAverage(&value);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		if (value != (numOfProcesses - 1.0))
 		{
@@ -219,7 +220,7 @@ void TestMPIData()
 	//ReduceToAverage double array test
 	data[0] = processRank * 1.0; data[1] = processRank * 2.0; data[2] = processRank * 3.0;
 	MPIMethods::ReduceToAverage(data, 3);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		if (data[0] != 0.5 * (numOfProcesses - 1.0) ||
 			data[1] != 1.0 * (numOfProcesses - 1.0) ||
@@ -233,7 +234,7 @@ void TestMPIData()
 	//ReduceToAverage vector test
 	v = {processRank * 1.0, processRank * 2.0, processRank * 3.0};
 	MPIMethods::ReduceToAverage(v);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		if (v[0] != 0.5 * (numOfProcesses - 1.0) ||
 			v[1] != 1.0 * (numOfProcesses - 1.0) ||
@@ -247,7 +248,7 @@ void TestMPIData()
 	//ReduceToAverage 2D vector test
 	v2 = {{processRank * 1.0, processRank * 2.0, processRank * 3.0}, {processRank * 4.0, processRank * 5.0, processRank * 6.0}};
 	MPIMethods::ReduceToAverage(v2);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		if (v2[0][0] != 0.5 * (numOfProcesses - 1.0) ||
 			v2[0][1] != 1.0 * (numOfProcesses - 1.0) ||
@@ -264,7 +265,7 @@ void TestMPIData()
 	//GatherForHistogram int test
 	intValue = processRank % 3;
 	h = MPIMethods::GatherHistogram(intValue);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		//TODO: check more properties of result
 		if (h.size() != 3 ||
@@ -288,7 +289,7 @@ void TestMPITiming(int multiplier, int nrOfRuns)
 	vector<double> v;
 	vector<vector<double> > v2D;
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		cout << endl << "=====================" << endl << endl;
 	}
@@ -329,7 +330,7 @@ void TestMPITiming(int multiplier, int nrOfRuns)
 	t.stop();
 	PrintTimings(MPIMethods::ReduceToMinMaxMean(t.duration()), "RandomVectorTest2D mersenne_64 (" + to_string(n2D) + "x" + to_string(n2D) + ")");
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		cout << endl << "=====================" << endl << endl;
 	}
@@ -374,49 +375,51 @@ void TestMPI(int argc, char *argv[])
 	//MPI::Init(argc, argv);
 	//processRank = MPI::COMM_WORLD.Get_rank();
 	//numOfProcesses = MPI::COMM_WORLD.Get_size();
+    isRootRank = processRank == rootRank;
 
 	MPIMethods::numOfProcesses = numOfProcesses;
 	MPIMethods::processRank = processRank;
 	MPIMethods::rootRank = rootRank;
+	MPIMethods::isRootRank = isRootRank;
 
 
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		cout << endl << "=====================";
 		cout << endl << "=====================" << endl << endl;
 	}
 	MPIMethods::GetCPUAllocation(true);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		cout << endl << "==========TestMPIData()==========";
 		cout << endl << "=================================" << endl << endl;
 	}
 	TestMPIData();
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		cout << endl << "==========TestMPITiming(10, 100)==========";
 		cout << endl << "==========================================" << endl << endl;
 	}
 	TestMPITiming(10, 100);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		cout << endl << "==========TestMPITiming(100, 100)==========";
 		cout << endl << "===========================================" << endl << endl;
 	}
 	TestMPITiming(100, 100);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		cout << endl << "==========TestMPITiming(500, 100)==========";
 		cout << endl << "===========================================" << endl << endl;
 	}
 	TestMPITiming(500, 100);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		cout << endl << "==========TestMPITiming(1000, 100)==========";
 		cout << endl << "============================================" << endl << endl;
 	}
 	TestMPITiming(1000, 100);
-	if (processRank == rootRank)
+	if (isRootRank)
 	{
 		cout << endl << "=====================";
 		cout << endl << "=====================" << endl << endl;

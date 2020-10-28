@@ -17,6 +17,10 @@ public:
 	int count;
 	double spacing;
 	vector<double> grid;
+	vector<double> gridCenterPoints;
+
+private:
+	void InitGridCenterPoints();
 
 public:
 	Grid();

@@ -24,7 +24,7 @@ void ObservableVsOnGrid::ClearValues()
 
 void ObservableVsOnGrid::InitGrid(double min, double max, double spacing)
 {
-	grid.Init(min, max, spacing);
+	this->grid.Init(min, max, spacing);
 }
 
 void ObservableVsOnGrid::InitGrid(vector<double> g)
