@@ -67,7 +67,7 @@ double Bosons1D::CalculateOBDMKernel(vector<double>& r, vector<vector<double> >&
 	vector<double> tmpSplineSums;
 	vector<double> tmpLocalOperators;
 
-	for (int part = 0; part < 1; part++)
+	for (int part = 0; part < 2; part++)
 	{
 		//according to Bosons1D::CalculateLocalOperators(vector<vector<double> >& R)
 		int bin;
@@ -127,8 +127,8 @@ double Bosons1D::CalculateOBDMKernel(vector<double>& r, vector<vector<double> >&
 	}
 
 	//result = exp(sumParts[0] + sumParts[1] + 2.0 * phiR);
-	//result = sumParts[0] + sumParts[1];
-	result = sumParts[0];
+	result = sumParts[0] + sumParts[1];
+	//result = sumParts[0];
 
 	return result;
 }
@@ -216,12 +216,14 @@ void Bosons1D::InitSystem()
 	//cout << "nodePointSpacing=" << nodePointSpacing << endl;
 
 	pairDistribution.name = "pairDistribution";
+	pairDistribution.grid.name = "r_ij";
 	//pairDistribution.InitGrid(0.0, halfLength, 0.05);
 	pairDistribution.InitGrid(0.0, nodes[nodes.size() - 4], nodes[nodes.size() - 4] / numOfPairDistributionValues);
 	pairDistribution.InitScaling();
 	pairDistribution.InitObservables( { "g_2(r_ij)" });
 
 	structureFactor.name = "structureFactor";
+	structureFactor.grid.name = "k";
 	structureFactor.InitGrid(kNorms);
 	structureFactor.InitObservables( { "S(k)" });
 
@@ -382,14 +384,14 @@ void Bosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
 				if (i < n)
 				{
 					//Gauss
-					//double rnia = rni / a;
-					//potentialIntern += b * exp(-(rnia * rnia) / 2.0);
+					double rnia = rni / a;
+					potentialIntern += b * exp(-(rnia * rnia) / 2.0);
 
 					//square well
-					if (rni < a)
-					{
-						potentialIntern += b;
-					}
+					//if (rni < a)
+					//{
+					//	potentialIntern += b;
+					//}
 
 					//Rydberg U_0 / (1 + (r/R_0)^6))
 					//R_0 = a, U_0 = b;

@@ -21,9 +21,9 @@
 
 using namespace std;
 
-const int exportPrecision = 16;
-const int exportPrecisionSc = 16;
-const int colWidth = 28;
+const int exportPrecision = 15;
+const int exportPrecisionSc = 15;
+const int colWidth = 24;
 const string fileExtension = ".dat";
 
 template<typename T> string JoinVector(const vector<T>& v, int everyNth = 1, bool fixedForm = false)

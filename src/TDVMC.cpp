@@ -3103,6 +3103,21 @@ int mainMPI(int argc, char** argv)
 
 	sys->InitSystem();
 	PostSystemInit();
+	//Write grid files for observables
+	if (processRank == rootRank)
+	{
+		if (auto s = dynamic_cast<PhysicalSystems::Bosons1D*>(sys))
+		{
+			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+			{
+				WriteDataToFile(o->grid.grid, "gr_grid", o->grid.name);
+			}
+			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+			{
+				WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
+			}
+		}
+	}
 
 	if (processRank == rootRank)
 	{
@@ -3192,45 +3207,87 @@ int mainMPI(int argc, char** argv)
 			//}
 		}
 	}
-	bool calcOBDM = true;
+	bool calcOBDM = false;
 	if (calcOBDM)
 	{
+		AlignCoordinates(R);
+		BroadcastNewParameters(uR, uI, &phiR, &phiI);
 		vector<vector<double> > values;
-		dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->SetParticleStartIndexForReducedSampling(1);
+		//dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->SetParticleStartIndexForReducedSampling(1);
 		sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
 		R[0][0] = 0.0;
 		vector<double> r = { 0 };
 		vector<double> obdms;
-		int rSteps = 10;
+		vector<int> obdmSampleCount;
+		int rSteps = 50;
 		double rStep = 1.0;
-		int obdm_mcsteps = 100000;
+		int obdm_mcsteps = 2e4;
 		InitVector(obdms, rSteps, 0.0);
-		DoReducedMetropolisSteps(R, uR, uI, phiR, phiI, 10000);
+		InitVector(obdmSampleCount, rSteps, 0);
+		//DoReducedMetropolisSteps(R, uR, uI, phiR, phiI, 100000);
+		DoMetropolisSteps(R, uR, uI, phiR, phiI, 10000);
+		for (int i = 0; i < obdm_mcsteps; i++)
+		{
+			if (processRank == rootRank && i % 100 == 0)
+			{
+				cout << i << endl;
+			}
+			sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
+			double exponent = sys->GetExponent();
+			for (int k = 0; k < 10; k++)
+			{
+				int p = randomParticleIndex();
+				int s = randomInt(rSteps);
+				double r = s * rStep;
+				R[p][0] += r;
+				sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
+				double exponentR = sys->GetExponent();
+				double exponentDiff = exponentR - exponent;
+				obdms[s] += exponentDiff;
+				obdmSampleCount[s]++;
+				R[p][0] -= r;
+			}
+			DoMetropolisSteps(R, uR, uI, phiR, phiI, 100);
+		}
 		for (int s = 0; s < rSteps; s++)
 		{
-			if (processRank == rootRank)
-			{
-				cout << "s=" << s << endl;
-			}
-			r[0] = (s+1) * rStep;
-			for (int i = 0; i < obdm_mcsteps; i++)
-			{
-				double obdm = dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->CalculateOBDMKernel(r, R, uR, uI, phiR, phiI);
-				obdms[s] += obdm / obdm_mcsteps;
-				DoReducedMetropolisSteps(R, uR, uI, phiR, phiI, 100);
-			}
-			if (processRank == rootRank)
-			{
-				//cout << obdms[s] << endl;
-			}
+			obdms[s] /= obdmSampleCount[s];
 		}
+		/*
+		 for (int s = 0; s < rSteps; s++)
+		 {
+		 if (processRank == rootRank)
+		 {
+		 cout << "s=" << s << endl;
+		 }
+		 r[0] = s * rStep;
+		 for (int i = 0; i < obdm_mcsteps; i++)
+		 {
+		 R[0][0] = 0.0;
+		 sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
+		 double wf0 = sys->GetExponent();
+		 R[0][0] = r[0];
+		 sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
+		 double wfr = sys->GetExponent();
+		 double obdm = wf0 - wfr;
+		 //double obdm = dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->CalculateOBDMKernel(r, R, uR, uI, phiR, phiI);
+		 obdms[s] += obdm / obdm_mcsteps;
+		 //DoReducedMetropolisSteps(R, uR, uI, phiR, phiI, 100);
+		 DoMetropolisSteps(R, uR, uI, phiR, phiI, 100);
+		 }
+		 if (processRank == rootRank)
+		 {
+		 //cout << obdms[s] << endl;
+		 }
+		 }
+		 */
 		MPIMethods::ReduceToAverage(obdms);
 		MPIMethods::Barrier();
 		if (processRank == rootRank)
 		{
-			for(double d : obdms)
+			for (double d : obdms)
 			{
-				cout << d << endl;
+				cout << exp(d) << endl;
 			}
 		}
 		if (processRank == rootRank)
@@ -3317,6 +3374,10 @@ int mainMPI(int argc, char** argv)
 		//////////////////////////////////////////////
 		if (CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP > 0 && (step % CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP == 0 || step == 1))
 		{
+			if (processRank == rootRank)
+			{
+				AppendDataToFile(currentTime, "times");
+			}
 			ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
 			if (processRank == rootRank)
 			{
@@ -4140,10 +4201,10 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "Bosons1D")
 		{
-			//configFilePath = "/home/gartner/Sources/TDVMC/config/B1D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/B1D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/SW2D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/SW1D_Carleo.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/obdm_test.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/obdm_test.config";
 		}
 		else if (SYSTEM_TYPE == "Bosons1D0th")
 		{

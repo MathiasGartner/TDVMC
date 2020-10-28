@@ -695,7 +695,6 @@ void SetFileFormat(ofstream& f)
 {
 	f.precision(exportPrecisionSc);
 	f << std::scientific;
-	f << left;
 }
 
 void WriteLineToFile(ofstream& f, double data)
