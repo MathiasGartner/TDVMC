@@ -384,14 +384,14 @@ void Bosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
 				if (i < n)
 				{
 					//Gauss
-					double rnia = rni / a;
-					potentialIntern += b * exp(-(rnia * rnia) / 2.0);
+					//double rnia = rni / a;
+					//potentialIntern += b * exp(-(rnia * rnia) / 2.0);
 
 					//square well
-					//if (rni < a)
-					//{
-					//	potentialIntern += b;
-					//}
+					if (rni < a)
+					{
+						potentialIntern += b;
+					}
 
 					//Rydberg U_0 / (1 + (r/R_0)^6))
 					//R_0 = a, U_0 = b;
@@ -596,7 +596,7 @@ void Bosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R, v
 	vector<double> vecrni(DIM);
 
 	//pairDistribution
-	double weight = 1.0 / ((double)N / 2.0);
+	double weight = 1.0 / ((double)N);
 	for (int i = 0; i < N; i++)
 	{
 		for (int j = 0; j < i; j++)

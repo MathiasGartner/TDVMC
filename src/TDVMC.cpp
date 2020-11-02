@@ -3093,20 +3093,25 @@ int mainMPI(int argc, char** argv)
 			//AdjustParameters(uR, uI, &phiR, &phiI);
 		}
 
-		WriteDataToFile(uR, "parametersR0", "parameterR");
-		WriteDataToFile(uI, "parametersI0", "parameterI");
+		//write start parameters
+		WriteDataToFile(uR, "ParametersR0", "uR_k...");
+		WriteDataToFile(uI, "ParametersI0", "uI_k...");
 
-		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER", WRITE_EVERY_NTH_STEP_TO_FILE);
-		WriteDataToFile(AllLocalEnergyI, "AllLocalEnergyI", "EI", WRITE_EVERY_NTH_STEP_TO_FILE);
-		WriteDataToFile(AllLocalOperators, "AllLocalOperators", "<O_k>", WRITE_EVERY_NTH_STEP_TO_FILE);
-		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", "kinetic, potential, wf, g(r)", WRITE_EVERY_NTH_STEP_TO_FILE);
-		WriteDataToFile(AllParametersR, "AllParametersR", "uR", WRITE_EVERY_NTH_STEP_TO_FILE);
-		WriteDataToFile(AllParametersI, "AllParametersI", "uI", WRITE_EVERY_NTH_STEP_TO_FILE);
+		//create empty files
+		vector<double> dummy;
+		WriteDataToFile(dummy, "LocalEnergyR", "E^R");
+		WriteDataToFile(dummy, "LocalEnergyI", "E^I");
+		WriteDataToFile(dummy, "LocalOperators", "<O_k>...");
+		WriteDataToFile(dummy, "OtherExpectationValues", "kinetic, potential, wf, g(r)");
+		WriteDataToFile(dummy, "ParametersR", "uR_k...");
+		WriteDataToFile(dummy, "ParametersI", "uI_k...");
+		WriteDataToFile(dummy, "times", "t");
 	}
 
 	sys->InitSystem();
 	PostSystemInit();
 	//Write grid files for observables
+	//INFO: for now only implemented for Bosons1D
 	if (isRootRank)
 	{
 		if (auto s = dynamic_cast<PhysicalSystems::Bosons1D*>(sys))
@@ -3378,7 +3383,7 @@ int mainMPI(int argc, char** argv)
 		{
 			if (isRootRank)
 			{
-				AppendDataToFile(currentTime, "times");
+				AppendDataToFile(currentTime, "timesAdditional");
 			}
 			ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
 			if (isRootRank)
@@ -3666,12 +3671,13 @@ int mainMPI(int argc, char** argv)
 				//WriteDataToFile(AllParametersR, "AllParametersR", "uR", WRITE_EVERY_NTH_STEP_TO_FILE);
 				//WriteDataToFile(AllParametersI, "AllParametersI", "uI", WRITE_EVERY_NTH_STEP_TO_FILE);
 
-				AppendDataToFile(AllLocalEnergyR.back(), "AllLocalEnergyR");
-				AppendDataToFile(AllLocalEnergyI.back(), "AllLocalEnergyI");
-				AppendDataToFile(AllLocalOperators.back(), "AllLocalOperators");
-				AppendDataToFile(AllOtherExpectationValues.back(), "AllOtherExpectationValues");
-				AppendDataToFile(AllParametersR.back(), "AllParametersR");
-				AppendDataToFile(AllParametersI.back(), "AllParametersI");
+				AppendDataToFile(currentTime, "timesSystem");
+				AppendDataToFile(AllLocalEnergyR.back(), "LocalEnergyR");
+				AppendDataToFile(AllLocalEnergyI.back(), "LocalEnergyI");
+				AppendDataToFile(AllLocalOperators.back(), "LocalOperators");
+				AppendDataToFile(AllOtherExpectationValues.back(), "OtherExpectationValues");
+				AppendDataToFile(AllParametersR.back(), "ParametersR");
+				AppendDataToFile(AllParametersI.back(), "ParametersI");
 			}
 		}
 
@@ -3785,7 +3791,7 @@ int mainMPI(int argc, char** argv)
 		WriteDataToFile(AllParametersR, "AllParametersR_every100th", "uR", 100);
 		WriteDataToFile(AllParametersI, "AllParametersI_every100th", "uI", 100);
 
-		WriteDataToFile(times, "AA_times", "t");
+		WriteDataToFile(times, "Alltimes", "t");
 	}
 
 	// Write random number gnerator states to file
