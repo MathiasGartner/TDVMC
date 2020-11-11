@@ -186,6 +186,7 @@ double VectorDisplacement(vector<double>& ri, vector<double>& rj, vector<double>
 	return norm;
 }
 
+//INFO: returns nearest image of r in the range [-L/2, L/2]
 double GetCoordinateNIC(double r)
 {
 	int k;

@@ -596,7 +596,7 @@ void Bosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R, v
 	vector<double> vecrni(DIM);
 
 	//pairDistribution
-	double weight = 1.0 / ((double)N);
+	double weight = 1.0 / ((double)(N - 1));
 	for (int i = 0; i < N; i++)
 	{
 		for (int j = 0; j < i; j++)
@@ -604,7 +604,6 @@ void Bosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R, v
 			rni = VectorDisplacementNIC_DIM(R[i], R[j], vecrni);
 			if (rni < pairDistribution.grid.max)
 			{
-				//pairDistribution.AddToHistogram(0, rni, 1.0);
 				pairDistribution.AddToHistogram(0, rni, weight);
 			}
 		}
@@ -623,6 +622,7 @@ void Bosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R, v
 		{
 			for (unsigned int kn = 0; kn < kValues[k].size(); kn++)
 			{
+				//TODO: check this for 3D, 2D, 1D
 				sumSCos[k] += cos(kValues[k][kn][0] * R[i][0] + kValues[k][kn][1] * R[i][1] + kValues[k][kn][2] * R[i][2]);
 				sumSSin[k] += sin(kValues[k][kn][0] * R[i][0] + kValues[k][kn][1] * R[i][1] + kValues[k][kn][2] * R[i][2]);
 			}

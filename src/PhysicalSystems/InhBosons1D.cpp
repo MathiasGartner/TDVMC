@@ -54,6 +54,7 @@ void InhBosons1D::InitSystem()
 	halfLength = LBOX / 2.0;
 	maxDistance = pc.nodes[pc.nodes.size() - 4]; //INFO: only valid for u_2(rij) that is defined up to L/2
 
+	//INFO: use same nodes and spf defined in the interval [0, L/2] only for symmetric external potentials
 	spf.numberOfSplines = spf.nodes.size() - (3 + 1); //3rd order splines -(d+1)
 	spf.splineWeights = SplineFactory::GetWeights(spf.nodes);
 	SplineFactory::SetBoundaryConditions3_1D_OR_2(spf.nodes, spf.bcFactorsStart, true);
@@ -131,11 +132,13 @@ void InhBosons1D::InitSystem()
 	//cout << "nodePointSpacing=" << nodePointSpacing << endl;
 
 	density.name = "density";
+	density.grid.name = "r";
 	density.InitGrid(0.0, halfLength, halfLength / 100.0);
 	density.InitScaling();
 	density.InitObservables( { "rho(r)" });
 
 	pairDistribution.name = "pairDistribution";
+	pairDistribution.grid.name = "r_ij";
 	//pairDistribution.InitGrid(0.0, halfLength, 0.05);
 	//pairDistribution.InitGrid(0.0, pc.nodes[pc.nodes.size() - 4], pc.nodes[pc.nodes.size() - 4] / 100.0);
 	pairDistribution.InitGrid(0.0, halfLength, halfLength / 100.0);
@@ -143,6 +146,7 @@ void InhBosons1D::InitSystem()
 	pairDistribution.InitObservables( { "g_2(r_ij)" });
 
 	structureFactor.name = "structureFactor";
+	structureFactor.grid.name = "k";
 	structureFactor.InitGrid(kNorms);
 	structureFactor.InitObservables( { "S(k)" });
 
@@ -214,7 +218,7 @@ void InhBosons1D::CalculateLocalOperators(vector<vector<double> >& R)
 	{
 		//INFO: SingleParticleFunction
 		r = abs(GetCoordinateNIC(R[n][0])); //INFO: only for 1D!
-		if (r < maxDistance)
+		if (r <= maxDistance)
 		{
 			bin = GetBinIndex(spf.nodes, r);
 			r2 = r * r;
@@ -229,7 +233,7 @@ void InhBosons1D::CalculateLocalOperators(vector<vector<double> >& R)
 		for (int i = 0; i < n; i++)
 		{
 			rni = VectorDisplacementNIC_DIM(R[n], R[i], vecrni);
-			if (rni < maxDistance)
+			if (rni <= maxDistance)
 			{
 				bin = GetBinIndex(pc.nodes, rni);
 				rni2 = rni * rni;
@@ -273,10 +277,10 @@ void InhBosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
 	//potential parameters (a -> width; b -> height)
 	double potentialRange = params[0];
 	double potentialStrength = params[1];
-	if (params.size() > 2 && this->time >= params[2])
+	if (params.size() > 4 && this->time >= params[4])
 	{
-		potentialRange = params[3];
-		potentialStrength = params[4];
+		potentialRange = params[5];
+		potentialStrength = params[6];
 	}
 
 	ClearVector(spf.splineSumsD);
@@ -324,7 +328,7 @@ void InhBosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
 		{
 			rni = VectorDisplacementNIC_DIM(R[n], R[i], vecrni);
 
-			if (rni < maxDistance)
+			if (rni <= maxDistance)
 			{
 				//internal potential energy
 				if (i < n)
@@ -407,8 +411,15 @@ vector<double> InhBosons1D::GetCenterOfMass(vector<vector<double> >& R)
 double InhBosons1D::GetExternalPotential(vector<double>& r)
 {
 	double value;
-	value = cos(2.0 * M_PI * r[0] / (maxDistance / 2.0));
-	value *= 2.0;
+	double potentialFrequency = params[2];
+	double potentialStrength = params[3];
+	if (params.size() > 4 && this->time >= params[4])
+	{
+		potentialFrequency = params[7];
+		potentialStrength = params[8];
+	}
+	value = cos(2.0 * M_PI * r[0] / (maxDistance / potentialFrequency));
+	value *= potentialStrength;
 	//value = 0.0;
 	return value;
 }
@@ -599,6 +610,7 @@ void InhBosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R
 	}
 
 	//pairDistribution
+	double weight = 1.0 / ((double)(N - 1));
 	for (int i = 0; i < N; i++)
 	{
 		for (int j = 0; j < i; j++)
@@ -606,7 +618,7 @@ void InhBosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R
 			rni = VectorDisplacementNIC_DIM(R[i], R[j], vecrni);
 			if (rni < pairDistribution.grid.max)
 			{
-				pairDistribution.AddToHistogram(0, rni, 1.0);
+				pairDistribution.AddToHistogram(0, rni, weight);
 			}
 		}
 	}
@@ -681,7 +693,7 @@ void InhBosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& 
 
 	//INFO: SingleParticleFunction
 	r = abs(GetCoordinateNIC(oldPosition[0])); //INFO: only for 1D!
-	if (r < maxDistance)
+	if (r <= maxDistance)
 	{
 		bin = GetBinIndex(spf.nodes, r);
 		r2 = r * r;
@@ -692,7 +704,7 @@ void InhBosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& 
 		}
 	}
 	r = abs(GetCoordinateNIC(R[changedParticleIndex][0])); //INFO: only for 1D!
-	if (r < maxDistance)
+	if (r <= maxDistance)
 	{
 		bin = GetBinIndex(spf.nodes, r);
 		r2 = r * r;
@@ -709,7 +721,7 @@ void InhBosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& 
 		if (i != changedParticleIndex)
 		{
 			rni = VectorDisplacementNIC_DIM(R[i], oldPosition, vecrni);
-			if (rni < maxDistance)
+			if (rni <= maxDistance)
 			{
 				bin = GetBinIndex(pc.nodes, rni);
 				rni2 = rni * rni;
@@ -725,7 +737,7 @@ void InhBosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& 
 				cout << "!!!" << endl;
 			}
 			rni = VectorDisplacementNIC_DIM(R[i], R[changedParticleIndex], vecrni);
-			if (rni < maxDistance)
+			if (rni <= maxDistance)
 			{
 				bin = GetBinIndex(pc.nodes, rni);
 				rni2 = rni * rni;

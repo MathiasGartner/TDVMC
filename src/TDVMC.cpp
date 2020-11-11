@@ -3125,6 +3125,21 @@ int mainMPI(int argc, char** argv)
 				WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
 			}
 		}
+		else if (auto s = dynamic_cast<PhysicalSystems::InhBosons1D*>(sys))
+		{
+			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+			{
+				WriteDataToFile(o->grid.grid, "rho_grid", o->grid.name);
+			}
+			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+			{
+				WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
+			}
+			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
+			{
+				WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
+			}
+		}
 	}
 
 	if (isRootRank)
@@ -3386,6 +3401,7 @@ int mainMPI(int argc, char** argv)
 				AppendDataToFile(currentTime, "timesAdditional");
 			}
 			ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
+			//TODO: generalize this for all types of IPhysicalSystems and all types of IObservable
 			if (isRootRank)
 			{
 				if (auto s = dynamic_cast<PhysicalSystems::Bosons1D*>(sys))
@@ -4173,7 +4189,7 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BulkSplines";
 		//SYSTEM_TYPE = "BulkSplinesScaled";
 		//SYSTEM_TYPE = "HeDrop";
-		SYSTEM_TYPE = "Bosons1D";
+		//SYSTEM_TYPE = "Bosons1D";
 		//SYSTEM_TYPE = "Bosons1D0th";
 		//SYSTEM_TYPE = "Bosons1D4th";
 		//SYSTEM_TYPE = "Bosons1DSp";
@@ -4183,7 +4199,7 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BosonsDiscrete";
 		//SYSTEM_TYPE = "BosonMixtureCluster_4thorder";
 		//SYSTEM_TYPE = "BosonMixtureCluster";
-		//SYSTEM_TYPE = "InhBosons1D";
+		SYSTEM_TYPE = "InhBosons1D";
 		//SYSTEM_TYPE = "NUBosonsBulk";
 		//SYSTEM_TYPE = "NUBosonsBulkPB";
 		//SYSTEM_TYPE = "NUBosonsBulkPBBox";
