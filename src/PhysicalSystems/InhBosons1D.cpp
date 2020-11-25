@@ -16,6 +16,8 @@ InhBosons1D::InhBosons1D(vector<double>& params, string configDirectory) :
 	maxDistance = 0;
 
 	numOfOtherLocalOperators = 0;
+	numOfPairDistributionValues = 0;
+	numOfDensityValues = 0;
 	numOfkValues = 0;
 
 	exponentNew = 0;
@@ -43,6 +45,16 @@ void InhBosons1D::SetNodesPC(vector<double> n)
 	ExtendNodes(this->pc.nodes);
 }
 
+void InhBosons1D::SetPairDistributionBinCount(double n)
+{
+	this->numOfPairDistributionValues = n;
+}
+
+void InhBosons1D::SetDensityBinCount(double n)
+{
+	this->numOfDensityValues = n;
+}
+
 void InhBosons1D::InitSystem()
 {
 	numOfOtherLocalOperators = 4; //INFO: potentialIntern, potentialInternComplex, potentialExtern, potentialExternComplex
@@ -52,9 +64,24 @@ void InhBosons1D::InitSystem()
 	numOfAdditionalSystemProperties = numOfOtherExpectationValues;
 
 	halfLength = LBOX / 2.0;
+
+	if (spf.nodes.empty())
+	{
+		//INFO: BC
+		//this is for SetBoundaryConditions3_1D_OR_2 and SetBoundaryConditions3_1D_CO_2
+		//and an even number of parameters
+		int nparam_2 = N_PARAM / 2;
+		for (int i = -3; i < nparam_2 + 3; i++)
+		{
+			spf.nodes.push_back((i * halfLength) / ((double) nparam_2 - 1));
+			pc.nodes.push_back((i * halfLength) / ((double) nparam_2 - 1));
+		}
+	}
+
 	maxDistance = pc.nodes[pc.nodes.size() - 4]; //INFO: only valid for u_2(rij) that is defined up to L/2
 
-	//INFO: use same nodes and spf defined in the interval [0, L/2] only for symmetric external potentials
+	//INFO: use same nodes and spf defined in the interval [0, L/2] for symmetric external potentials
+	//INFO: if non symmetric external potential this has to be implemented differently
 	spf.numberOfSplines = spf.nodes.size() - (3 + 1); //3rd order splines -(d+1)
 	spf.splineWeights = SplineFactory::GetWeights(spf.nodes);
 	SplineFactory::SetBoundaryConditions3_1D_OR_2(spf.nodes, spf.bcFactorsStart, true);
@@ -133,7 +160,7 @@ void InhBosons1D::InitSystem()
 
 	density.name = "density";
 	density.grid.name = "r";
-	density.InitGrid(0.0, halfLength, halfLength / 100.0);
+	density.InitGrid(0.0, halfLength, halfLength / numOfDensityValues);
 	density.InitScaling();
 	density.InitObservables( { "rho(r)" });
 
@@ -141,7 +168,7 @@ void InhBosons1D::InitSystem()
 	pairDistribution.grid.name = "r_ij";
 	//pairDistribution.InitGrid(0.0, halfLength, 0.05);
 	//pairDistribution.InitGrid(0.0, pc.nodes[pc.nodes.size() - 4], pc.nodes[pc.nodes.size() - 4] / 100.0);
-	pairDistribution.InitGrid(0.0, halfLength, halfLength / 100.0);
+	pairDistribution.InitGrid(0.0, halfLength, halfLength / numOfPairDistributionValues);
 	pairDistribution.InitScaling();
 	pairDistribution.InitObservables( { "g_2(r_ij)" });
 
@@ -338,9 +365,20 @@ void InhBosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
 					//potentialIntern += b * exp(-(rnia * rnia) / 2.0);
 
 					//square well
+					//if (rni < potentialRange)
+					//{
+					//	potentialIntern += potentialStrength;
+					//}
 					if (rni < potentialRange)
 					{
-						potentialIntern += potentialStrength;
+						if (rni < potentialRange / 2.0)
+						{
+							potentialIntern += potentialStrength;
+						}
+						else
+						{
+							potentialIntern -= potentialStrength;
+						}
 					}
 
 					//Rydberg U_0 / (1 + (r/R_0)^6))
@@ -411,14 +449,14 @@ vector<double> InhBosons1D::GetCenterOfMass(vector<vector<double> >& R)
 double InhBosons1D::GetExternalPotential(vector<double>& r)
 {
 	double value;
-	double potentialFrequency = params[2];
+	double potentialWidth = params[2];
 	double potentialStrength = params[3];
 	if (params.size() > 4 && this->time >= params[4])
 	{
-		potentialFrequency = params[7];
+		potentialWidth = params[7];
 		potentialStrength = params[8];
 	}
-	value = cos(2.0 * M_PI * r[0] / (maxDistance / potentialFrequency));
+	value = cos(2.0 * M_PI * r[0] / potentialWidth);
 	value *= potentialStrength;
 	//value = 0.0;
 	return value;

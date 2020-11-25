@@ -117,6 +117,7 @@ int USE_ADJUST_PARAMETERS;
 int UPDATE_SAMPLES_EVERY_NTH_STEP;
 double UPDATE_SAMPLES_PERCENT;
 int GR_BIN_COUNT;
+int RHO_BIN_COUNT;
 int USE_NURBS;
 vector<double> NURBS_GRID;
 vector<int> PARTICLE_TYPES;
@@ -398,6 +399,7 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("UPDATE_SAMPLES_EVERY_NTH_STEP", &UPDATE_SAMPLES_EVERY_NTH_STEP, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("UPDATE_SAMPLES_PERCENT", &UPDATE_SAMPLES_PERCENT, ConfigItemType::DOUBLE, true));
 	configItems.push_back(ConfigItem("GR_BIN_COUNT", &GR_BIN_COUNT, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("RHO_BIN_COUNT", &RHO_BIN_COUNT, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("USE_NURBS", &USE_NURBS, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("NURBS_GRID", NURBS_GRID, ConfigItemType::ARR_DOUBLE));
 	configItems.push_back(ConfigItem("PARTICLE_TYPES", PARTICLE_TYPES, ConfigItemType::ARR_INT));
@@ -2851,6 +2853,11 @@ bool InitializePhysicalSystem()
 	else if (SYSTEM_TYPE == "BosonsBulk")
 	{
 		sys = new PhysicalSystems::BosonsBulk(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PhysicalSystems::BosonsBulk*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<PhysicalSystems::BosonsBulk*>(sys)->SetPairDistributionBinCount(GR_BIN_COUNT);
 	}
 	else if (SYSTEM_TYPE == "BosonsBulkDamped")
 	{
@@ -2919,6 +2926,8 @@ bool InitializePhysicalSystem()
 			dynamic_cast<PhysicalSystems::InhBosons1D*>(sys)->SetNodesSPF(NURBS_GRID);
 			dynamic_cast<PhysicalSystems::InhBosons1D*>(sys)->SetNodesPC(NURBS_GRID);
 		}
+		dynamic_cast<PhysicalSystems::InhBosons1D*>(sys)->SetPairDistributionBinCount(GR_BIN_COUNT);
+		dynamic_cast<PhysicalSystems::InhBosons1D*>(sys)->SetDensityBinCount(RHO_BIN_COUNT);
 	}
 	else if (SYSTEM_TYPE == "NUBosonsBulk")
 	{
@@ -3115,6 +3124,17 @@ int mainMPI(int argc, char** argv)
 	if (isRootRank)
 	{
 		if (auto s = dynamic_cast<PhysicalSystems::Bosons1D*>(sys))
+		{
+			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+			{
+				WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
+			}
+			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+			{
+				WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
+			}
+		}
+		else if (auto s = dynamic_cast<PhysicalSystems::BosonsBulk*>(sys))
 		{
 			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
 			{
@@ -3438,6 +3458,17 @@ int mainMPI(int argc, char** argv)
 					}
 				}
 				else if (auto s = dynamic_cast<PhysicalSystems::Bosons1DSp*>(sys))
+				{
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "gr");
+					}
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "sk");
+					}
+				}
+				else if (auto s = dynamic_cast<PhysicalSystems::BosonsBulk*>(sys))
 				{
 					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
 					{
@@ -4193,6 +4224,7 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "Bosons1D0th";
 		//SYSTEM_TYPE = "Bosons1D4th";
 		//SYSTEM_TYPE = "Bosons1DSp";
+		//SYSTEM_TYPE = "BosonsBulk";
 		//SYSTEM_TYPE = "BosonCluster";
 		//SYSTEM_TYPE = "BosonClusterWithLog";
 		//SYSTEM_TYPE = "BosonClusterWithLogParam";
@@ -4248,7 +4280,7 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "BosonsBulk")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonsBulk1D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonsBulk2D.config";
 		}
 		else if (SYSTEM_TYPE == "BosonsBulkDamped")
 		{
@@ -4286,7 +4318,8 @@ int main(int argc, char **argv)
 		else if (SYSTEM_TYPE == "InhBosons1D")
 		{
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhSW1D.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/InhSW1D10.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhSW1D10.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/InhBosons1D.config";			
 		}
 		else if (SYSTEM_TYPE == "NUBosonsBulk")
 		{
@@ -4360,7 +4393,10 @@ int main(int argc, char **argv)
 		}
 	}
 
-	//Log("exit");
+	if (isRootRank) 
+	{
+		Log("exit");
+	}
 	return val;
 }
 

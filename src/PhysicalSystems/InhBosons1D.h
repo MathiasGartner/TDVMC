@@ -32,6 +32,8 @@ private:
 	int numOfOtherLocalOperators;
 	vector<double> otherLocalOperators;
 
+	int numOfPairDistributionValues;
+	int numOfDensityValues;
 	vector<vector<vector<double> > > kValues;
 	vector<double> kNorms;
 	int numOfkValues;
@@ -51,6 +53,8 @@ private:
 public:
 	void SetNodesSPF(vector<double> n);
 	void SetNodesPC(vector<double> n);
+	void SetPairDistributionBinCount(double n);
+	void SetDensityBinCount(double n);
 
 //Implementation of IPhysicalSystem
 public:

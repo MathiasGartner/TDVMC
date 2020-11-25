@@ -141,22 +141,25 @@ void Bosons1D::InitSystem()
 	numOfOtherExpectationValues = 9;
 	numOfAdditionalSystemProperties = numOfOtherExpectationValues;
 
-	//INFO: BC
-	//numberOfSplines = N_PARAM + 1; //BC3.1D.CO.1
-	//numberOfSplines = N_PARAM + 2; //BC3.1D.CO.2
-	//numberOfSplines = N_PARAM + 3; //BC3.1D.CO.2 + BC3.1D.OR.1
-	numberOfSplines = nodes.size() - 3 - 1; //3rd order splines -(d+1)
 	halfLength = LBOX / 2.0;
-	maxDistance = nodes[nodes.size() - 4];
 
 	if (nodes.empty())
 	{
+		//INFO: BC
+		//this is for SetBoundaryConditions3_1D_OR_2 and SetBoundaryConditions3_1D_CO_2
 		for (int i = -3; i < N_PARAM + 3; i++)
 		{
 			nodes.push_back((i * halfLength) / ((double) N_PARAM - 1));
 		}
 	}
 	splineWeights = SplineFactory::GetWeights(nodes);
+
+	//INFO: BC
+	//numberOfSplines = N_PARAM + 1; //BC3.1D.CO.1
+	//numberOfSplines = N_PARAM + 2; //BC3.1D.CO.2
+	//numberOfSplines = N_PARAM + 3; //BC3.1D.CO.2 + BC3.1D.OR.1
+	numberOfSplines = nodes.size() - 3 - 1; //3rd order splines -(d+1) (d...spline dimension)
+	maxDistance = nodes[nodes.size() - 4];
 
 	//cut off
 	SplineFactory::SetBoundaryConditions3_1D_OR_2(nodes, bcFactorsStart, true);
