@@ -613,6 +613,8 @@ void Bosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R, v
 	}
 
 	//structureFactor
+	//according to Zhang, Kai. "On the concept of static structure factor." arXiv preprint arXiv:1606.03610 (2016).
+	double sumS;
 	vector<double> sumSCos;
 	vector<double> sumSSin;
 	vector<double> sk;
@@ -625,9 +627,9 @@ void Bosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R, v
 		{
 			for (unsigned int kn = 0; kn < kValues[k].size(); kn++)
 			{
-				//TODO: check this for 3D, 2D, 1D
-				sumSCos[k] += cos(kValues[k][kn][0] * R[i][0] + kValues[k][kn][1] * R[i][1] + kValues[k][kn][2] * R[i][2]);
-				sumSSin[k] += sin(kValues[k][kn][0] * R[i][0] + kValues[k][kn][1] * R[i][1] + kValues[k][kn][2] * R[i][2]);
+				sumS = VectorDotProduct_DIM(kValues[k][kn], R[i]);
+				sumSCos[k] += cos(sumS);
+				sumSSin[k] += sin(sumS);
 			}
 		}
 	}

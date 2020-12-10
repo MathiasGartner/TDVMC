@@ -365,21 +365,22 @@ void InhBosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
 					//potentialIntern += b * exp(-(rnia * rnia) / 2.0);
 
 					//square well
-					//if (rni < potentialRange)
-					//{
-					//	potentialIntern += potentialStrength;
-					//}
 					if (rni < potentialRange)
 					{
-						if (rni < potentialRange / 2.0)
-						{
-							potentialIntern += potentialStrength;
-						}
-						else
-						{
-							potentialIntern -= potentialStrength;
-						}
+						potentialIntern += potentialStrength;
 					}
+
+					//if (rni < potentialRange)
+					//{
+					//	if (rni < potentialRange / 2.0)
+					//	{
+					//		potentialIntern += potentialStrength;
+					//	}
+					//	else
+					//	{
+					//		potentialIntern -= potentialStrength;
+					//	}
+					//}
 
 					//Rydberg U_0 / (1 + (r/R_0)^6))
 					//R_0 = a, U_0 = b;
@@ -636,19 +637,21 @@ void InhBosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R
 	double r;
 	double rni;
 	vector<double> vecrni(DIM);
+	double weight = 1.0;
 
 	//density
+	weight = 1.0 / 2.0;
 	for (int i = 0; i < N; i++)
 	{
 		r = abs(GetCoordinateNIC(R[i][0]));
 		if (r < density.grid.max)
 		{
-			density.AddToHistogram(0, r, 1.0); //INFO: only for 1D - otherwise there should be a multi-dim histogram variable r
+			density.AddToHistogram(0, r, weight); //INFO: only for 1D - otherwise there should be a multi-dim histogram variable r
 		}
 	}
 
 	//pairDistribution
-	double weight = 1.0 / ((double)(N - 1));
+	weight = 1.0 / ((double)(N - 1));
 	for (int i = 0; i < N; i++)
 	{
 		for (int j = 0; j < i; j++)
@@ -662,6 +665,8 @@ void InhBosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R
 	}
 
 	//structureFactor
+	//according to Zhang, Kai. "On the concept of static structure factor." arXiv preprint arXiv:1606.03610 (2016).
+	double sumS;
 	vector<double> sumSCos;
 	vector<double> sumSSin;
 	vector<double> sk;
@@ -674,8 +679,9 @@ void InhBosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R
 		{
 			for (unsigned int kn = 0; kn < kValues[k].size(); kn++)
 			{
-				sumSCos[k] += cos(kValues[k][kn][0] * R[i][0] + kValues[k][kn][1] * R[i][1] + kValues[k][kn][2] * R[i][2]);
-				sumSSin[k] += sin(kValues[k][kn][0] * R[i][0] + kValues[k][kn][1] * R[i][1] + kValues[k][kn][2] * R[i][2]);
+				sumS = VectorDotProduct_DIM(kValues[k][kn], R[i]);
+				sumSCos[k] += cos(sumS);
+				sumSSin[k] += sin(sumS);
 			}
 		}
 	}

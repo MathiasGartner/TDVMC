@@ -765,7 +765,10 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 		{
 			//Lattice
 			//TODO: funktioniert nicht
-			Log("init coordinates on lattice");
+			if (isRootRank)
+			{
+				Log("init coordinates on lattice");
+			}
 			int n = round(pow(N, 1.0 / ((double) DIM)));
 			double l = LBOX / n;
 			l *= 0.5;
@@ -1423,7 +1426,7 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
 		cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
 		for (int i = 0; i < N; i++)
 		{
-			cout << i << ": " << (nAcceptancesPP[i] / (nTrialsPP[i] / 100.0)) << "% (" << nAcceptancesPP[i] << "/" << nTrialsPP[i] << ")" << endl;
+			//cout << i << ": " << (nAcceptancesPP[i] / (nTrialsPP[i] / 100.0)) << "% (" << nAcceptancesPP[i] << "/" << nTrialsPP[i] << ")" << endl;
 		}
 	}
 }
@@ -4224,14 +4227,14 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "Bosons1D0th";
 		//SYSTEM_TYPE = "Bosons1D4th";
 		//SYSTEM_TYPE = "Bosons1DSp";
-		//SYSTEM_TYPE = "BosonsBulk";
+		SYSTEM_TYPE = "BosonsBulk";
 		//SYSTEM_TYPE = "BosonCluster";
 		//SYSTEM_TYPE = "BosonClusterWithLog";
 		//SYSTEM_TYPE = "BosonClusterWithLogParam";
 		//SYSTEM_TYPE = "BosonsDiscrete";
 		//SYSTEM_TYPE = "BosonMixtureCluster_4thorder";
 		//SYSTEM_TYPE = "BosonMixtureCluster";
-		SYSTEM_TYPE = "InhBosons1D";
+		//SYSTEM_TYPE = "InhBosons1D";
 		//SYSTEM_TYPE = "NUBosonsBulk";
 		//SYSTEM_TYPE = "NUBosonsBulkPB";
 		//SYSTEM_TYPE = "NUBosonsBulkPBBox";
@@ -4280,7 +4283,8 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "BosonsBulk")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonsBulk2D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/BosonsBulk2D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonsBulk3D.config";
 		}
 		else if (SYSTEM_TYPE == "BosonsBulkDamped")
 		{
@@ -4319,7 +4323,8 @@ int main(int argc, char **argv)
 		{
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhSW1D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhSW1D10.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/InhBosons1D.config";			
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhBosons1D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/InhBosons1D_QU.config";
 		}
 		else if (SYSTEM_TYPE == "NUBosonsBulk")
 		{
@@ -4393,7 +4398,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (isRootRank) 
+	if (isRootRank)
 	{
 		Log("exit");
 	}
