@@ -15,7 +15,7 @@ ObservableVsOnGridWithScaling* ObservableVsOnGridWithScaling::Clone() const
 	return new ObservableVsOnGridWithScaling(*this);
 }
 
-//INFO: only for r^2 volume observables in 3D...
+//INFO: eg. for r^2 volume observables in 3D...
 void ObservableVsOnGridWithScaling::InitScaling()
 {
 	if (DIM == 1)

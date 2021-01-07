@@ -33,6 +33,7 @@
 #include "PhysicalSystems/HeBulk.h"
 #include "PhysicalSystems/HeDrop.h"
 #include "PhysicalSystems/InhBosons1D.h"
+#include "PhysicalSystems/LinearChain.h"
 #include "PhysicalSystems/NUBosonsBulk.h"
 #include "PhysicalSystems/NUBosonsBulkPB.h"
 #include "PhysicalSystems/NUBosonsBulkPBBox.h"
@@ -562,7 +563,7 @@ void WriteParticleInputFile(string fileName, vector<vector<double> >& R)
 			particlePositionList[0].push_back(R[i][a]);
 		}
 	}
-	WriteDataToFile(particlePositionList, fileName, "", 1, false);
+	WriteDataToFile(particlePositionList, fileName, { "r_i,x", "..." }, 1, false);
 }
 
 void BroadcastNewParameters(vector<double>& uR, vector<double>& uI, double* phiR, double* phiI)
@@ -685,7 +686,7 @@ void PostSystemInit()
 
 void WriteParticlesToFile(vector<vector<double> >& R, string ending)
 {
-	WriteDataToFile(R, "position" + ending, "x, y, z");
+	WriteDataToFile(R, "position" + ending, { "x", "y", "z" });
 }
 
 bool LoadLastPositionsFromFile(string filename, vector<vector<double> >& R)
@@ -771,7 +772,7 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 			}
 			int n = round(pow(N, 1.0 / ((double) DIM)));
 			double l = LBOX / n;
-			l *= 0.5;
+			//l *= 0.5;
 			int p = 0;
 			if (DIM == 3)
 			{
@@ -805,7 +806,7 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 			{
 				for (int i = 0; i < n; i++)
 				{
-					R[p][0] = i * l + (random01() - 0.5) * l / 10.0;
+					R[p][0] = i * l + (random01() - 0.5) * l / 10.0 - LBOX / 2.0;
 					p++;
 				}
 			}
@@ -2932,6 +2933,17 @@ bool InitializePhysicalSystem()
 		dynamic_cast<PhysicalSystems::InhBosons1D*>(sys)->SetPairDistributionBinCount(GR_BIN_COUNT);
 		dynamic_cast<PhysicalSystems::InhBosons1D*>(sys)->SetDensityBinCount(RHO_BIN_COUNT);
 	}
+	else if (SYSTEM_TYPE == "LinearChain")
+	{
+		sys = new PhysicalSystems::LinearChain(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PhysicalSystems::LinearChain*>(sys)->SetNodesSPF(NURBS_GRID);
+			dynamic_cast<PhysicalSystems::LinearChain*>(sys)->SetNodesPC(NURBS_GRID);
+		}
+		dynamic_cast<PhysicalSystems::LinearChain*>(sys)->SetPairDistributionBinCount(GR_BIN_COUNT);
+		dynamic_cast<PhysicalSystems::LinearChain*>(sys)->SetDensityBinCount(RHO_BIN_COUNT);
+	}
 	else if (SYSTEM_TYPE == "NUBosonsBulk")
 	{
 		sys = new PhysicalSystems::NUBosonsBulk(SYSTEM_PARAMS, configDirectory);
@@ -3152,7 +3164,7 @@ int mainMPI(int argc, char** argv)
 		{
 			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
 			{
-				WriteDataToFile(o->grid.grid, "rho_grid", o->grid.name);
+				WriteDataToFile(o->grid.gridCenterPoints, "rho_grid", o->grid.name);
 			}
 			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
 			{
@@ -3161,6 +3173,29 @@ int mainMPI(int argc, char** argv)
 			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
 			{
 				WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
+			}
+			if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
+			{
+				WriteGridsToFile(o->grids, "rho2_grid", true);
+			}
+		}
+		else if (auto s = dynamic_cast<PhysicalSystems::LinearChain*>(sys))
+		{
+			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+			{
+				WriteDataToFile(o->grid.gridCenterPoints, "rho_grid", o->grid.name);
+			}
+			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+			{
+				WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
+			}
+			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
+			{
+				WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
+			}
+			if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
+			{
+				WriteGridsToFile(o->grids, "rho2_grid", true);
 			}
 		}
 	}
@@ -3222,7 +3257,7 @@ int mainMPI(int argc, char** argv)
 			N = tmpN;
 			string name = "wf";
 			string nameEnd = "WH";
-			WriteDataToFile(wfValues, name + nameEnd, name + nameEnd);
+			WriteDataToFile(wfValues, name + nameEnd, { name + nameEnd });
 			//WriteDataToFile(wfValues, "wfValuesHeNa", "wfValuesHeNa");
 		}
 		bool saveToKineticFile = false;
@@ -3246,7 +3281,7 @@ int mainMPI(int argc, char** argv)
 			N = tmpN;
 			string name = "values";
 			string nameEnd = "1D";
-			WriteDataToFile(kineticValues, name + nameEnd, name + nameEnd);
+			WriteDataToFile(kineticValues, name + nameEnd, { name + nameEnd });
 			//if (auto s = dynamic_cast<PhysicalSystems::NUBosonsBulkPBWhitehead*>(sys))
 			//{
 			//	WriteDataToFile(s->test, "test", "test");
@@ -3507,6 +3542,29 @@ int mainMPI(int argc, char** argv)
 					{
 						AppendDataToFile(o->observablesV[0].values, "sk");
 					}
+					if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "rho2");
+					}
+				}
+				else if (auto s = dynamic_cast<PhysicalSystems::LinearChain*>(sys))
+				{
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "rho");
+					}
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "gr");
+					}
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "sk");
+					}
+					if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "rho2");
+					}
 				}
 				else if (auto s = dynamic_cast<PhysicalSystems::NUBosonsBulkPB*>(sys))
 				{
@@ -3623,7 +3681,7 @@ int mainMPI(int argc, char** argv)
 					WriteDataToFile(localOperators, "localOperators" + to_string(step), "localOperators");
 					WriteDataToFile(localEnergyR, "localEnergyR" + to_string(step), "localEnergyR");
 					WriteDataToFile(localEnergyI, "localEnergyI" + to_string(step), "localEnergyI");
-					WriteDataToFile(localOperatorsMatrix, "localOperatorsMatrix" + to_string(step), "localOperatorsMatrix");
+					WriteDataToFile(localOperatorsMatrix, "localOperatorsMatrix" + to_string(step), { "localOperatorsMatrix" });
 					WriteDataToFile(localOperatorlocalEnergyR, "localOperatorlocalEnergyR" + to_string(step), "localOperatorlocalEnergyR");
 					WriteDataToFile(localOperatorlocalEnergyI, "localOperatorlocalEnergyI" + to_string(step), "localOperatorlocalEnergyI");
 					WriteDataToFile(otherExpectationValues, "otherExpectationValues" + to_string(step), "Ekin, Ekin_cor, Epot, Epot_corr, wf, g(r)_1, ..., g(r)_100");
@@ -3829,17 +3887,17 @@ int mainMPI(int argc, char** argv)
 		Log("Write last files ...");
 		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR", "ER");
 		WriteDataToFile(AllLocalEnergyI, "AllLocalEnergyI", "EI");
-		WriteDataToFile(AllLocalOperators, "AllLocalOperators", "<O_k>");
-		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", "kinetic, potential, wf, g(r)");
-		WriteDataToFile(AllParametersR, "AllParametersR", "uR");
-		WriteDataToFile(AllParametersI, "AllParametersI", "uI");
+		WriteDataToFile(AllLocalOperators, "AllLocalOperators", { "<O_k>", "..." });
+		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues", { "kinetic", "potential", "wf", "g(r)" });
+		WriteDataToFile(AllParametersR, "AllParametersR", { "uR_k", "..." });
+		WriteDataToFile(AllParametersI, "AllParametersI", { "uI_k", "..." });
 
 		WriteDataToFile(AllLocalEnergyR, "AllLocalEnergyR_every100th", "ER", 100);
 		WriteDataToFile(AllLocalEnergyI, "AllLocalEnergyI_every100th", "EI", 100);
-		WriteDataToFile(AllLocalOperators, "AllLocalOperators_every100th", "<O_k>", 100);
-		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues_every100th", "kinetic, potential, wf, g(r)", 100);
-		WriteDataToFile(AllParametersR, "AllParametersR_every100th", "uR", 100);
-		WriteDataToFile(AllParametersI, "AllParametersI_every100th", "uI", 100);
+		WriteDataToFile(AllLocalOperators, "AllLocalOperators_every100th", { "<O_k>", "..." }, 100);
+		WriteDataToFile(AllOtherExpectationValues, "AllOtherExpectationValues_every100th", { "kinetic", "potential", "wf", "g(r)" }, 100);
+		WriteDataToFile(AllParametersR, "AllParametersR_every100th", { "uR_k", "..." }, 100);
+		WriteDataToFile(AllParametersI, "AllParametersI_every100th", { "uI_k", "..." }, 100);
 
 		WriteDataToFile(times, "Alltimes", "t");
 	}
@@ -4116,7 +4174,7 @@ int startVMCSamplerMPI(int argc, char** argv)
 
 	if (isRootRank)
 	{
-		WriteDataToFile(energies, "energies", "a, energy");
+		WriteDataToFile(energies, "energies", { "a", "energy" }, 1, true);
 	}
 
 	MPIMethods::Barrier(); // wait for main process to create directory
@@ -4129,8 +4187,9 @@ int startVMCSamplerMPI(int argc, char** argv)
 	ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
 	if (isRootRank)
 	{
+		//TODO: is this still needed?
 		WriteDataToFile(additionalSystemProperties, "AdditionalSystemProperties", "g(r), ...");
-		WriteDataToFile(AllAdditionalSystemProperties, "AllAdditionalSystemProperties", "g(r), ...");
+		WriteDataToFile(AllAdditionalSystemProperties, "AllAdditionalSystemProperties", { "g(r)", "..." }, 1, true);
 	}
 
 	//Log("free memory ...");
@@ -4227,7 +4286,7 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "Bosons1D0th";
 		//SYSTEM_TYPE = "Bosons1D4th";
 		//SYSTEM_TYPE = "Bosons1DSp";
-		SYSTEM_TYPE = "BosonsBulk";
+		//SYSTEM_TYPE = "BosonsBulk";
 		//SYSTEM_TYPE = "BosonCluster";
 		//SYSTEM_TYPE = "BosonClusterWithLog";
 		//SYSTEM_TYPE = "BosonClusterWithLogParam";
@@ -4235,6 +4294,7 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BosonMixtureCluster_4thorder";
 		//SYSTEM_TYPE = "BosonMixtureCluster";
 		//SYSTEM_TYPE = "InhBosons1D";
+		SYSTEM_TYPE = "LinearChain";
 		//SYSTEM_TYPE = "NUBosonsBulk";
 		//SYSTEM_TYPE = "NUBosonsBulkPB";
 		//SYSTEM_TYPE = "NUBosonsBulkPBBox";
@@ -4323,8 +4383,13 @@ int main(int argc, char **argv)
 		{
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhSW1D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhSW1D10.config";
-			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhBosons1D.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/InhBosons1D_QU.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/InhBosons1D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhBosons1D_QU.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhBosons1D_QU_Pulse.config";
+		}
+		else if (SYSTEM_TYPE == "LinearChain")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/LinearChain.config";
 		}
 		else if (SYSTEM_TYPE == "NUBosonsBulk")
 		{

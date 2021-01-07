@@ -20,7 +20,7 @@ using namespace WFParts;
 namespace PhysicalSystems
 {
 
-class InhBosons1D: public IPhysicalSystem
+class LinearChain: public IPhysicalSystem
 {
 private:
 	SingleParticleFunction spf;
@@ -59,7 +59,7 @@ public:
 
 //Implementation of IPhysicalSystem
 public:
-	InhBosons1D(vector<double>& params, string configDirectory);
+	LinearChain(vector<double>& params, string configDirectory);
 
 	void InitSystem() override;
 

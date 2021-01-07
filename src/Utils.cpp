@@ -713,6 +713,15 @@ void WriteLineToFile(ofstream& f, vector<double>& data)
 	f << endl;
 }
 
+void WriteHeaderToFile(ofstream& f, vector<string>& data)
+{
+	for (auto& value : data)
+	{
+		f << setw(colWidth) << value;
+	}
+	f << endl;
+}
+
 void WriteDataToFile(double data, string filename, string header)
 {
 	ofstream file;
@@ -738,7 +747,7 @@ void WriteDataToFile(vector<double>& data, string filename, string header, int e
 	file.close();
 }
 
-void WriteDataToFile(vector<vector<double> >& data, string filename, string header, int everyNth, bool writeHeader)
+void WriteDataToFile(vector<vector<double> >& data, string filename, vector<string> header, int everyNth, bool writeHeader)
 {
 	ofstream file;
 	//cout << OUT_DIR << filename << fileExtension << endl;
@@ -746,7 +755,7 @@ void WriteDataToFile(vector<vector<double> >& data, string filename, string head
 	SetFileFormat(file);
 	if (writeHeader)
 	{
-		file << header << endl;
+		WriteHeaderToFile(file, header);
 	}
 	for (unsigned int i = everyNth - 1; i < data.size(); i += everyNth)
 	{
@@ -755,7 +764,7 @@ void WriteDataToFile(vector<vector<double> >& data, string filename, string head
 	file.close();
 }
 
-void WriteDataToFileTransposed(vector<vector<double> >& data, string filename, string header, int everyNth, bool writeHeader)
+void WriteDataToFileTransposed(vector<vector<double> >& data, string filename, vector<string> header, int everyNth, bool writeHeader)
 {
 	ofstream file;
 	//cout << OUT_DIR << filename << fileExtension << endl;
@@ -763,7 +772,7 @@ void WriteDataToFileTransposed(vector<vector<double> >& data, string filename, s
 	SetFileFormat(file);
 	if (writeHeader)
 	{
-		file << header << endl;
+		WriteHeaderToFile(file, header);
 	}
 	for (unsigned int j = 0; j < data[0].size(); j++)
 	{
@@ -798,6 +807,25 @@ void WriteDataToFile(vector<vector<vector<double> > >& data, string filename, st
 	}
 	file << "}" << endl;
 	file.close();
+}
+
+void WriteGridsToFile(vector<Observables::Grid> grids, string filename, bool useGridCenterPoints)
+{
+	vector<string> gridNames;
+	vector<vector<double>> gridValues;
+	for (auto g : grids)
+	{
+		gridNames.push_back(g.name);
+		if (useGridCenterPoints)
+		{
+			gridValues.push_back(g.gridCenterPoints);
+		}
+		else
+		{
+			gridValues.push_back(g.grid);
+		}		
+	}
+	WriteDataToFileTransposed(gridValues, filename, gridNames, 1, true);
 }
 
 void WriteDataToFile(Observables::ObservableCollection& data, string filename)

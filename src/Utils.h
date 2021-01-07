@@ -147,13 +147,15 @@ void InitVector(vector<vector<vector<vector<double> > > >& v, int size1, int siz
 void SetFileFormat(ofstream& f);
 void WriteLineToFile(ofstream& f, double data);
 void WriteLineToFile(ofstream& f, vector<double>& data);
+void WriteHeaderToFile(ofstream& f, vector<string>& data);
 
 void WriteDataToFile(double data, string filename, string header);
 void WriteDataToFile(vector<double>& data, string filename, string header, int everyNth = 1);
-void WriteDataToFile(vector<vector<double> >& data, string filename, string header, int everyNth = 1, bool writeHeader = true);
-void WriteDataToFileTransposed(vector<vector<double> >& data, string filename, string header, int everyNth = 1, bool writeHeader = true);
+void WriteDataToFile(vector<vector<double> >& data, string filename, vector<string> header, int everyNth = 1, bool writeHeader = true);
+void WriteDataToFileTransposed(vector<vector<double> >& data, string filename, vector<string> header, int everyNth = 1, bool writeHeader = true);
 void WriteDataToFile(vector<vector<vector<double> > >& data, string filename, string header);
 
+void WriteGridsToFile(vector<Observables::Grid> grids, string filename, bool useGridCenterPoints);
 void WriteDataToFile(Observables::ObservableCollection& data, string filename);
 
 void AppendDataToFile(double data, string filename);

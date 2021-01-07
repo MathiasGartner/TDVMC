@@ -35,6 +35,8 @@ public:
 	IObservable& operator-=(const IObservable& oc) override;
 	IObservable& operator*=(double d) override;
 	IObservable& operator/=(double d) override;
+
+	vector<string> GridNames();
 };
 
 }

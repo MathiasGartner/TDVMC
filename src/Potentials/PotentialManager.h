@@ -22,7 +22,7 @@ void SavePotentialValues(IPairPotential& pot, double rmin, double rmax, double s
 	{
 		values.push_back( { r, pot.GetPotential(r) });
 	}
-	WriteDataToFile(values, filename, pot.description);
+	WriteDataToFile(values, filename, { "r", pot.description });
 }
 
 void SaveAllPotentialValues(string path)

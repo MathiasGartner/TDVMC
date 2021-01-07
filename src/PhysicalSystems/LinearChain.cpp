@@ -1,11 +1,11 @@
-#include "InhBosons1D.h"
+#include "LinearChain.h"
 
 #include "../SplineFactory.h"
 
 namespace PhysicalSystems
 {
 
-InhBosons1D::InhBosons1D(vector<double>& params, string configDirectory) :
+LinearChain::LinearChain(vector<double>& params, string configDirectory) :
 		IPhysicalSystem(params, configDirectory)
 {
 	this->USE_NORMALIZATION_AND_PHASE = true;
@@ -23,7 +23,7 @@ InhBosons1D::InhBosons1D(vector<double>& params, string configDirectory) :
 	exponentNew = 0;
 }
 
-void InhBosons1D::ExtendNodes(vector<double>& n)
+void LinearChain::ExtendNodes(vector<double>& n)
 {
 	int periodicNodeCount = 3;
 	for (int i = 0; i < periodicNodeCount; i++)
@@ -33,29 +33,29 @@ void InhBosons1D::ExtendNodes(vector<double>& n)
 	}
 }
 
-void InhBosons1D::SetNodesSPF(vector<double> n)
+void LinearChain::SetNodesSPF(vector<double> n)
 {
 	this->spf.nodes = n;
 	ExtendNodes(this->spf.nodes);
 }
 
-void InhBosons1D::SetNodesPC(vector<double> n)
+void LinearChain::SetNodesPC(vector<double> n)
 {
 	this->pc.nodes = n;
 	ExtendNodes(this->pc.nodes);
 }
 
-void InhBosons1D::SetPairDistributionBinCount(double n)
+void LinearChain::SetPairDistributionBinCount(double n)
 {
 	this->numOfPairDistributionValues = n;
 }
 
-void InhBosons1D::SetDensityBinCount(double n)
+void LinearChain::SetDensityBinCount(double n)
 {
 	this->numOfDensityValues = n;
 }
 
-void InhBosons1D::InitSystem()
+void LinearChain::InitSystem()
 {
 	numOfOtherLocalOperators = 4; //INFO: potentialIntern, potentialInternComplex, potentialExtern, potentialExternComplex
 	otherLocalOperators.resize(numOfOtherLocalOperators);
@@ -67,31 +67,39 @@ void InhBosons1D::InitSystem()
 
 	if (spf.nodes.empty())
 	{
+		//INFO: use half of the parameters for spf
+		int nparam_2 = N_PARAM / 2;
+		for (int i = -3; i < nparam_2 + 4; i++)
+		{
+			spf.nodes.push_back((i * LBOX) / ((double) nparam_2));
+		}
+	}
+	
+	if (pc.nodes.empty())
+	{		
+		//INFO: use half of the parameters for pc
 		//INFO: BC
 		//this is for SetBoundaryConditions3_1D_OR_2 and SetBoundaryConditions3_1D_CO_2
 		//and an even number of parameters
 		int nparam_2 = N_PARAM / 2;
 		for (int i = -3; i < nparam_2 + 3; i++)
 		{
-			spf.nodes.push_back((i * halfLength) / ((double) nparam_2 - 1));
-			pc.nodes.push_back((i * halfLength) / ((double) nparam_2 - 1));
+			pc.nodes.push_back((i * halfLength) / ((double) nparam_2 - 1.0));
 		}
 	}
 
 	maxDistance = pc.nodes[pc.nodes.size() - 4]; //INFO: only valid for u_2(rij) that is defined up to L/2
 
-	//INFO: use same nodes and spf defined in the interval [0, L/2] for symmetric external potentials
-	//INFO: if non symmetric external potential this has to be implemented differently
 	spf.numberOfSplines = spf.nodes.size() - (3 + 1); //3rd order splines -(d+1)
 	spf.splineWeights = SplineFactory::GetWeights(spf.nodes);
-	SplineFactory::SetBoundaryConditions3_1D_OR_2(spf.nodes, spf.bcFactorsStart, true);
-	SplineFactory::SetBoundaryConditions3_1D_CO_2(spf.nodes, spf.bcFactorsEnd, maxDistance, true);
+	SplineFactory::SetBoundaryConditions3_1D_OR_1(spf.nodes, spf.bcFactorsStart, true);
+	SplineFactory::SetBoundaryConditions3_1D_CO_1(spf.nodes, spf.bcFactorsEnd, LBOX, true);
 	spf.numberOfSpecialParametersStart = spf.bcFactorsStart.size();
 	spf.numberOfSpecialParametersEnd = spf.bcFactorsEnd.size();
-	spf.numberOfStandardParameters = spf.nodes.size() - 2 * spf.splineOrder - spf.numberOfSpecialParametersStart - spf.numberOfSpecialParametersEnd;
+	spf.numberOfStandardParameters = spf.nodes.size() - 2 * spf.splineOrder - spf.numberOfSpecialParametersStart - 1;
 	spf.np1 = spf.numberOfSpecialParametersStart;
 	spf.np2 = spf.np1 + spf.numberOfStandardParameters;
-	spf.np3 = spf.np2 + spf.numberOfSpecialParametersEnd;
+	spf.np3 = spf.np2;// + spf.numberOfSpecialParametersEnd;
 
 	pc.numberOfSplines = pc.nodes.size() - (3 + 1); //3rd order splines -(d+1)
 	pc.splineWeights = SplineFactory::GetWeights(pc.nodes);
@@ -104,7 +112,7 @@ void InhBosons1D::InitSystem()
 	pc.np2 = pc.np1 + pc.numberOfStandardParameters;
 	pc.np3 = pc.np2 + pc.numberOfSpecialParametersEnd;
 
-	int requiredParams = spf.numberOfSplines - (3 - spf.numberOfSpecialParametersStart) - (3 - spf.numberOfSpecialParametersEnd) +
+	int requiredParams = spf.numberOfSplines - (3 - spf.numberOfSpecialParametersStart) - (3 - spf.numberOfSpecialParametersEnd) - 3 + //INFO: last -3 is because the last three parameters are identical to the first three parameters
 						 pc.numberOfSplines - (3 - pc.numberOfSpecialParametersStart) - (3 - pc.numberOfSpecialParametersEnd);
 	if (N_PARAM != requiredParams)
 	{
@@ -160,12 +168,12 @@ void InhBosons1D::InitSystem()
 
 	density.name = "density";
 	density.grid.name = "r";
-	density.InitGrid(0.0, halfLength, halfLength / numOfDensityValues);
+	density.InitGrid(0.0, LBOX, LBOX / numOfDensityValues);
 	density.InitScaling();
 	density.InitObservables( { "rho(r)" });
 
 	pairDensity.name = "pairDensity";
-	pairDensity.InitGrid({{0.0, halfLength, halfLength / numOfPairDistributionValues}, {0.0, halfLength, halfLength / numOfPairDistributionValues}});	
+	pairDensity.InitGrid({{0.0, LBOX, LBOX / numOfPairDistributionValues}, {0.0, LBOX, LBOX / numOfPairDistributionValues}});	
 	pairDensity.grids[0].name = "r_i";
 	pairDensity.grids[1].name = "r_j";
 	pairDensity.InitObservables( { "rho_2(r_i,r_j)" });
@@ -189,7 +197,7 @@ void InhBosons1D::InitSystem()
 	additionalObservables.Add(&pairDensity);
 }
 
-void InhBosons1D::RefreshLocalOperators()
+void LinearChain::RefreshLocalOperators()
 {
 	int offset;
 	int spIdx;
@@ -200,18 +208,14 @@ void InhBosons1D::RefreshLocalOperators()
 	for (int i = 0; i < spf.np1; i++)
 	{
 		this->localOperators[i] = (spf.bcFactorsStart[i][0] * spf.splineSums[0] + spf.bcFactorsStart[i][1] * spf.splineSums[1] + spf.bcFactorsStart[i][2] * spf.splineSums[2]);
+		//INFO: add the last three splineSums to the first three operators
+		this->localOperators[i] += (spf.bcFactorsEnd[i][0] * spf.splineSums[spf.numberOfSplines - 3] + spf.bcFactorsEnd[i][1] * spf.splineSums[spf.numberOfSplines - 2] + spf.bcFactorsEnd[i][2] * spf.splineSums[spf.numberOfSplines - 1]);
 	}
 	spIdx = 3;
 	for (int i = spf.np1; i < spf.np2; i++)
 	{
 		this->localOperators[i] = spf.splineSums[spIdx];
 		spIdx++;
-	}
-	idx = 0;
-	for (int i = spf.np2; i < spf.np3; i++)
-	{
-		this->localOperators[i] = (spf.bcFactorsEnd[idx][0] * spf.splineSums[spf.numberOfSplines - 3] + spf.bcFactorsEnd[idx][1] * spf.splineSums[spf.numberOfSplines - 2] + spf.bcFactorsEnd[idx][2] * spf.splineSums[spf.numberOfSplines - 1]);
-		idx++;
 	}
 
 	//INFO: PairCorrelation
@@ -234,7 +238,7 @@ void InhBosons1D::RefreshLocalOperators()
 	}
 }
 
-void InhBosons1D::CalculateLocalOperators(vector<vector<double> >& R)
+void LinearChain::CalculateLocalOperators(vector<vector<double> >& R)
 {
 	int bin;
 	double rni;
@@ -251,8 +255,12 @@ void InhBosons1D::CalculateLocalOperators(vector<vector<double> >& R)
 	for (int n = 0; n < N; n++)
 	{
 		//INFO: SingleParticleFunction
-		r = abs(GetCoordinateNIC(R[n][0])); //INFO: only for 1D!
-		if (r <= maxDistance)
+		r = GetCoordinateNIC(R[n][0]) + halfLength; //to get coordinate in interval [0, LBOX]
+		if (r < 0 || r > LBOX)
+		{
+			cout << "!!!!!!";
+		}
+		else
 		{
 			bin = GetBinIndex(spf.nodes, r);
 			r2 = r * r;
@@ -287,7 +295,7 @@ void InhBosons1D::CalculateLocalOperators(vector<vector<double> >& R)
 	RefreshLocalOperators();
 }
 
-void InhBosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
+void LinearChain::CalculateOtherLocalOperators(vector<vector<double> >& R)
 {
 	vector<double> vecr(DIM);
 	vector<double> evecr(DIM);
@@ -307,6 +315,9 @@ void InhBosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
 	double potentialExternComplex = 0;
 	double potentialIntern = 0;
 	double potentialInternComplex = 0;
+
+	vector<double> displacementsFromFirstParticle;
+	InitVector(displacementsFromFirstParticle, N, 0.0);
 
 	//potential parameters (a -> width; b -> height)
 	double potentialRange = params[0];
@@ -329,7 +340,7 @@ void InhBosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
 		potentialExtern += GetExternalPotential(R[n]);
 
 		//INFO: SingleParticleFunction
-		r = abs(GetCoordinateNIC(R[n][0])); //INFO: only for 1D!
+		r = GetCoordinateNIC(R[n][0]) + halfLength; //to get coordinate in interval [0, LBOX]
 		bin = GetBinIndex(spf.nodes, r);
 		r2 = r * r;
 
@@ -342,7 +353,7 @@ void InhBosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
 		}
 
 
-		evecr[0] = GetCoordinateNIC(R[n][0]) > 0 ? 1.0 : -1.0; //TODO: is this the unit vector? do not calculate again
+		evecr[0] = 1.0; //TODO: is this the unit vector? do not calculate again
 		bool outsideL2 = false;
 		double firstDerivativeFactor = outsideL2 ? -1.0 : 1.0;
 		for (int a = 0; a < DIM; a++)
@@ -358,52 +369,19 @@ void InhBosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
 			spf.splineSumsD2[bin - b][n] += spftmp2[spf.numOfSplineParts - 1 - b] + secondDerivativeFactor / r * spftmp1[spf.numOfSplineParts - 1 - b];
 		}
 
+		double rn = GetCoordinateNIC(R[n][0]);
 		for (int i = 0; i < N; i++)
 		{
+			if (n == 0 && i > 0)
+			{
+				double ri = GetCoordinateNIC(R[i][0]);
+				displacementsFromFirstParticle[i] = ri - rn;
+			}
+
 			rni = VectorDisplacementNIC_DIM(R[n], R[i], vecrni);
 
 			if (rni <= maxDistance)
 			{
-				//internal potential energy
-				if (i < n)
-				{
-					//Gauss
-					//double rnia = rni / a;
-					//potentialIntern += b * exp(-(rnia * rnia) / 2.0);
-
-					//square well
-					if (rni < potentialRange)
-					{
-						potentialIntern += potentialStrength;
-					}
-
-					//if (rni < potentialRange)
-					//{
-					//	if (rni < potentialRange / 2.0)
-					//	{
-					//		potentialIntern += potentialStrength;
-					//	}
-					//	else
-					//	{
-					//		potentialIntern -= potentialStrength;
-					//	}
-					//}
-
-					//Rydberg U_0 / (1 + (r/R_0)^6))
-					//R_0 = a, U_0 = b;
-					//double rniR0 = rni / a;
-					//double rniR03 = rniR0 * rniR0 * rniR0;
-					//potentialIntern += b / (1 + rniR03 * rniR03);
-
-					//imaginary part
-					//double rniAbsorption = rni - 4.5;
-					//double absorptionFactor = 0.0;//-3e-6;
-					//if (rniAbsorption > 0)
-					//{
-					//	potentialInternComplex += absorptionFactor * rniAbsorption * rniAbsorption;
-					//}
-				}
-
 				//kinetic energy
 				//TODO: maybe it is faster to calculate all localOperators[i][n] before and then loop over this precalculated values
 				//		otherwise values are calculated multiple times
@@ -442,31 +420,56 @@ void InhBosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
 			}
 		}
 	}
+	//harmonic chain potential energy
+	r = 0.0;
+	double d = 1.0;
+	sort(displacementsFromFirstParticle.begin(), displacementsFromFirstParticle.end());
+	//shift all coordinates to start with first coordinate at zero
+	for (unsigned int i = 1; i < N; i++)
+	{
+		displacementsFromFirstParticle[i] -= displacementsFromFirstParticle[0];
+	}
+	displacementsFromFirstParticle[0] = 0.0;
+	for (unsigned int i = 0; i < N; i++)
+	{		
+		if (i == N - 1)
+		{
+			r = LBOX - abs(displacementsFromFirstParticle[i] - displacementsFromFirstParticle[0]) - d;
+		}
+		else
+		{
+			r = abs(displacementsFromFirstParticle[i + 1] - displacementsFromFirstParticle[i]) - d;
+		}
+		potentialIntern += potentialStrength * r * r;		
+	}
+
 	otherLocalOperators[0] = potentialIntern;
 	otherLocalOperators[1] = potentialInternComplex;
 	otherLocalOperators[2] = potentialExtern;
 	otherLocalOperators[3] = potentialExternComplex;
 }
 
-vector<double> InhBosons1D::GetCenterOfMass(vector<vector<double> >& R)
+vector<double> LinearChain::GetCenterOfMass(vector<vector<double> >& R)
 {
 	vector<double> com = { 0.0, 0.0, 0.0 };
 	return com;
 }
 
-double InhBosons1D::GetExternalPotential(vector<double>& r)
+double LinearChain::GetExternalPotential(vector<double>& r)
 {
+	double x;
 	double value = 0.0;
-	double potentialWidth = params[2];
+	double potentialK = params[2];
 	double potentialStrength = params[3];
+	x = GetCoordinateNIC(r[0]) + halfLength;
 	if (params.size() > 4)
 	{
-		potentialWidth = params[7];
+		potentialK = params[7];
 		potentialStrength = params[8];
 	}
-	if (potentialWidth > 0.0 && potentialStrength > 0.0)
+	if (potentialK > 0.0 && potentialStrength > 0.0)
 	{
-		value = cos(2.0 * M_PI * r[0] / potentialWidth);
+		value = cos(potentialK * 2.0 * M_PI * x / LBOX);
 		value *= potentialStrength;
 	}
 	if (params.size() > 4 && params[4] > 0.0 && this->time >= params[4])
@@ -475,14 +478,14 @@ double InhBosons1D::GetExternalPotential(vector<double>& r)
 	}
 	else
 	{
-		value *= exp(-pow((this->time - 0.05)/0.02, 2.0));
-		//value *= sin(2.0 * M_PI * this->time * 10.0);
+		//value *= sin(2.0 * M_PI * this->time * params[9]);
 	}
 	//value = 0.0;
+	//value = abs(x);
 	return value;
 }
 
-void InhBosons1D::CalculateExpectationValues(vector<double>& O, vector<vector<vector<double> > >& spf_sD, vector<vector<double> >& spf_sD2, vector<vector<vector<double> > >& pc_sD, vector<vector<double> >& pc_sD2, vector<double>& otherO, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void LinearChain::CalculateExpectationValues(vector<double>& O, vector<vector<vector<double> > >& spf_sD, vector<vector<double> >& spf_sD2, vector<vector<vector<double> > >& pc_sD, vector<vector<double> >& pc_sD2, vector<double>& otherO, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	double tmp = 0;
 	double kineticR = 0;
@@ -527,6 +530,17 @@ void InhBosons1D::CalculateExpectationValues(vector<double>& O, vector<vector<ve
 			tmp = (spf.bcFactorsStart[i][0] * spf_sD2[0][n] + spf.bcFactorsStart[i][1] * spf_sD2[1][n] + spf.bcFactorsStart[i][2] * spf_sD2[2][n]);
 			kineticSumR2 += uR[i] * tmp;
 			kineticSumI2 += uI[i] * tmp;
+			for (int a = 0; a < DIM; a++)
+			{
+				//INFO: use the last three splineSumsD with the first three parameters
+				tmp = (spf.bcFactorsEnd[i][0] * spf_sD[spf.numberOfSplines - 3][n][a] + spf.bcFactorsEnd[i][1] * spf_sD[spf.numberOfSplines - 2][n][a] + spf.bcFactorsEnd[i][2] * spf_sD[spf.numberOfSplines - 1][n][a]);
+				vecKineticSumR1[a] += uR[i] * tmp;
+				vecKineticSumI1[a] += uI[i] * tmp;
+			}
+			//INFO: use the last three splineSumsD2 with the first three parameters
+			tmp = (spf.bcFactorsEnd[i][0] * spf_sD2[spf.numberOfSplines - 3][n] + spf.bcFactorsEnd[i][1] * spf_sD2[spf.numberOfSplines - 2][n] + spf.bcFactorsEnd[i][2] * spf_sD2[spf.numberOfSplines - 1][n]);
+			kineticSumR2 += uR[i] * tmp;
+			kineticSumI2 += uI[i] * tmp;
 		}
 		spIdx = 3;
 		for (int i = spf.np1; i < spf.np2; i++)
@@ -539,20 +553,6 @@ void InhBosons1D::CalculateExpectationValues(vector<double>& O, vector<vector<ve
 			kineticSumR2 += uR[i] * spf_sD2[spIdx][n];
 			kineticSumI2 += uI[i] * spf_sD2[spIdx][n];
 			spIdx++;
-		}
-		idx = 0;
-		for (int i = spf.np2; i < spf.np3; i++)
-		{
-			for (int a = 0; a < DIM; a++)
-			{
-				tmp = (spf.bcFactorsEnd[idx][0] * spf_sD[spf.numberOfSplines - 3][n][a] + spf.bcFactorsEnd[idx][1] * spf_sD[spf.numberOfSplines - 2][n][a] + spf.bcFactorsEnd[idx][2] * spf_sD[spf.numberOfSplines - 1][n][a]);
-				vecKineticSumR1[a] += uR[i] * tmp;
-				vecKineticSumI1[a] += uI[i] * tmp;
-			}
-			tmp = (spf.bcFactorsEnd[idx][0] * spf_sD2[spf.numberOfSplines - 3][n] + spf.bcFactorsEnd[idx][1] * spf_sD2[spf.numberOfSplines - 2][n] + spf.bcFactorsEnd[idx][2] * spf_sD2[spf.numberOfSplines - 1][n]);
-			kineticSumR2 += uR[i] * tmp;
-			kineticSumI2 += uI[i] * tmp;
-			idx++;
 		}
 
 		//INFO: PairCorrelation
@@ -638,19 +638,19 @@ void InhBosons1D::CalculateExpectationValues(vector<double>& O, vector<vector<ve
 	otherExpectationValues[8] = kineticSumR1I1;
 }
 
-void InhBosons1D::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void LinearChain::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	RefreshLocalOperators();
 	CalculateOtherLocalOperators(R);
 	CalculateExpectationValues(this->localOperators, this->spf.splineSumsD, this->spf.splineSumsD2, this->pc.splineSumsD, this->pc.splineSumsD2, this->otherLocalOperators, uR, uI, phiR, phiI);
 }
 
-void InhBosons1D::CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void LinearChain::CalculateExpectationValues(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	cout << "not implemented" << endl;
 }
 
-void InhBosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void LinearChain::CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	additionalObservables.ClearValues();
 	double r;
@@ -665,7 +665,7 @@ void InhBosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R
 	weight = 1.0 / 2.0;
 	for (int i = 0; i < N; i++)
 	{
-		r = abs(GetCoordinateNIC(R[i][0]));
+		r = GetCoordinateNIC(R[i][0]) + halfLength; //to get coordinate in interval [0, LBOX]
 		if (r < density.grid.max)
 		{
 			density.AddToHistogram(0, r, weight); //INFO: only for 1D - otherwise there should be a multi-dim histogram variable r
@@ -677,10 +677,10 @@ void InhBosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R
 	weight2 = 1.0;
 	for (int i = 0; i < N; i++)
 	{
-		ri = abs(GetCoordinateNIC(R[i][0]));
+		ri = GetCoordinateNIC(R[i][0]) + halfLength; //to get coordinate in interval [0, LBOX]
 		for (int j = 0; j < i; j++)
 		{
-			rn = abs(GetCoordinateNIC(R[j][0]));
+			rn = GetCoordinateNIC(R[j][0]) + halfLength; //to get coordinate in interval [0, LBOX]
 			if (ri < pairDensity.grids[0].max && rn < pairDensity.grids[1].max)
 			{
 				pairDensity.AddToHistogram(0, { ri, rn }, weight2);
@@ -721,7 +721,7 @@ void InhBosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R
 	}
 }
 
-void InhBosons1D::CalculateWavefunction(vector<double>& O, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void LinearChain::CalculateWavefunction(vector<double>& O, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	double sum = 0;
 
@@ -735,19 +735,19 @@ void InhBosons1D::CalculateWavefunction(vector<double>& O, vector<double>& uR, v
 	wf = exp(exponent + phiR);
 }
 
-void InhBosons1D::CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void LinearChain::CalculateWavefunction(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	CalculateLocalOperators(R);
 	CalculateWavefunction(this->localOperators, uR, uI, phiR, phiI);
 }
 
-void InhBosons1D::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+void LinearChain::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	CSDataBulkSplines* s = dynamic_cast<CSDataBulkSplines*>(sample);
 	CalculateWavefunction(s->localOperators, uR, uI, phiR, phiI);
 }
 
-void InhBosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
+void LinearChain::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
 	double sum = 0;
 	int bin = 0;
@@ -765,27 +765,21 @@ void InhBosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& 
 	ClearVector(pc.sumNewPerBin);
 
 	//INFO: SingleParticleFunction
-	r = abs(GetCoordinateNIC(oldPosition[0])); //INFO: only for 1D!
-	if (r <= maxDistance)
+	r = GetCoordinateNIC(oldPosition[0]) + halfLength; //to get coordinate in interval [0, LBOX]
+	bin = GetBinIndex(spf.nodes, r);
+	r2 = r * r;
+	r3 = r2 * r;
+	for (int p = 0; p < spf.numOfSplineParts; p++)
 	{
-		bin = GetBinIndex(spf.nodes, r);
-		r2 = r * r;
-		r3 = r2 * r;
-		for (int p = 0; p < spf.numOfSplineParts; p++)
-		{
-			spf.sumOldPerBin[bin - p] += spf.splineWeights[bin - p][p][0] + spf.splineWeights[bin - p][p][1] * r + spf.splineWeights[bin - p][p][2] * r2 + spf.splineWeights[bin - p][p][3] * r3;
-		}
+		spf.sumOldPerBin[bin - p] += spf.splineWeights[bin - p][p][0] + spf.splineWeights[bin - p][p][1] * r + spf.splineWeights[bin - p][p][2] * r2 + spf.splineWeights[bin - p][p][3] * r3;
 	}
-	r = abs(GetCoordinateNIC(R[changedParticleIndex][0])); //INFO: only for 1D!
-	if (r <= maxDistance)
+	r = GetCoordinateNIC(R[changedParticleIndex][0]) + halfLength; //to get coordinate in interval [0, LBOX]
+	bin = GetBinIndex(spf.nodes, r);
+	r2 = r * r;
+	r3 = r2 * r;
+	for (int p = 0; p < spf.numOfSplineParts; p++)
 	{
-		bin = GetBinIndex(spf.nodes, r);
-		r2 = r * r;
-		r3 = r2 * r;
-		for (int p = 0; p < spf.numOfSplineParts; p++)
-		{
-			spf.sumNewPerBin[bin - p] += spf.splineWeights[bin - p][p][0] + spf.splineWeights[bin - p][p][1] * r + spf.splineWeights[bin - p][p][2] * r2 + spf.splineWeights[bin - p][p][3] * r3;
-		}
+		spf.sumNewPerBin[bin - p] += spf.splineWeights[bin - p][p][0] + spf.splineWeights[bin - p][p][1] * r + spf.splineWeights[bin - p][p][2] * r2 + spf.splineWeights[bin - p][p][3] * r3;
 	}
 
 	//INFO: PairCorrelation
@@ -848,18 +842,13 @@ void InhBosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& 
 	for (int i = 0; i < spf.np1; i++)
 	{
 		sum += uR[i] * (spf.bcFactorsStart[i][0] * spf.splineSumsNew[0] + spf.bcFactorsStart[i][1] * spf.splineSumsNew[1] + spf.bcFactorsStart[i][2] * spf.splineSumsNew[2]);
+		sum += uR[i] * (spf.bcFactorsEnd[i][0] * spf.splineSumsNew[spf.numberOfSplines - 3] + spf.bcFactorsEnd[i][1] * spf.splineSumsNew[spf.numberOfSplines - 2] + spf.bcFactorsEnd[i][2] * spf.splineSumsNew[spf.numberOfSplines - 1]);
 	}
 	spIdx = 3;
 	for (int i = spf.np1; i < spf.np2; i++)
 	{
 		sum += uR[i] * spf.splineSumsNew[spIdx];
 		spIdx++;
-	}
-	idx = 0;
-	for (int i = spf.np2; i < spf.np3; i++)
-	{
-		sum += uR[i] * (spf.bcFactorsEnd[idx][0] * spf.splineSumsNew[spf.numberOfSplines - 3] + spf.bcFactorsEnd[idx][1] * spf.splineSumsNew[spf.numberOfSplines - 2] + spf.bcFactorsEnd[idx][2] * spf.splineSumsNew[spf.numberOfSplines - 1]);
-		idx++;
 	}
 
 	//INFO: PairCorrelation
@@ -885,7 +874,7 @@ void InhBosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& 
 	wfNew = exp(exponentNew + phiR);
 }
 
-double InhBosons1D::CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
+double LinearChain::CalculateWFQuotient(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
 	CalculateWFChange(R, uR, uI, phiR, phiI, changedParticleIndex, oldPosition);
 	double wfQuotient = exp(2.0 * (exponentNew - exponent));
@@ -895,7 +884,7 @@ double InhBosons1D::CalculateWFQuotient(vector<vector<double> >& R, vector<doubl
 	return wfQuotient;
 }
 
-void InhBosons1D::AcceptMove()
+void LinearChain::AcceptMove()
 {
 	wf = wfNew;
 	exponent = exponentNew;
@@ -903,11 +892,11 @@ void InhBosons1D::AcceptMove()
 	pc.splineSums = pc.splineSumsNew;
 }
 
-void InhBosons1D::InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data)
+void LinearChain::InitCorrelatedSamplingData(vector<ICorrelatedSamplingData*>& data)
 {
 }
 
-void InhBosons1D::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
+void LinearChain::FillCorrelatedSamplingData(ICorrelatedSamplingData* data)
 {
 }
 

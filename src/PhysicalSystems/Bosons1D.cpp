@@ -137,7 +137,7 @@ void Bosons1D::InitSystem()
 {
 	numOfOtherLocalOperators = 4; //INFO: potentialIntern, potentialInternComplex, potentialExtern, potentialExternComplex
 	otherLocalOperators.resize(numOfOtherLocalOperators);
-	numOfkValues = 50;
+	numOfkValues = 150;
 	numOfOtherExpectationValues = 9;
 	numOfAdditionalSystemProperties = numOfOtherExpectationValues;
 

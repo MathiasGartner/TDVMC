@@ -4,6 +4,7 @@
 
 #include "../Observables/ObservableCollection.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 

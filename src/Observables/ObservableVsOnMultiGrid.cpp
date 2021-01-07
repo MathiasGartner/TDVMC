@@ -28,22 +28,11 @@ void ObservableVsOnMultiGrid::InitGrid(vector<vector<double> > gridProperties)
 	totalGridPoints = 1;
 	this->grids.resize(gridProperties.size());
 	int i = 0;
-	for (auto& g : grids)
+	for (unsigned int i = 0; i < gridProperties.size(); i++)
 	{
-		g.min = gridProperties[i][0];
-		g.max = gridProperties[i][1];
-		g.spacing = gridProperties[i][2];
-		g.count = (g.max - g.min) / g.spacing;
-		InitVector(g.grid, g.count, 0.0);
-
-		double val = g.min;
-		for (int j = 0; j < g.count; j++)
-		{
-			g.grid[j] = val;
-			val += g.spacing;
-		}
-		totalGridPoints *= g.count;
-		i++;
+		auto prop = gridProperties[i];
+		this->grids[i].Init(prop[0], prop[1], prop[2]);
+		totalGridPoints *= this->grids[i].count;
 	}
 }
 
@@ -102,6 +91,16 @@ IObservable& ObservableVsOnMultiGrid::operator/=(double d)
 		this->observablesV[i] /= d;
 	}
 	return *this;
+}
+
+vector<string> ObservableVsOnMultiGrid::GridNames()
+{
+	vector<string> names;
+	for(auto g : this->grids)
+	{
+		names.push_back(g.name);
+	}
+	return names;
 }
 
 }
