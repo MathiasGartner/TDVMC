@@ -470,6 +470,8 @@ double LinearChain::GetExternalPotential(vector<double>& r)
 	if (potentialK > 0.0 && potentialStrength > 0.0)
 	{
 		value = cos(potentialK * 2.0 * M_PI * x / LBOX);
+		//value += cos(0.5 * potentialK * 2.0 * M_PI * x / LBOX);
+		//value *= 0.5 * potentialStrength;
 		value *= potentialStrength;
 	}
 	if (params.size() > 4 && params[4] > 0.0 && this->time >= params[4])
@@ -479,6 +481,9 @@ double LinearChain::GetExternalPotential(vector<double>& r)
 	else
 	{
 		//value *= sin(2.0 * M_PI * this->time * params[9]);
+		//value *= (sin(2.0 * M_PI * this->time * params[9]) + sin(2.0 * M_PI * this->time * params[9] * 0.5)) * 0.5;
+		//gauss
+		value *= exp(-pow((this->time - params[9])/(params[9] * 0.4), 2.0));
 	}
 	//value = 0.0;
 	//value = abs(x);

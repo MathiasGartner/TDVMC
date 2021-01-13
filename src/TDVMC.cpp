@@ -3552,6 +3552,14 @@ int mainMPI(int argc, char** argv)
 					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
 					{
 						AppendDataToFile(o->observablesV[0].values, "rho");
+						//INFO: write external potential
+						vector<double> potExt;
+						for (auto r : o->grid.gridCenterPoints)
+						{
+							vector<double> vr = {r};
+							potExt.push_back(s->GetExternalPotential(vr));
+						}
+						AppendDataToFile(potExt, "V_ext");
 					}
 					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
 					{

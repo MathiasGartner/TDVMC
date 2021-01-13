@@ -44,7 +44,6 @@ private:
 	Observables::ObservableVsOnGrid structureFactor;
 
 private:
-	double GetExternalPotential(vector<double>& r);
 	void RefreshLocalOperators();
 	void CalculateLocalOperators(vector<vector<double> >& R);
 	void CalculateExpectationValues(vector<double>& O, vector<vector<vector<double> > >& spf_sD, vector<vector<double> >& spf_sD2, vector<vector<vector<double> > >& pc_sD, vector<vector<double> >& pc_sD2, vector<double>& otherO, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
@@ -52,6 +51,7 @@ private:
 	void ExtendNodes(vector<double>& n);
 
 public:
+	double GetExternalPotential(vector<double>& r);
 	void SetNodesSPF(vector<double> n);
 	void SetNodesPC(vector<double> n);
 	void SetPairDistributionBinCount(double n);
