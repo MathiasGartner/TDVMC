@@ -14,6 +14,7 @@ public:
 	int numOfSplineParts;
 
 	vector<double> nodes;
+	double nodeSpacing;
 
 	int numberOfSplines;
 	vector<double> splineSums; //indices: k (bin); for <O_k>

@@ -25,6 +25,7 @@ CPP_SRCS += \
 ../src/PhysicalSystems/HeBulk.cpp \
 ../src/PhysicalSystems/HeDrop.cpp \
 ../src/PhysicalSystems/InhBosons1D.cpp \
+../src/PhysicalSystems/InhContactBosons.cpp \
 ../src/PhysicalSystems/LinearChain.cpp \
 ../src/PhysicalSystems/NUBosonsBulk.cpp \
 ../src/PhysicalSystems/NUBosonsBulkPB.cpp \
@@ -54,6 +55,7 @@ OBJS += \
 ./src/PhysicalSystems/HeBulk.o \
 ./src/PhysicalSystems/HeDrop.o \
 ./src/PhysicalSystems/InhBosons1D.o \
+./src/PhysicalSystems/InhContactBosons.o \
 ./src/PhysicalSystems/LinearChain.o \
 ./src/PhysicalSystems/NUBosonsBulk.o \
 ./src/PhysicalSystems/NUBosonsBulkPB.o \
@@ -83,6 +85,7 @@ CPP_DEPS += \
 ./src/PhysicalSystems/HeBulk.d \
 ./src/PhysicalSystems/HeDrop.d \
 ./src/PhysicalSystems/InhBosons1D.d \
+./src/PhysicalSystems/InhContactBosons.d \
 ./src/PhysicalSystems/LinearChain.d \
 ./src/PhysicalSystems/NUBosonsBulk.d \
 ./src/PhysicalSystems/NUBosonsBulkPB.d \

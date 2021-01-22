@@ -8,6 +8,8 @@ SplinedFunction::SplinedFunction(int splineOrder_)
 	splineOrder = splineOrder_;
 	numOfSplineParts = splineOrder + 1;
 
+	nodeSpacing = 0.0;
+
 	numberOfSplines = 0;
 
 	numberOfSpecialParametersStart = 0;

@@ -33,6 +33,7 @@
 #include "PhysicalSystems/HeBulk.h"
 #include "PhysicalSystems/HeDrop.h"
 #include "PhysicalSystems/InhBosons1D.h"
+#include "PhysicalSystems/InhContactBosons.h"
 #include "PhysicalSystems/LinearChain.h"
 #include "PhysicalSystems/NUBosonsBulk.h"
 #include "PhysicalSystems/NUBosonsBulkPB.h"
@@ -2707,11 +2708,12 @@ bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double
 			{
 				if (!isfinite(uR[p]))
 				{
+					Log("a parameter is not finite", WARNING);
 					return false;
 				}
 			}
 		}
-		if (AllLocalEnergyR.size() > 20)
+		if (AllLocalEnergyR.size() > 50)
 		{
 			double maxLastRelativeDiff = 0.0;
 			double relativeDiff;
@@ -2722,7 +2724,8 @@ bool AcceptNewParams(vector<double>& uR, vector<double>& uI, double phiR, double
 			relativeDiff = abs(GetRelativeError(AllLocalEnergyR[AllLocalEnergyR.size() - 2], AllLocalEnergyR.back()));
 			if (relativeDiff / 10.0 > maxLastRelativeDiff)
 			{
-				return false;
+				Log("change in energy is too high", WARNING);
+				//return false;
 			}
 		}
 	}
@@ -2932,6 +2935,17 @@ bool InitializePhysicalSystem()
 		}
 		dynamic_cast<PhysicalSystems::InhBosons1D*>(sys)->SetPairDistributionBinCount(GR_BIN_COUNT);
 		dynamic_cast<PhysicalSystems::InhBosons1D*>(sys)->SetDensityBinCount(RHO_BIN_COUNT);
+	}
+	else if (SYSTEM_TYPE == "InhContactBosons")
+	{
+		sys = new PhysicalSystems::InhContactBosons(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PhysicalSystems::InhContactBosons*>(sys)->SetNodesSPF(NURBS_GRID);
+			dynamic_cast<PhysicalSystems::InhContactBosons*>(sys)->SetNodesPC(NURBS_GRID);
+		}
+		dynamic_cast<PhysicalSystems::InhContactBosons*>(sys)->SetPairDistributionBinCount(GR_BIN_COUNT);
+		dynamic_cast<PhysicalSystems::InhContactBosons*>(sys)->SetDensityBinCount(RHO_BIN_COUNT);
 	}
 	else if (SYSTEM_TYPE == "LinearChain")
 	{
@@ -3161,6 +3175,25 @@ int mainMPI(int argc, char** argv)
 			}
 		}
 		else if (auto s = dynamic_cast<PhysicalSystems::InhBosons1D*>(sys))
+		{
+			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+			{
+				WriteDataToFile(o->grid.gridCenterPoints, "rho_grid", o->grid.name);
+			}
+			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+			{
+				WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
+			}
+			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
+			{
+				WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
+			}
+			if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
+			{
+				WriteGridsToFile(o->grids, "rho2_grid", true);
+			}
+		}
+		else if (auto s = dynamic_cast<PhysicalSystems::InhContactBosons*>(sys))
 		{
 			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
 			{
@@ -3533,6 +3566,33 @@ int mainMPI(int argc, char** argv)
 					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
 					{
 						AppendDataToFile(o->observablesV[0].values, "rho");
+					}
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "gr");
+					}
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "sk");
+					}
+					if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "rho2");
+					}
+				}
+				else if (auto s = dynamic_cast<PhysicalSystems::InhContactBosons*>(sys))
+				{
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "rho");
+						//INFO: write external potential
+						vector<double> potExt;
+						for (auto r : o->grid.gridCenterPoints)
+						{
+							vector<double> vr = {r};
+							potExt.push_back(s->GetExternalPotential(vr));
+						}
+						AppendDataToFile(potExt, "V_ext");
 					}
 					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
 					{
@@ -4302,7 +4362,8 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BosonMixtureCluster_4thorder";
 		//SYSTEM_TYPE = "BosonMixtureCluster";
 		//SYSTEM_TYPE = "InhBosons1D";
-		SYSTEM_TYPE = "LinearChain";
+		SYSTEM_TYPE = "InhContactBosons";
+		//SYSTEM_TYPE = "LinearChain";
 		//SYSTEM_TYPE = "NUBosonsBulk";
 		//SYSTEM_TYPE = "NUBosonsBulkPB";
 		//SYSTEM_TYPE = "NUBosonsBulkPBBox";
@@ -4394,6 +4455,11 @@ int main(int argc, char **argv)
 			configFilePath = "/home/gartner/Sources/TDVMC/config/InhBosons1D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhBosons1D_QU.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhBosons1D_QU_Pulse.config";
+		}
+		else if (SYSTEM_TYPE == "InhContactBosons")
+		{
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosons.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosons_QU.config";
 		}
 		else if (SYSTEM_TYPE == "LinearChain")
 		{
