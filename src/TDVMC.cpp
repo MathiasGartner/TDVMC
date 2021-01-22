@@ -86,6 +86,9 @@ double LBOX;
 double LBOX_R;
 int DIM;     	        	 	//number of dimensions
 int N_PARAM;	        	  	//number of parameters of trial function
+int USE_PARAM_START;
+int USE_PARAM_END;
+int USED_PARAM_COUNT;
 double MC_STEP;
 double MC_STEP_OFFSET;			//INFO: currently not used
 int MC_NSTEPS;
@@ -372,6 +375,8 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("LBOX", &LBOX, ConfigItemType::DOUBLE));
 	configItems.push_back(ConfigItem("DIM", &DIM, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("N_PARAM", &N_PARAM, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("USE_PARAM_START", &USE_PARAM_START, ConfigItemType::INT));
+	configItems.push_back(ConfigItem("USE_PARAM_END", &USE_PARAM_END, ConfigItemType::INT));
 	configItems.push_back(ConfigItem("RHO", &RHO, ConfigItemType::DOUBLE));
 	configItems.push_back(ConfigItem("RC", &RC, ConfigItemType::DOUBLE));
 	configItems.push_back(ConfigItem("MC_STEP", &MC_STEP, ConfigItemType::DOUBLE));
@@ -601,6 +606,9 @@ void Init()
 	nTrials = 0;
 	InitVector(nAcceptancesPP, N, 0);
 	InitVector(nTrialsPP, N, 0);
+
+	//use only a subset of parameters
+	USED_PARAM_COUNT = USE_PARAM_END - USE_PARAM_START + 1;
 
 	mc_nsteps = (double) MC_NSTEPS;
 	mc_nsteps_original = MC_NSTEPS;
@@ -1551,30 +1559,32 @@ void BuildSystemOfEquationsForParametersIncludePhiWithTimeRotation(vector<vector
 
 void BuildSystemOfEquationsForParametersIncludePhi(vector<vector<double> >& matrix, vector<double>& energiesReal, vector<double>& energiesImag)
 {
-	energiesReal.resize(N_PARAM);
-	energiesImag.resize(N_PARAM);
-	matrix.resize(N_PARAM);
+	energiesReal.resize(USED_PARAM_COUNT);
+	energiesImag.resize(USED_PARAM_COUNT);
+	matrix.resize(USED_PARAM_COUNT);
 	for (auto &i : matrix)
 	{
-		i.resize(N_PARAM);
+		i.resize(USED_PARAM_COUNT);
 	}
 
-	for (int i = 0; i < N_PARAM; i++)
+	for (int i = 0; i < USED_PARAM_COUNT; i++)
 	{
+		int param_i = USE_PARAM_START + i;
 		if (IMAGINARY_TIME == 0)
 		{
 			//energiesReal[i] = localOperatorlocalEnergyI[i];
-			energiesReal[i] = localOperatorlocalEnergyI[i] - localEnergyI * localOperators[i];
-			energiesImag[i] = -localOperatorlocalEnergyR[i] + localEnergyR * localOperators[i];
+			energiesReal[i] = localOperatorlocalEnergyI[param_i] - localEnergyI * localOperators[param_i];
+			energiesImag[i] = -localOperatorlocalEnergyR[param_i] + localEnergyR * localOperators[param_i];
 		}
 		else
 		{
-			energiesReal[i] = -localOperatorlocalEnergyR[i] + localEnergyR * localOperators[i];
-			energiesImag[i] = -localOperatorlocalEnergyI[i];
+			energiesReal[i] = -localOperatorlocalEnergyR[param_i] + localEnergyR * localOperators[param_i];
+			energiesImag[i] = -localOperatorlocalEnergyI[param_i];
 		}
 		for (int j = 0; j <= i; j++)
 		{
-			matrix[i][j] = localOperatorsMatrix[i][j] - localOperators[i] * localOperators[j];
+			int param_j = USE_PARAM_START + j;
+			matrix[i][j] = localOperatorsMatrix[param_i][param_j] - localOperators[param_i] * localOperators[param_j];
 			matrix[j][i] = matrix[i][j];
 		}
 	}
@@ -1811,11 +1821,11 @@ void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double 
 		{
 			e_matrix.row(i) = Eigen::VectorXd::Map(&matrix[i][0], matrix[i].size());
 		}
-		e_matrix += Eigen::MatrixXd::Identity(N_PARAM, N_PARAM) * 0.001;
+		e_matrix += Eigen::MatrixXd::Identity(USED_PARAM_COUNT, USED_PARAM_COUNT) * 0.001;
 		Eigen::VectorXd e_energiesReal = Eigen::VectorXd::Map(energiesReal.data(), energiesReal.size());
 		Eigen::VectorXd e_energiesImag = Eigen::VectorXd::Map(energiesImag.data(), energiesImag.size());
 
-		Eigen::FullPivHouseholderQR<Eigen::MatrixXd> solver(N_PARAM, N_PARAM);
+		Eigen::FullPivHouseholderQR<Eigen::MatrixXd> solver(USED_PARAM_COUNT, USED_PARAM_COUNT);
 		solver.setThreshold(1.0e-6);
 		solver.compute(e_matrix);
 		//auto svd = e_matrix.bdcSvd(Eigen::DecompositionOptions::ComputeFullU | Eigen::DecompositionOptions::ComputeFullV);
@@ -1825,14 +1835,15 @@ void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double 
 
 		vector<double> uDotR_(resultReal.data(), resultReal.data() + resultReal.size());
 		vector<double> uDotI_(resultImag.data(), resultImag.data() + resultImag.size());
-		uDotR.resize(uDotR_.size());
-		uDotI.resize(uDotI_.size());
+		InitVector(uDotR, N_PARAM, 0.0);
+		InitVector(uDotI, N_PARAM, 0.0);
 		double meanR = Mean(uDotR_);
 		double meanI = Mean(uDotI_);
 		for (unsigned int i = 0; i < uDotR_.size(); i++)
 		{
-			uDotR[i] = uDotR_[i] - meanR;
-			uDotI[i] = uDotI_[i] - meanI;
+			int param_i = USE_PARAM_START + i;
+			uDotR[param_i] = uDotR_[i] - meanR;
+			uDotI[param_i] = uDotI_[i] - meanI;
 		}
 		CalculatePhiDot(uDotR, uDotI, phiDotR, phiDotI);
 		//if (sys->GetStep() == 1)
