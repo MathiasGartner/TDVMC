@@ -98,6 +98,7 @@ int MC_VERY_FIRST_NINITIALIZATIONSTEPS;
 int MC_NADDITIONALSTEPS;
 int MC_NADDITIONALTHERMSTEPS;
 int MC_NADDITIONALINITIALIZATIONSTEPS;
+int MC_NFINALSTEPS_MULTIPLICATOR;
 double RHO;
 double RC;          			//cutoff for WF and LJ
 double TIMESTEP;
@@ -128,7 +129,7 @@ vector<double> NURBS_GRID;
 vector<int> PARTICLE_TYPES;
 vector<double> SYSTEM_PARAMS;
 
-string requiredConfigVersion = "0.22";
+string requiredConfigVersion = "0.23";
 int numOfProcesses = 1;
 int rootRank = 0;
 bool isRootRank = false;
@@ -177,12 +178,9 @@ vector<double> times;
 vector<double> previousStepWeights = { 0.982014, 0.952574, 0.880797, 0.731059, 0.5, 0.268941, 0.119203, 0.0474259, 0.0179862, 0.00669285 };
 vector<SimulationStepData> previousStepData;
 
-mt19937_64 generator;
-//default_random_engine generator;
-uniform_real_distribution<double> distUniform(0.0, 1.0);
-uniform_int_distribution<int> distParticleIndex;
-uniform_int_distribution<int> distParticleIndex1;
-normal_distribution<double> distNormal(0.0, 1.0);
+extern mt19937_64 generator;
+extern uniform_int_distribution<int> distParticleIndex;
+extern uniform_int_distribution<int> distParticleIndex1;
 
 ////////////////////
 /// Log messages ///
@@ -263,75 +261,6 @@ void onSignalStop(int signum)
 /// random number generation ///
 ////////////////////////////////
 
-double random01()
-{
-	return distUniform(generator);
-}
-
-double randomNormal()
-{
-	return distNormal(generator);
-}
-
-double randomNormal(double sigma)
-{
-	return randomNormal() * sigma;
-}
-
-double randomNormal(double sigma, double mu)
-{
-	return randomNormal() * sigma + mu;
-}
-
-int randomInt(int maxValue)
-{
-	//INFO: test for maxValue > 0 is only needed for Gaussian wavepacket simulation where only one  particle is used
-	return maxValue > 0 ? ((int) floor(random01() * maxValue)) % maxValue : maxValue;
-	//return ((int) floor(random01() * maxValue)) % maxValue;
-}
-
-int randomInt(int minValue, int maxValue)
-{
-	return randomInt(maxValue - minValue) + minValue;
-}
-
-int randomParticleIndex()
-{
-	return distParticleIndex(generator);
-}
-
-void ReadRandomGeneratorStatesFromFile(string fileNamePrefix)
-{
-	ifstream fGenerator(configDirectory + fileNamePrefix + "_generator_" + to_string(processRank) + ".dat");
-	fGenerator >> generator;
-	fGenerator.close();
-	ifstream fUniform(configDirectory + fileNamePrefix + "_uniform_" + to_string(processRank) + ".dat");
-	fUniform >> distUniform;
-	fUniform.close();
-	ifstream fNormal(configDirectory + fileNamePrefix + "_normal_" + to_string(processRank) + ".dat");
-	fNormal >> distNormal;
-	fNormal.close();
-	ifstream fParticle(configDirectory + fileNamePrefix + "_particleIndex_" + to_string(processRank) + ".dat");
-	fParticle >> distParticleIndex;
-	fParticle.close();
-}
-
-void WriteRandomGeneratorStatesToFile(string fileNamePrefix)
-{
-	ofstream fGenerator(OUT_DIR + fileNamePrefix + "_generator_" + to_string(processRank) + ".dat");
-	fGenerator << generator;
-	fGenerator.close();
-	ofstream fUniform(OUT_DIR + fileNamePrefix + "_uniform_" + to_string(processRank) + ".dat");
-	fUniform << distUniform;
-	fUniform.close();
-	ofstream fNormal(OUT_DIR + fileNamePrefix + "_normal_" + to_string(processRank) + ".dat");
-	fNormal << distNormal;
-	fNormal.close();
-	ofstream fParticle(OUT_DIR + fileNamePrefix + "_particleIndex_" + to_string(processRank) + ".dat");
-	fParticle << distParticleIndex;
-	fParticle.close();
-}
-
 void (*RandomDisplaceParticle_DIM)(vector<double>& r);
 
 void RandomDisplaceParticle_1D(vector<double>& r)
@@ -388,6 +317,7 @@ void RegisterAllConfigItems()
 	configItems.push_back(ConfigItem("MC_NADDITIONALSTEPS", &MC_NADDITIONALSTEPS, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("MC_NADDITIONALTHERMSTEPS", &MC_NADDITIONALTHERMSTEPS, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("MC_NADDITIONALINITIALIZATIONSTEPS", &MC_NADDITIONALINITIALIZATIONSTEPS, ConfigItemType::INT, true));
+	configItems.push_back(ConfigItem("MC_NFINALSTEPS_MULTIPLICATOR", &MC_NFINALSTEPS_MULTIPLICATOR, ConfigItemType::INT, true));
 	configItems.push_back(ConfigItem("TIMESTEP", &TIMESTEP, ConfigItemType::DOUBLE));
 	configItems.push_back(ConfigItem("TOTALTIME", &TOTALTIME, ConfigItemType::DOUBLE, true));
 	configItems.push_back(ConfigItem("IMAGINARY_TIME", &IMAGINARY_TIME, ConfigItemType::INT));
@@ -585,7 +515,7 @@ void Init()
 	if (FileExist(configDirectory + "random/state" + "_generator_" + to_string(processRank) + ".dat") && FileExist(configDirectory + "random/state" + "_uniform_" + to_string(processRank) + ".dat") && FileExist(configDirectory + "random/state" + "_normal_" + to_string(processRank) + ".dat"))
 	{
 		Log("read random generator configurations");
-		ReadRandomGeneratorStatesFromFile("random/state");
+		ReadRandomGeneratorStatesFromFile("random/state", configDirectory, processRank);
 	}
 	else
 	{
@@ -608,7 +538,14 @@ void Init()
 	InitVector(nTrialsPP, N, 0);
 
 	//use only a subset of parameters
-	USED_PARAM_COUNT = USE_PARAM_END - USE_PARAM_START + 1;
+	if (USE_PARAM_START == 0 && USE_PARAM_END == 0)
+	{
+		USED_PARAM_COUNT = N_PARAM;
+	}
+	else
+	{
+		USED_PARAM_COUNT = USE_PARAM_END - USE_PARAM_START + 1;
+	}
 
 	mc_nsteps = (double) MC_NSTEPS;
 	mc_nsteps_original = MC_NSTEPS;
@@ -3989,7 +3926,7 @@ int mainMPI(int argc, char** argv)
 		cout << tmp << endl;
 	}
 	MPIMethods::Barrier(); // wait for main process to create directory
-	WriteRandomGeneratorStatesToFile("random/state");
+	WriteRandomGeneratorStatesToFile("random/state", configDirectory, processRank);
 	if (isRootRank)
 	{
 		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
@@ -4023,7 +3960,10 @@ int mainMPI(int argc, char** argv)
 	}
 	BroadcastNewParameters(uR, uI, &phiR, &phiI);
 	AlignCoordinates(R);
+	int tmp = MC_NADDITIONALSTEPS;
+	MC_NADDITIONALSTEPS *= MC_NFINALSTEPS_MULTIPLICATOR;
 	ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
+	MC_NADDITIONALSTEPS = tmp;
 	if (isRootRank)
 	{
 		//WriteDataToFile(additionalSystemProperties, "AdditionalSystemProperties", "g(r), ...");
@@ -4257,7 +4197,7 @@ int startVMCSamplerMPI(int argc, char** argv)
 	}
 
 	MPIMethods::Barrier(); // wait for main process to create directory
-	WriteRandomGeneratorStatesToFile("random/state");
+	WriteRandomGeneratorStatesToFile("random/state", configDirectory, processRank);
 
 	nAcceptances = 0;
 	nTrials = 0;
@@ -4469,8 +4409,8 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "InhContactBosons")
 		{
-			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosons.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosons_QU.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosons.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosons_QU.config";
 		}
 		else if (SYSTEM_TYPE == "LinearChain")
 		{

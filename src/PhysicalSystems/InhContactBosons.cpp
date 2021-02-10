@@ -22,6 +22,7 @@ InhContactBosons::InhContactBosons(vector<double>& params, string configDirector
 
 	exponentNew = 0;
 
+	//INFO: gamma=10 equals c=20 in 10.1103/PhysRevA.74.031605
 	gamma = params[0] == 0.0 ? params[1] : 0.0;
 }
 
@@ -458,11 +459,12 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 		//for (int k = 1; k < potentialK; k++) {
 		//	value += cos(k * 2.0 * M_PI * x / LBOX);
 		//}
-		value += exp(-4.0*x*x);
-		//value = cos(potentialK * 2.0 * M_PI * x / LBOX);
+		//value += exp(-4.0*x*x);
+		value = cos(potentialK * 2.0 * M_PI * x / LBOX);
 		//value += cos(0.5 * potentialK * 2.0 * M_PI * x / LBOX);
 		//value *= 0.5 * potentialStrength;
 		value *= potentialStrength;
+		value += params[9] * randomNormal();
 	}
 	if (params.size() > 4 && params[4] > 0.0 && this->time >= params[4])
 	{
@@ -473,7 +475,7 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 		//value *= sin(2.0 * M_PI * this->time * params[9]);
 		//value *= (sin(2.0 * M_PI * this->time * params[9]) + sin(2.0 * M_PI * this->time * params[9] * 0.5)) * 0.5;
 		//gauss
-		value *= exp(-pow((this->time - params[9])/(params[9] * 0.4), 2.0));
+		//value *= exp(-pow((this->time - params[9])/(params[9] * 0.4), 2.0));
 	}
 	//value = 0.0;
 	//value = abs(x);

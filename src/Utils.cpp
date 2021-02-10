@@ -2,6 +2,81 @@
 
 using namespace std;
 
+mt19937_64 generator;
+uniform_real_distribution<double> distUniform(0.0, 1.0);
+uniform_int_distribution<int> distParticleIndex;
+uniform_int_distribution<int> distParticleIndex1;
+normal_distribution<double> distNormal(0.0, 1.0);
+
+double random01()
+{
+	return distUniform(generator);
+}
+
+double randomNormal()
+{
+	return distNormal(generator);
+}
+
+double randomNormal(double sigma)
+{
+	return randomNormal() * sigma;
+}
+
+double randomNormal(double sigma, double mu)
+{
+	return randomNormal() * sigma + mu;
+}
+
+int randomInt(int maxValue)
+{
+	//INFO: test for maxValue > 0 is only needed for Gaussian wavepacket simulation where only one  particle is used
+	return maxValue > 0 ? ((int) floor(random01() * maxValue)) % maxValue : maxValue;
+	//return ((int) floor(random01() * maxValue)) % maxValue;
+}
+
+int randomInt(int minValue, int maxValue)
+{
+	return randomInt(maxValue - minValue) + minValue;
+}
+
+int randomParticleIndex()
+{
+	return distParticleIndex(generator);
+}
+
+void ReadRandomGeneratorStatesFromFile(string fileNamePrefix, string configDirectory, int processRank)
+{
+	ifstream fGenerator(configDirectory + fileNamePrefix + "_generator_" + to_string(processRank) + ".dat");
+	fGenerator >> generator;
+	fGenerator.close();
+	ifstream fUniform(configDirectory + fileNamePrefix + "_uniform_" + to_string(processRank) + ".dat");
+	fUniform >> distUniform;
+	fUniform.close();
+	ifstream fNormal(configDirectory + fileNamePrefix + "_normal_" + to_string(processRank) + ".dat");
+	fNormal >> distNormal;
+	fNormal.close();
+	ifstream fParticle(configDirectory + fileNamePrefix + "_particleIndex_" + to_string(processRank) + ".dat");
+	fParticle >> distParticleIndex;
+	fParticle.close();
+}
+
+void WriteRandomGeneratorStatesToFile(string fileNamePrefix, string configDirectory, int processRank)
+{
+	ofstream fGenerator(OUT_DIR + fileNamePrefix + "_generator_" + to_string(processRank) + ".dat");
+	fGenerator << generator;
+	fGenerator.close();
+	ofstream fUniform(OUT_DIR + fileNamePrefix + "_uniform_" + to_string(processRank) + ".dat");
+	fUniform << distUniform;
+	fUniform.close();
+	ofstream fNormal(OUT_DIR + fileNamePrefix + "_normal_" + to_string(processRank) + ".dat");
+	fNormal << distNormal;
+	fNormal.close();
+	ofstream fParticle(OUT_DIR + fileNamePrefix + "_particleIndex_" + to_string(processRank) + ".dat");
+	fParticle << distParticleIndex;
+	fParticle.close();
+}
+
 bool FileExist(string path)
 {
 	ifstream file(path.c_str());

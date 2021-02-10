@@ -26,6 +26,32 @@ const int exportPrecisionSc = 15;
 const int colWidth = 24;
 const string fileExtension = ".dat";
 
+////////////////////////////////
+/// random number generation ///
+////////////////////////////////
+
+double random01();
+
+double randomNormal();
+
+double randomNormal(double sigma);
+
+double randomNormal(double sigma, double mu);
+
+int randomInt(int maxValue);
+
+int randomInt(int minValue, int maxValue);
+
+int randomParticleIndex();
+
+void ReadRandomGeneratorStatesFromFile(string fileNamePrefix, string configDirectory, int processRank);
+
+void WriteRandomGeneratorStatesToFile(string fileNamePrefix, string configDirectory, int processRank);
+
+/////////////
+/// Utils ///
+/////////////
+
 template<typename T> string JoinVector(const vector<T>& v, int everyNth = 1, bool fixedForm = false)
 {
 	string text = "";
