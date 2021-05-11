@@ -129,7 +129,7 @@ vector<double> NURBS_GRID;
 vector<int> PARTICLE_TYPES;
 vector<double> SYSTEM_PARAMS;
 
-string requiredConfigVersion = "0.23";
+string requiredConfigVersion = "0.24";
 int numOfProcesses = 1;
 int rootRank = 0;
 bool isRootRank = false;

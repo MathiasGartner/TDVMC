@@ -448,6 +448,7 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 	double value = 0.0;
 	double potentialK = params[2];
 	double potentialStrength = params[3];
+	double kf = M_PI; //INFO: kf = \pi * n = \pi * N / LBOX; change this if density n is not equal to one.
 	x = GetCoordinateNIC(r[0]) + halfLength;
 	if (params.size() > 4)
 	{
@@ -456,15 +457,31 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 	}
 	if (potentialK > 0.0 && potentialStrength > 0.0)
 	{
-		//for (int k = 1; k < potentialK; k++) {
-		//	value += cos(k * 2.0 * M_PI * x / LBOX);
-		//}
-		//value += exp(-4.0*x*x);
-		value = cos(potentialK * 2.0 * M_PI * x / LBOX);
-		//value += cos(0.5 * potentialK * 2.0 * M_PI * x / LBOX);
-		//value *= 0.5 * potentialStrength;
+		value = sin(potentialK * kf * x);
+		value *= value; //sin^2
 		value *= potentialStrength;
-		value += params[9] * randomNormal();
+	}
+	//INFO: add noise
+	if (params.size() > 8)
+	{
+		//additive noise
+		//value += params[9] * randomNormal();
+
+		//multiply external potential by gauss in time
+		//value *= 1.0 + exp(-pow((this->time - params[9])/(params[9] * 0.4), 2.0)) * 0.001;
+
+		//add external potential of different k and gaussian in time
+		double pulseK = params[10];
+		double pulseStrength = params[11];
+		for (int i = -1; i <=1; i++)
+		{
+			pulseK = params[10] + i * 0.05;
+			double pulse = sin(pulseK * kf * x);
+			pulse *= pulse; //sin^2
+			pulse *= pulseStrength;
+			pulse *= exp(-pow((this->time - params[9])/(params[9] * 0.4), 2.0));
+			value += pulse;
+		}
 	}
 	if (params.size() > 4 && params[4] > 0.0 && this->time >= params[4])
 	{
