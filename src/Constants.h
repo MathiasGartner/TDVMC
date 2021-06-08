@@ -19,6 +19,7 @@ extern int IMAGINARY_TIME;					//0: real time, 1: imaginary time
 
 extern double LBOX;				    //length of box
 extern double LBOX_R;				//reciprocal length of box
+extern double LBOX_2;				//half of box length
 
 namespace Constants
 {

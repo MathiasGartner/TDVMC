@@ -461,7 +461,7 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 		value *= value; //sin^2
 		value *= potentialStrength;
 	}
-	//INFO: add noise
+	//INFO: add perturbation
 	if (params.size() > 8)
 	{
 		//additive noise
@@ -473,9 +473,11 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 		//add external potential of different k and gaussian in time
 		double pulseK = params[10];
 		double pulseStrength = params[11];
-		for (int i = -1; i <=1; i++)
+		//for (int i = -5; i <= 4; i++)
+		for (int i = 1; i < 10; i++)
 		{
-			pulseK = params[10] + i * 0.05;
+			//pulseK = params[10] + i * 0.05;
+			pulseK = i * 0.05;
 			double pulse = sin(pulseK * kf * x);
 			pulse *= pulse; //sin^2
 			pulse *= pulseStrength;

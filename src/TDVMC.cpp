@@ -84,6 +84,7 @@ string OUT_DIR_NAME;			//if not empty, exactly this name is used as output direc
 int N;           	    		//number of particles
 double LBOX;
 double LBOX_R;
+double LBOX_2;
 int DIM;     	        	 	//number of dimensions
 int N_PARAM;	        	  	//number of parameters of trial function
 int USE_PARAM_START;
@@ -532,6 +533,7 @@ void Init()
 	//INFO: box length is specified in cofig file due to problems with rounding errors
 	//LBOX = pow((N / RHO), 1.0 / DIM); //box with dimensions [-L/2, L/2]
 	LBOX_R = 1.0 / LBOX;
+	LBOX_2 = LBOX / 2.0;
 	nAcceptances = 0;
 	nTrials = 0;
 	InitVector(nAcceptancesPP, N, 0);
@@ -1159,6 +1161,7 @@ void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>&
 	t.stop();
 	dblDuration = (double) t.duration();
 	//INFO: sometimes error **MPI Error, rank:0, function:MPI_REDUCE, Message truncated on receive**
+	//					 or **MPT ERROR: rank:0, function:MPI_REDUCE, Message truncated on receive: sender sent too much data**
 	vector<double> timings = MPIMethods::ReduceToMinMaxMean(dblDuration);
 	if (isRootRank && !intermediateStep)
 	{
@@ -1684,7 +1687,7 @@ void PreconditionEquationSystemByScaling(vector<vector<double> >& matrix, vector
 	{
 		for (unsigned int j = 0; j < matrix.size(); j++)
 		{
-			matrix[i][j] /= preconditionScalings[i] * preconditionScalings[j];
+			matrix[i][j] /= (preconditionScalings[i] * preconditionScalings[j]);
 		}
 		energiesReal[i] /= preconditionScalings[i];
 		energiesImag[i] /= preconditionScalings[i];
@@ -1696,8 +1699,8 @@ void RegularizeEquationSystem(vector<vector<double> >& matrix, double eps)
 	//INFO: for square matrices only!
 	for (unsigned int i = 0; i < matrix.size(); i++)
 	{
-		//matrix[i][i] += eps;
-		matrix[i][i] += matrix[i][i] * eps;
+		matrix[i][i] += eps;
+		//matrix[i][i] += matrix[i][i] * eps;
 	}
 }
 
@@ -1753,20 +1756,36 @@ void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double 
 	}
 	else if (LINEAR_EQUATION_SOLVER_TYPE == 1) //SVD or FullPivHouseholderQR
 	{
+
+		vector<double> preconditionScalings;
+		if (USE_PRECONDITIONING == 1)
+		{
+			PreconditionEquationSystemByScaling(matrix, energiesReal, energiesImag, preconditionScalings);
+			RegularizeEquationSystem(matrix, 0.002);
+		}
+
 		Eigen::MatrixXd e_matrix(matrix.size(), matrix.size());
 		for (unsigned int i = 0; i < matrix.size(); i++)
 		{
 			e_matrix.row(i) = Eigen::VectorXd::Map(&matrix[i][0], matrix[i].size());
 		}
-		e_matrix += Eigen::MatrixXd::Identity(USED_PARAM_COUNT, USED_PARAM_COUNT) * 0.001;
+		//e_matrix += Eigen::MatrixXd::Identity(USED_PARAM_COUNT, USED_PARAM_COUNT) * 0.001;
 		Eigen::VectorXd e_energiesReal = Eigen::VectorXd::Map(energiesReal.data(), energiesReal.size());
 		Eigen::VectorXd e_energiesImag = Eigen::VectorXd::Map(energiesImag.data(), energiesImag.size());
 
+		//LLT
+		//Eigen::LLT<Eigen::MatrixXd> solver(USED_PARAM_COUNT);
+		//solver.compute(e_matrix);
+
+		//FullPivHouseholderQR
 		Eigen::FullPivHouseholderQR<Eigen::MatrixXd> solver(USED_PARAM_COUNT, USED_PARAM_COUNT);
-		solver.setThreshold(1.0e-6);
 		solver.compute(e_matrix);
-		//auto svd = e_matrix.bdcSvd(Eigen::DecompositionOptions::ComputeFullU | Eigen::DecompositionOptions::ComputeFullV);
-		//svd.setThreshold(1e-3);
+
+		//SVD
+		//Eigen::BDCSVD<Eigen::MatrixXd> solver(USED_PARAM_COUNT, USED_PARAM_COUNT, Eigen::DecompositionOptions::ComputeFullU | Eigen::DecompositionOptions::ComputeFullV);
+		//solver.setThreshold(1e-3);
+		//solver.compute(e_matrix);
+
 		Eigen::VectorXd resultReal = solver.solve(e_energiesReal);
 		Eigen::VectorXd resultImag = solver.solve(e_energiesImag);
 
@@ -1789,6 +1808,16 @@ void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double 
 		//	WriteDataToFile(uDotI, "BBuDotI", "BBuDotI");
 		//	exit(0);
 		//}
+
+		if (USE_PRECONDITIONING == 1)
+		{
+			for (unsigned int i = 0; i < uDotR.size(); i++)
+			{
+				uDotR[i] /= preconditionScalings[i];
+				uDotI[i] /= preconditionScalings[i];
+			}
+		}
+
 	}
 }
 
@@ -3537,7 +3566,7 @@ int mainMPI(int argc, char** argv)
 						vector<double> potExt;
 						for (auto r : o->grid.gridCenterPoints)
 						{
-							vector<double> vr = {r};
+							vector<double> vr = { r };
 							potExt.push_back(s->GetExternalPotential(vr));
 						}
 						AppendDataToFile(potExt, "V_ext");
@@ -3564,7 +3593,7 @@ int mainMPI(int argc, char** argv)
 						vector<double> potExt;
 						for (auto r : o->grid.gridCenterPoints)
 						{
-							vector<double> vr = {r};
+							vector<double> vr = { r };
 							potExt.push_back(s->GetExternalPotential(vr));
 						}
 						AppendDataToFile(potExt, "V_ext");
@@ -4235,6 +4264,7 @@ void startVMCSampler()
 
 	LBOX = 4;
 	LBOX_R = 1.0 / LBOX;
+	LBOX_2 = LBOX / 2.0;
 	N = 64;
 	DIM = 3;
 	N_PARAM = 100;
@@ -4409,7 +4439,8 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "InhContactBosons")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosons.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosons.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosonsLinearResponseToPulse.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosons_QU.config";
 		}
 		else if (SYSTEM_TYPE == "LinearChain")

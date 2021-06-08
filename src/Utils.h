@@ -8,6 +8,7 @@
 #include "Observables/ObservableVsOnGrid.h"
 #include "Observables/ObservableVsOnMultiGrid.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <fstream>
@@ -131,6 +132,8 @@ vector<double> AllVectorDisplacements(vector<double>& ri, vector<double>& rj, do
 
 double GetRelativeError(double d1, double d2);
 double GetRelativeErrorLastElements(vector<double> v);
+
+vector<double> ElementwiseMultiply(vector<double>& a, vector<double>& b);
 
 double Sum(vector<double>& v);
 vector<double> Sum(vector<vector<double> >& v);

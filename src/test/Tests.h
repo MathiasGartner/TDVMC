@@ -78,6 +78,7 @@ void TestVectorDisplacements()
 	cout << "LBOX=4, DIM=3" << endl;
 	LBOX = 4;
 	LBOX_R = 1.0 / LBOX;
+	LBOX_2 = LBOX / 2.0;
 	DIM = 3;
 	TestVectorDisplacement(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 	TestVectorDisplacement(0, 0, 0, 1, 0, 0, 1, -1, 0, 0);
@@ -100,6 +101,7 @@ void TestVectorDisplacements()
 	cout << "LBOX=5, DIM=3" << endl;
 	LBOX = 5;
 	LBOX_R = 1.0 / LBOX;
+	LBOX_2 = LBOX / 2.0;
 	DIM = 3;
 	TestVectorDisplacement(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 	TestVectorDisplacement(0, 0, 0, 1, 0, 0, 1, -1, 0, 0);
@@ -124,6 +126,7 @@ void TestVectorDisplacements()
 	cout << "LBOX=4, DIM=1" << endl;
 	LBOX = 4;
 	LBOX_R = 1.0 / LBOX;
+	LBOX_2 = LBOX / 2.0;
 	DIM = 1;
 	TestVectorDisplacement(0, 0, 0, 0);
 	TestVectorDisplacement(0, 1, 1, -1);
@@ -138,6 +141,7 @@ void TestVectorDisplacements()
 	cout << "LBOX=5, DIM=1" << endl;
 	LBOX = 5;
 	LBOX_R = 1.0 / LBOX;
+	LBOX_2 = LBOX / 2.0;
 	DIM = 1;
 	TestVectorDisplacement(0, 0, 0, 0);
 	TestVectorDisplacement(0, 1, 1, -1);

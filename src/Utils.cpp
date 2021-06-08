@@ -109,7 +109,8 @@ string PrintArrayValues(double* r, int length)
 //returns the index i for which list[i] <= value < list[i+1] holds
 int GetBinIndex(vector<double>& list, double value)
 {
-	return lower_bound(list.begin(), list.end(), value) - list.begin() - 1;
+	//return lower_bound(list.begin(), list.end(), value) - list.begin() - 1;
+	return upper_bound(list.begin(), list.end(), value) - list.begin() - 1;
 }
 
 vector<double> VectorAbs(vector<double> v)
@@ -264,9 +265,19 @@ double VectorDisplacement(vector<double>& ri, vector<double>& rj, vector<double>
 //INFO: returns nearest image of r in the range [-L/2, L/2]
 double GetCoordinateNIC(double r)
 {
+	double result;
 	int k;
 	k = (int) (r * LBOX_R + ((r >= 0.0) ? 0.5 : -0.5));
-	return r - k * LBOX;
+	result = r - k * LBOX;
+	if (result == LBOX_2)
+	{
+		result -= 1e-10;
+	}
+	else if (result == -LBOX_2)
+	{
+		result += 1e-10;
+	}
+	return result;
 }
 
 void (*GetVectorNIC_DIM)(vector<double>& r, vector<double>& rNIC);
@@ -451,6 +462,13 @@ double GetRelativeError(double d1, double d2)
 double GetRelativeErrorLastElements(vector<double> v)
 {
 	return GetRelativeError(v[v.size() - 2], v[v.size() - 1]);
+}
+
+vector<double> ElementwiseMultiply(vector<double>& a, vector<double>& b)
+{
+	vector<double> result(a.size());
+	std::transform(a.begin(), a.end(), b.begin(), result.begin(), std::multiplies<double>());
+	return result;
 }
 
 double Sum(vector<double>& v)
