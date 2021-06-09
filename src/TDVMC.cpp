@@ -1162,13 +1162,19 @@ void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>&
 	dblDuration = (double) t.duration();
 	//INFO: sometimes error **MPI Error, rank:0, function:MPI_REDUCE, Message truncated on receive**
 	//					 or **MPT ERROR: rank:0, function:MPI_REDUCE, Message truncated on receive: sender sent too much data**
-	vector<double> timings = MPIMethods::ReduceToMinMaxMean(dblDuration);
+	/*vector<double> timings = MPIMethods::ReduceToMinMaxMean(dblDuration);
 	if (isRootRank && !intermediateStep)
 	{
 		Log("duration: min = " + to_string(timings[0]) + " ms");
 		Log("          max = " + to_string(timings[1]) + " ms");
 		Log("          <t> = " + to_string(timings[2]) + " ms");
-	}
+	}*/
+	/*
+	MPIMethods::ReduceToAverage(&dblDuration);
+	if (isRootRank && !intermediateStep)
+	{
+		Log("duration: <t> = " + to_string(dblDuration) + " ms");
+	}*/
 
 	//Log("localOperators" + to_string(processRank));
 	//WriteDataToFile(localOperators, "localOperators" + to_string(processRank), "localOperators");
