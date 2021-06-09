@@ -2102,6 +2102,109 @@ void CalculateNextParametersRK4ReuseSamples(double dt, vector<double>& uR, vecto
 	}
 }
 
+double CalculateNextParametersDP5(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
+{
+	//TODO: use FSAL (First Same As Last)
+	double err = 1.0;
+	int n = 6;
+	vector<vector<double>> a =
+		{
+			{ 1./5. },
+			{ 3./40., 9./40. },
+			{ 44./45., -56./15., 32./9 },
+			{ 19372./6561., -25360./2187., 64448./6561., -212./729 },
+			{ 9017./3168., -355./33., 46732./5247., 49./176., -5103./18656 },
+			{ 35./384., 0., 500./1113., 125./192., -2187./6784., 11./84 }
+		};
+	vector<double> b5 = { 35./384., 0., 500./1113., 125./192., -2187./6784., 11./84., 0. };
+	vector<double> b4 = { 5179./57600., 0., 7571./16695., 393./640., -92097./339200., 187./2100., 1./40. };
+	vector<double> c = { 1./5., 3./10., 4./5., 8./9., 1., 1. };
+
+	vector<double> tmpUR(N_PARAM);
+	vector<double> tmpUI(N_PARAM);
+	double tmpPhiR = 0;
+	double tmpPhiI = 0;
+
+	vector<vector<double> > uDotR;
+	vector<vector<double> > uDotI;
+	vector<double> phiDotR;
+	vector<double> phiDotI;
+
+	double oldNormR = 0;
+	double oldNormI = 0;
+	vector<double> diffR;
+	vector<double> diffI;
+	InitVector(diffR, N_PARAM, 0.0);
+	InitVector(diffI, N_PARAM, 0.0);
+
+	ClearVector(tmpUR);
+	ClearVector(tmpUI);
+	uDotR.resize(n);
+	uDotI.resize(n);
+	phiDotR.resize(n);
+	phiDotI.resize(n);
+	double startTime;
+
+	startTime = sys->GetTime();
+	if (isRootRank)
+	{
+		oldNormR = VectorNorm(uR);
+		oldNormI = VectorNorm(uI);
+	}
+	for (int i = 0; i < n-1; i++)
+	{
+		if (isRootRank)
+		{
+			SolveForParametersDot(uDotR[i], uDotI[i], &(phiDotR[i]), &(phiDotI[i])); //uDotR[i] corresponds to k_i in Runge Kutta scheme
+			tmpUR = uR; //tmpUR are new parameters used to calculate the next k_i
+			tmpUI = uI;
+			tmpPhiR = *phiR;
+			tmpPhiI = *phiI;
+			for (int j = 0; j <= i; j++)
+			{
+				tmpUR += uDotR[j] * a[i][j];
+				tmpUI += uDotI[j] * a[i][j];
+				tmpPhiR += phiDotR[j] * a[i][j];
+				tmpPhiI += phiDotI[j] * a[i][j];
+			}
+		}
+		sys->SetTime(startTime + dt * c[i]);
+		BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
+		ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
+	}
+
+	if (isRootRank)
+	{
+		SolveForParametersDot(uDotR[n-1], uDotI[n-1], &(phiDotR[n-1]), &(phiDotI[n-1]));
+		for (int i = 0; i < n; i++)
+		{
+			uR += uDotR[i] * b5[i] * dt;
+			uI += uDotI[i] * b5[i] * dt;
+			*phiR += phiDotR[i] * b5[i] * dt;
+			*phiI += phiDotI[i] * b5[i] * dt;
+			diffR += uDotR[i] * (b5[i] - b4[i]) * dt;
+			diffI += uDotI[i] * (b5[i] - b4[i]) * dt;
+		}
+	}
+
+	sys->SetTime(startTime);
+
+	if (isRootRank)
+	{
+		double atol = 1e-6;
+		double rtol = 1e-6;
+		double normR = VectorNorm(uR);
+		double normI = VectorNorm(uI);
+		double tolR = atol + max(oldNormR, normR) * rtol;
+		double tolI = atol + max(oldNormI, normI) * rtol;
+		double errR = VectorNorm(uR) / (sqrt(N_PARAM) * tolR);
+		double errI = VectorNorm(uI) / (sqrt(N_PARAM) * tolI);
+		err = max(errR, errI);
+	}
+
+	return err;
+}
+
 void CalculateNextParametersImplicitEuler(double dt, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
 	vector<double> uR_Start(uR);
@@ -2451,8 +2554,9 @@ void CalculateNextParametersCrankNicolson(double dt, vector<double>& uR, vector<
 	}
 }
 
-void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
+double CalculateNextParameters(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
+	double err = 1.0;
 	Timer t;
 	if (isRootRank)
 	{
@@ -2503,19 +2607,26 @@ void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<doubl
 			CalculateNextParametersCrankNicolson(dt, uR, uI, phiR, phiI);
 		}
 	}
+	else if (ODE_SOLVER_TYPE == 45)
+	{
+		vector<vector<double> >& Rcopy(R);
+		err = CalculateNextParametersDP5(dt, Rcopy, uR, uI, phiR, phiI);
+	}
 
 	if (isRootRank)
 	{
 		t.stop();
 		Log("DGL duration = " + to_string(t.duration()) + " ms");
 	}
+
+	return err;
 }
 
-void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI)
+double CalculateNextParameters(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI)
 {
 	double tmpPhiR = 0;
 	double tmpPhiI = 0;
-	CalculateNextParameters(dt, R, uR, uI, &tmpPhiR, &tmpPhiI);
+	return CalculateNextParameters(dt, R, uR, uI, &tmpPhiR, &tmpPhiI);
 }
 
 ////////////
@@ -3416,7 +3527,10 @@ int mainMPI(int argc, char** argv)
 		DoMetropolisStep(R, uR, uI, phiR, phiI);
 	}
 	sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
-	for (currentTime = 0; currentTime <= TOTALTIME; currentTime += dynTimestep)
+	currentTime = 0;
+	bool isAdaptiveODESolver = ODE_SOLVER_TYPE == 45;
+	double dynTimestepFactor = 1.0;
+	while (currentTime <= TOTALTIME)
 	{
 		if (isRootRank)
 		{
@@ -3647,6 +3761,7 @@ int mainMPI(int argc, char** argv)
 		////////////////////////////////////////
 		while (acceptNewParams != 1 && nrOfAcceptParameterTrials < maxNrOfAcceptParameterTrials)
 		{
+			double timeStepError = 0;
 			nrOfAcceptParameterTrials++;
 			MC_NSTEPS *= nrOfAcceptParameterTrials;
 			AlignCoordinates(R);
@@ -3756,7 +3871,7 @@ int mainMPI(int argc, char** argv)
 			}
 			if (sys->USE_NORMALIZATION_AND_PHASE)
 			{
-				CalculateNextParameters(dynTimestep, R, uR, uI, &phiR, &phiI);
+				timeStepError = CalculateNextParameters(dynTimestep, R, uR, uI, &phiR, &phiI);
 				if (isRootRank && USE_NORMALIZE_WF == 1)
 				{
 					//NormalizeWavefunction(sys->GetWf(), &phiR);
@@ -3767,12 +3882,16 @@ int mainMPI(int argc, char** argv)
 			}
 			else
 			{
-				CalculateNextParameters(dynTimestep, R, uR, uI);
+				timeStepError = CalculateNextParameters(dynTimestep, R, uR, uI);
 			}
+
 			if (isRootRank && USE_ADJUST_PARAMETERS == 1)
 			{
 				AdjustParameters(uR, uI, &phiR, &phiI);
 			}
+
+			//Check if parameters should be accepted
+			acceptNewParams = 1;
 			if (USE_PARAMETER_ACCEPTANCE_CHECK == 1)
 			{
 				if (isRootRank)
@@ -3783,28 +3902,42 @@ int mainMPI(int argc, char** argv)
 						Log("PARAMETERS NOT ACCEPTED", ERROR);
 					}
 				}
-				MPIMethods::BroadcastValue(&acceptNewParams);
-				if (acceptNewParams != 1)
-				{
-					if (isRootRank)
-					{
-						AllLocalEnergyR.pop_back();
-						AllLocalEnergyI.pop_back();
-						AllLocalOperators.pop_back();
-						AllOtherExpectationValues.pop_back();
-						AllParametersR.pop_back();
-						AllParametersI.pop_back();
-						uR = uRList.back();
-						uI = uIList.back();
-						phiR = phiRList.back();
-						phiI = phiIList.back();
-					}
-					BroadcastNewParameters(uR, uI, &phiR, &phiI);
-				}
 			}
-			else
+			//see chapter II.4 Automatic Step Size Control in  "Solving Ordinary Differential Equations I" by Hairer, Norsett and Wanner
+			if (isAdaptiveODESolver)
 			{
-				acceptNewParams = 1;
+				if (isRootRank)
+				{
+					if (timeStepError > 1.0)
+					{
+						acceptNewParams = false;
+					}
+					double facMax = 1.2;
+					double facMin = 0.5;
+					double facSafety = 0.9;
+					double pExponent = 4.0 + 1.0;
+					double fac = clamp(facSafety * pow(timeStepError, -1.0 / pExponent), facMin, facMax);
+					dynTimestepFactor = fac;
+				}
+				MPIMethods::BroadcastValue(&dynTimestep);
+			}
+			MPIMethods::BroadcastValue(&acceptNewParams);
+			if (acceptNewParams != 1)
+			{
+				if (isRootRank)
+				{
+					AllLocalEnergyR.pop_back();
+					AllLocalEnergyI.pop_back();
+					AllLocalOperators.pop_back();
+					AllOtherExpectationValues.pop_back();
+					AllParametersR.pop_back();
+					AllParametersI.pop_back();
+					uR = uRList.back();
+					uI = uIList.back();
+					phiR = phiRList.back();
+					phiI = phiIList.back();
+				}
+				BroadcastNewParameters(uR, uI, &phiR, &phiI);
 			}
 		}
 
@@ -3899,7 +4032,7 @@ int mainMPI(int argc, char** argv)
 		if (cancel != 0)
 		{
 			TOTALTIME = currentTime;
-			break; //break for (currentTime = 0; currentTime <= TOTALTIME; currentTime += TIMESTEP)
+			break; //while (currentTime <= TOTALTIME)
 		}
 		if (configChanged != 0)
 		{
@@ -3922,7 +4055,9 @@ int mainMPI(int argc, char** argv)
 			Log("duration for full timestep: " + to_string(t.duration()) + " ms");
 		}
 
+		currentTime += dynTimestep;
 		step++;
+		dynTimestep *= dynTimestepFactor;
 	}
 
 	//if (isRootRank)
