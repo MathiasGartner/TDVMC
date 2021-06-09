@@ -2106,7 +2106,7 @@ double CalculateNextParametersDP5(double dt, vector<vector<double> >& R, vector<
 {
 	//TODO: use FSAL (First Same As Last)
 	double err = 1.0;
-	int n = 6;
+	int n = 7;
 	vector<vector<double>> a =
 		{
 			{ 1./5. },
@@ -2162,13 +2162,13 @@ double CalculateNextParametersDP5(double dt, vector<vector<double> >& R, vector<
 			tmpPhiI = *phiI;
 			for (int j = 0; j <= i; j++)
 			{
-				tmpUR += uDotR[j] * a[i][j];
-				tmpUI += uDotI[j] * a[i][j];
-				tmpPhiR += phiDotR[j] * a[i][j];
-				tmpPhiI += phiDotI[j] * a[i][j];
+				tmpUR += uDotR[j] * a[i][j] * dt;
+				tmpUI += uDotI[j] * a[i][j] * dt;
+				tmpPhiR += phiDotR[j] * a[i][j] * dt;
+				tmpPhiI += phiDotI[j] * a[i][j] * dt;
 			}
 		}
-		sys->SetTime(startTime + dt * c[i]);
+		sys->SetTime(startTime + c[i] * dt);
 		BroadcastNewParameters(tmpUR, tmpUI, &tmpPhiR, &tmpPhiI);
 		ParallelUpdateExpectationValues(R, tmpUR, tmpUI, tmpPhiR, tmpPhiI, true);
 	}
@@ -2191,14 +2191,14 @@ double CalculateNextParametersDP5(double dt, vector<vector<double> >& R, vector<
 
 	if (isRootRank)
 	{
-		double atol = 1e-6;
-		double rtol = 1e-6;
+		double atol = 1e-4;
+		double rtol = 1e-4;
 		double normR = VectorNorm(uR);
 		double normI = VectorNorm(uI);
 		double tolR = atol + max(oldNormR, normR) * rtol;
 		double tolI = atol + max(oldNormI, normI) * rtol;
-		double errR = VectorNorm(uR) / (sqrt(N_PARAM) * tolR);
-		double errI = VectorNorm(uI) / (sqrt(N_PARAM) * tolI);
+		double errR = VectorNorm(diffR) / (sqrt(N_PARAM) * tolR);
+		double errI = VectorNorm(diffI) / (sqrt(N_PARAM) * tolI);
 		err = max(errR, errI);
 	}
 
@@ -3512,7 +3512,7 @@ int mainMPI(int argc, char** argv)
 	int step = 0;
 	int acceptNewParams;
 	int nrOfAcceptParameterTrials;
-	int maxNrOfAcceptParameterTrials = 2;
+	int maxNrOfAcceptParameterTrials = 5;
 
 	double nrOfSamplesToUpdate;
 	double percentForExtraSampleToUpdate;
@@ -3529,7 +3529,7 @@ int mainMPI(int argc, char** argv)
 	sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
 	currentTime = 0;
 	bool isAdaptiveODESolver = ODE_SOLVER_TYPE == 45;
-	double dynTimestepFactor = 1.0;
+	double acceptedTimeStep = dynTimestep;
 	while (currentTime <= TOTALTIME)
 	{
 		if (isRootRank)
@@ -3912,13 +3912,18 @@ int mainMPI(int argc, char** argv)
 					{
 						acceptNewParams = false;
 					}
-					double facMax = 1.2;
+					else
+					{
+						acceptedTimeStep = dynTimestep;
+					}
+					double facMax = 2.0;
 					double facMin = 0.5;
 					double facSafety = 0.9;
 					double pExponent = 4.0 + 1.0;
 					double fac = clamp(facSafety * pow(timeStepError, -1.0 / pExponent), facMin, facMax);
-					dynTimestepFactor = fac;
+					dynTimestep *= fac;
 				}
+				MPIMethods::BroadcastValue(&acceptedTimeStep);
 				MPIMethods::BroadcastValue(&dynTimestep);
 			}
 			MPIMethods::BroadcastValue(&acceptNewParams);
@@ -4055,9 +4060,15 @@ int mainMPI(int argc, char** argv)
 			Log("duration for full timestep: " + to_string(t.duration()) + " ms");
 		}
 
-		currentTime += dynTimestep;
+		currentTime += acceptedTimeStep;
 		step++;
-		dynTimestep *= dynTimestepFactor;
+
+		if (isAdaptiveODESolver && isRootRank)
+		{
+			Log("###");
+			Log("dt: " + to_string(acceptedTimeStep) + "\t\ttrials: " + to_string(nrOfAcceptParameterTrials));
+			Log("###");
+		}
 	}
 
 	//if (isRootRank)
@@ -4580,8 +4591,8 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "InhContactBosons")
 		{
-			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosons.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosonsLinearResponseToPulse.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosons.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosonsLinearResponseToPulse.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosons_QU.config";
 		}
 		else if (SYSTEM_TYPE == "LinearChain")
