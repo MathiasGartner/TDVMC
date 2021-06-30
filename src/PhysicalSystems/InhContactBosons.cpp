@@ -446,8 +446,8 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 {
 	double x;
 	double value = 0.0;
-	double potentialK = params[2];
-	double potentialStrength = params[3];
+	double potentialK = params[2]; //given in units of kf
+	double potentialStrength = params[3]; //given in units of recoil energy E_r
 	double kf = M_PI; //INFO: kf = \pi * n = \pi * N / LBOX; change this if density n is not equal to one.
 	x = GetCoordinateNIC(r[0]) + halfLength;
 	if (params.size() > 4)
@@ -457,9 +457,11 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 	}
 	if (potentialK > 0.0 && potentialStrength > 0.0)
 	{
-		value = sin(potentialK * kf * x);
+		double k = potentialK * kf;
+		value = sin(k * x);
 		value *= value; //sin^2
-		value *= potentialStrength;
+		value *= potentialStrength; //corresponds to V_0 / E_r
+		value *= k * k; //INFO: potential is given by k^2 V_0 / E_r sin^2(k x) to get a factor of 1 in front of kinetic energy
 	}
 	//INFO: add perturbation
 	if (params.size() > 8)
@@ -478,9 +480,11 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 		{
 			//pulseK = params[10] + i * 0.05;
 			pulseK = i * 0.05;
-			double pulse = sin(pulseK * kf * x);
+			double k = pulseK * kf;
+			double pulse = sin(k * x);
 			pulse *= pulse; //sin^2
 			pulse *= pulseStrength;
+			pulse *= k * k;
 			pulse *= exp(-pow((this->time - params[9])/(params[9] * 0.4), 2.0));
 			value += pulse;
 		}
