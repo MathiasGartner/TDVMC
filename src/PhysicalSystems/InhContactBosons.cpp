@@ -24,6 +24,9 @@ InhContactBosons::InhContactBosons(vector<double>& params, string configDirector
 
 	//INFO: gamma=10 equals c=20 in 10.1103/PhysRevA.74.031605
 	gamma = params[0] == 0.0 ? params[1] : 0.0;
+	double potentialK = params[2];
+	double kf = M_PI;
+	gamma *= potentialK * kf;
 }
 
 void InhContactBosons::ExtendNodes(vector<double>& n)
@@ -476,7 +479,7 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 		double pulseK = params[10];
 		double pulseStrength = params[11];
 		//for (int i = -5; i <= 4; i++)
-		for (int i = 1; i < 10; i++)
+		for (int i = 1; i <= 10; i++)
 		{
 			//pulseK = params[10] + i * 0.05;
 			pulseK = i * 0.05;
