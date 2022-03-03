@@ -12,6 +12,7 @@ CPP_SRCS += \
 ../src/PhysicalSystems/Bosons1D.cpp \
 ../src/PhysicalSystems/Bosons1D0th.cpp \
 ../src/PhysicalSystems/Bosons1D4th.cpp \
+../src/PhysicalSystems/Bosons1DMixture.cpp \
 ../src/PhysicalSystems/Bosons1DSp.cpp \
 ../src/PhysicalSystems/BosonsBulk.cpp \
 ../src/PhysicalSystems/BosonsBulkDamped.cpp \
@@ -42,6 +43,7 @@ OBJS += \
 ./src/PhysicalSystems/Bosons1D.o \
 ./src/PhysicalSystems/Bosons1D0th.o \
 ./src/PhysicalSystems/Bosons1D4th.o \
+./src/PhysicalSystems/Bosons1DMixture.o \
 ./src/PhysicalSystems/Bosons1DSp.o \
 ./src/PhysicalSystems/BosonsBulk.o \
 ./src/PhysicalSystems/BosonsBulkDamped.o \
@@ -72,6 +74,7 @@ CPP_DEPS += \
 ./src/PhysicalSystems/Bosons1D.d \
 ./src/PhysicalSystems/Bosons1D0th.d \
 ./src/PhysicalSystems/Bosons1D4th.d \
+./src/PhysicalSystems/Bosons1DMixture.d \
 ./src/PhysicalSystems/Bosons1DSp.d \
 ./src/PhysicalSystems/BosonsBulk.d \
 ./src/PhysicalSystems/BosonsBulkDamped.d \

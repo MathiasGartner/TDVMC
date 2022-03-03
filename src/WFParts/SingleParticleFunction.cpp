@@ -7,7 +7,7 @@ SingleParticleFunction::SingleParticleFunction() : SplinedFunction(3)
 {
 }
 
-SingleParticleFunction::SingleParticleFunction(int splineOrder_) : SplinedFunction(splineOrder)
+SingleParticleFunction::SingleParticleFunction(int splineOrder_) : SplinedFunction(splineOrder_)
 {
 }
 

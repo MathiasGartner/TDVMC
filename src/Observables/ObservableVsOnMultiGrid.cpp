@@ -27,7 +27,6 @@ void ObservableVsOnMultiGrid::InitGrid(vector<vector<double> > gridProperties)
 {
 	totalGridPoints = 1;
 	this->grids.resize(gridProperties.size());
-	int i = 0;
 	for (unsigned int i = 0; i < gridProperties.size(); i++)
 	{
 		auto prop = gridProperties[i];

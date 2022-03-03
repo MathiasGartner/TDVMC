@@ -21,4 +21,20 @@ SplinedFunction::SplinedFunction(int splineOrder_)
 
 }
 
+void SplinedFunction::Init()
+{
+	InitVector(splineSums, numberOfSplines, 0.0);
+	InitVector(splineSumsD, numberOfSplines, N, DIM, 0.0);
+	InitVector(splineSumsD2, numberOfSplines, N, 0.0);
+
+	InitVector(splineSumsNew, numberOfSplines, 0.0);
+	InitVector(sumOldPerBin, numberOfSplines, 0.0);
+	InitVector(sumNewPerBin, numberOfSplines, 0.0);
+}
+
+int SplinedFunction::BinIndex(double r)
+{
+	return GetBinIndex(this->nodes, r);
+}
+
 }

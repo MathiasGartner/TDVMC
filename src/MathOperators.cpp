@@ -5,7 +5,7 @@ using namespace std;
 vector<double> operator*(vector<int> v, double x)
 {
 	vector<double> result(v.size());
-	for (int i = 0; i < v.size(); i++)
+	for (unsigned int i = 0; i < v.size(); i++)
 	{
 		result[i] = v[i] * x;
 	}

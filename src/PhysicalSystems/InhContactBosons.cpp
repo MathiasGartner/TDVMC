@@ -331,6 +331,7 @@ void InhContactBosons::CalculateOtherLocalOperators(vector<vector<double> >& R)
 	{
 		potentialRange = params[5];
 		potentialStrength = params[6];
+		//TODO: set gamma if interaction is quenched
 	}
 
 	ClearVector(spf.splineSumsD);
@@ -448,6 +449,7 @@ vector<double> InhContactBosons::GetCenterOfMass(vector<vector<double> >& R)
 double InhContactBosons::GetExternalPotential(vector<double>& r)
 {
 	double x;
+	double k;
 	double value = 0.0;
 	double potentialK = params[2]; //given in units of kf
 	double potentialStrength = params[3]; //given in units of recoil energy E_r
@@ -458,13 +460,16 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 		potentialK = params[7];
 		potentialStrength = params[8];
 	}
-	if (potentialK > 0.0 && potentialStrength > 0.0)
+	if (potentialK > 0.0)
 	{
-		double k = potentialK * kf;
-		value = sin(k * x);
-		value *= value; //sin^2
-		value *= potentialStrength; //corresponds to V_0 / E_r
-		value *= k * k; //INFO: potential is given by k^2 V_0 / E_r sin^2(k x) to get a factor of 1 in front of kinetic energy
+		k = potentialK * kf;
+		if (potentialStrength > 0.0)
+		{
+			value = sin(k * x);
+			value *= value; //sin^2
+			value *= potentialStrength; //corresponds to V_0 / E_r
+			value *= k * k; //INFO: potential is given by k^2 V_0 / E_r sin^2(k x) to get a factor of 1 in front of kinetic energy
+		}
 	}
 	//INFO: add perturbation
 	if (params.size() > 8)
@@ -479,13 +484,13 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 		double pulseK = params[10];
 		double pulseStrength = params[11];
 		//for (int i = -5; i <= 4; i++)
-		for (int i = 1; i <= 10; i++)
+		//for (double i = 1; i <= LBOX_2; i += 1)
 		{
 			//pulseK = params[10] + i * 0.05;
-			pulseK = i * 0.05;
-			double k = pulseK * kf;
-			double pulse = sin(k * x);
+			pulseK = 1.0 / LBOX * kf;
+			double pulse = sin(pulseK * x);
 			pulse *= pulse; //sin^2
+			pulse -= 0.5; //symmetric around zero
 			pulse *= pulseStrength;
 			pulse *= k * k;
 			pulse *= exp(-pow((this->time - params[9])/(params[9] * 0.4), 2.0));

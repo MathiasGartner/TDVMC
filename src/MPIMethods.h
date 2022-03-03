@@ -248,7 +248,7 @@ void ReduceToAverage(Observables::ObservableVsOnGrid& data)
 			//INFO: only root process holds the average values from all processes.
 			if (isRootRank)
 			{
-				for (unsigned int i = 0; i < data.grid.count; i++)
+				for (int i = 0; i < data.grid.count; i++)
 				{
 					data.observablesV[j].values[i] = reducedValues[i] / (double) numOfProcesses;
 				}

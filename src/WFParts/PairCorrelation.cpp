@@ -8,7 +8,7 @@ PairCorrelation::PairCorrelation() : SplinedFunction(3)
 
 }
 
-PairCorrelation::PairCorrelation(int splineOrder_) : SplinedFunction(splineOrder)
+PairCorrelation::PairCorrelation(int splineOrder_) : SplinedFunction(splineOrder_)
 {
 
 }

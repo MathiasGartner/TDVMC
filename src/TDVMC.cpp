@@ -18,6 +18,7 @@
 #include "PhysicalSystems/Bosons1D0th.h"
 #include "PhysicalSystems/Bosons1D4th.h"
 #include "PhysicalSystems/Bosons1DSp.h"
+#include "PhysicalSystems/Bosons1DMixture.h"
 #include "PhysicalSystems/BosonsBulk.h"
 #include "PhysicalSystems/BosonsBulkDamped.h"
 #include "PhysicalSystems/BosonCluster.h"
@@ -2840,6 +2841,16 @@ bool InitializePhysicalSystem()
 			dynamic_cast<PhysicalSystems::Bosons1DSp*>(sys)->SetNodes(NURBS_GRID);
 		}
 	}
+	else if (SYSTEM_TYPE == "Bosons1DMixture")
+	{
+		sys = new PhysicalSystems::Bosons1DMixture(SYSTEM_PARAMS, configDirectory);
+		if (USE_NURBS == 1)
+		{
+			dynamic_cast<PhysicalSystems::Bosons1DMixture*>(sys)->SetNodes(NURBS_GRID);
+		}
+		dynamic_cast<PhysicalSystems::Bosons1DMixture*>(sys)->SetPairDistributionBinCount(GR_BIN_COUNT);
+		dynamic_cast<PhysicalSystems::Bosons1DMixture*>(sys)->SetParticleType(PARTICLE_TYPES);
+	}
 	else if (SYSTEM_TYPE == "BosonsBulk")
 	{
 		sys = new PhysicalSystems::BosonsBulk(SYSTEM_PARAMS, configDirectory);
@@ -3136,6 +3147,17 @@ int mainMPI(int argc, char** argv)
 	if (isRootRank)
 	{
 		if (auto s = dynamic_cast<PhysicalSystems::Bosons1D*>(sys))
+		{
+			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+			{
+				WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
+			}
+			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+			{
+				WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
+			}
+		}
+		if (auto s = dynamic_cast<PhysicalSystems::Bosons1DMixture*>(sys))
 		{
 			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
 			{
@@ -3512,6 +3534,17 @@ int mainMPI(int argc, char** argv)
 					}
 				}
 				else if (auto s = dynamic_cast<PhysicalSystems::Bosons1DSp*>(sys))
+				{
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "gr");
+					}
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+					{
+						AppendDataToFile(o->observablesV[0].values, "sk");
+					}
+				}
+				if (auto s = dynamic_cast<PhysicalSystems::Bosons1DMixture*>(sys))
 				{
 					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
 					{
@@ -4341,6 +4374,7 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "Bosons1D0th";
 		//SYSTEM_TYPE = "Bosons1D4th";
 		//SYSTEM_TYPE = "Bosons1DSp";
+		SYSTEM_TYPE = "Bosons1DMixture";
 		//SYSTEM_TYPE = "BosonsBulk";
 		//SYSTEM_TYPE = "BosonCluster";
 		//SYSTEM_TYPE = "BosonClusterWithLog";
@@ -4349,7 +4383,7 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BosonMixtureCluster_4thorder";
 		//SYSTEM_TYPE = "BosonMixtureCluster";
 		//SYSTEM_TYPE = "InhBosons1D";
-		SYSTEM_TYPE = "InhContactBosons";
+		//SYSTEM_TYPE = "InhContactBosons";
 		//SYSTEM_TYPE = "LinearChain";
 		//SYSTEM_TYPE = "NUBosonsBulk";
 		//SYSTEM_TYPE = "NUBosonsBulkPB";
@@ -4396,6 +4430,10 @@ int main(int argc, char **argv)
 		else if (SYSTEM_TYPE == "Bosons1DSp")
 		{
 			configFilePath = "/home/gartner/Sources/TDVMC/config/SW1D.config";
+		}
+		else if (SYSTEM_TYPE == "Bosons1DMixture")
+		{
+			configFilePath = "/home/gartner/Sources/TDVMC/config/B1DMix.config";
 		}
 		else if (SYSTEM_TYPE == "BosonsBulk")
 		{

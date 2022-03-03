@@ -1,6 +1,6 @@
 #pragma once
 
-#include <vector>
+#include "../Utils.h"
 
 using namespace std;
 
@@ -38,6 +38,9 @@ public:
 
 public:
 	SplinedFunction(int splineOrder_);
+
+	void Init();
+	int BinIndex(double r);
 };
 
 }

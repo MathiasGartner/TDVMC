@@ -11,7 +11,8 @@ CPP_SRCS += \
 ../src/Potentials/KTTY_He_Na.cpp \
 ../src/Potentials/LJ.cpp \
 ../src/Potentials/LJ_He_He.cpp \
-../src/Potentials/LJ_XSplit.cpp 
+../src/Potentials/LJ_XSplit.cpp \
+../src/Potentials/SquareWell.cpp 
 
 OBJS += \
 ./src/Potentials/HFDB.o \
@@ -21,7 +22,8 @@ OBJS += \
 ./src/Potentials/KTTY_He_Na.o \
 ./src/Potentials/LJ.o \
 ./src/Potentials/LJ_He_He.o \
-./src/Potentials/LJ_XSplit.o 
+./src/Potentials/LJ_XSplit.o \
+./src/Potentials/SquareWell.o 
 
 CPP_DEPS += \
 ./src/Potentials/HFDB.d \
@@ -31,7 +33,8 @@ CPP_DEPS += \
 ./src/Potentials/KTTY_He_Na.d \
 ./src/Potentials/LJ.d \
 ./src/Potentials/LJ_He_He.d \
-./src/Potentials/LJ_XSplit.d 
+./src/Potentials/LJ_XSplit.d \
+./src/Potentials/SquareWell.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes
