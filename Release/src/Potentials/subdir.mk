@@ -4,6 +4,7 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
+../src/Potentials/Gauss.cpp \
 ../src/Potentials/HFDB.cpp \
 ../src/Potentials/HFDB_He_He.cpp \
 ../src/Potentials/KTTY.cpp \
@@ -15,6 +16,7 @@ CPP_SRCS += \
 ../src/Potentials/SquareWell.cpp 
 
 OBJS += \
+./src/Potentials/Gauss.o \
 ./src/Potentials/HFDB.o \
 ./src/Potentials/HFDB_He_He.o \
 ./src/Potentials/KTTY.o \
@@ -26,6 +28,7 @@ OBJS += \
 ./src/Potentials/SquareWell.o 
 
 CPP_DEPS += \
+./src/Potentials/Gauss.d \
 ./src/Potentials/HFDB.d \
 ./src/Potentials/HFDB_He_He.d \
 ./src/Potentials/KTTY.d \

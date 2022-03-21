@@ -1,5 +1,6 @@
 #include "Bosons1DMixture.h"
 
+#include "../Potentials/Gauss.h"
 #include "../Potentials/SquareWell.h"
 #include "../SplineFactory.h"
 
@@ -63,7 +64,7 @@ void Bosons1DMixture::SetParticleType(vector<int> p)
 		numOfTypeSpecifiedParticles++;
 	}
 	//INFO: set type of remaining particles to be the last specified type
-	for (int i = numOfTypeSpecifiedParticles - 1; i < N; i++)
+	for (int i = numOfTypeSpecifiedParticles; i < N; i++)
 	{
 		pt.push_back(pt.back());
 	}
@@ -73,8 +74,8 @@ void Bosons1DMixture::SetParticleType(vector<int> p)
 void Bosons1DMixture::SetParticleType(vector<ParticleType> p)
 {
 	this->originalParticleTypes = p;
-	InitVector(particleTypes, N, 0);
-	InitVector(correlationTypes, N, N, 0);
+	InitVector(particleTypes, N, -1);
+	InitVector(correlationTypes, N, N, -1);
 
 	InitVector(particleTypeIndexMapping, ParticleType::ParticleType_COUNT, -1);
 	int particleIndex = 0;
@@ -98,19 +99,26 @@ void Bosons1DMixture::SetParticleType(vector<ParticleType> p)
 		for (int j = 0; j < i; j++)
 		{
 			int pt2 = this->originalParticleTypes[j];
-			if (correlationIndexMapping[pt1][pt2] == -1)
+			int cim = correlationIndexMapping[pt1][pt2];
+			if (cim == -1)
 			{
-				correlationIndexMapping[pt1][pt2] = correlationIndex;
-				correlationIndexMapping[pt2][pt1] = correlationIndex;
+				cim = correlationIndex;
+				correlationIndexMapping[pt1][pt2] = cim;
+				correlationIndexMapping[pt2][pt1] = cim;
+				PairCorrelation pc;
+				pc.FirstParticleType = particleTypeIndexMapping[pt1];
+				pc.SecondParticleType = particleTypeIndexMapping[pt2];
+				this->pcs.push_back(pc);
+				this->correlationNames.push_back(this->ParticleShortNames[pt1] + "-" + this->ParticleShortNames[pt2]);
 				correlationIndex++;
 			}
-			this->correlationTypes[i][j] = correlationIndexMapping[pt1][pt2];
-			this->correlationTypes[j][i] = correlationIndexMapping[pt2][pt1];
+			this->correlationTypes[i][j] = cim;
+			this->correlationTypes[j][i] = cim;
+			this->pcs[cim].numOfParticlePairs++;
 		}
 	}
 	int correlationsCount = correlationIndex;
 
-	this->pcs.resize(correlationsCount);
 	this->particleProperties.resize(particleTypeCount);
 	this->particlePairProperties.resize(correlationsCount);
 	this->oneParticleData.resize(N);
@@ -120,33 +128,67 @@ void Bosons1DMixture::InitSystem()
 {
 	int index;
 
+	double tmphbar = 1.0;
 	index = this->particleTypeIndexMapping[ParticleType::Boson];
 	if (index > -1)
 	{
 		ParticleProperties& pp = this->particleProperties[index];
 		pp.mass = 0.5;
-		pp.hbarOver2m = 1.0;
+		pp.hbarOver2m = tmphbar * tmphbar / (2.0 * pp.mass);
 	}
 	index = this->particleTypeIndexMapping[ParticleType::Impurity];
 	if (index > -1)
 	{
 		ParticleProperties& pp = this->particleProperties[index];
+		pp.mass = 0.5*4.0;
+		pp.hbarOver2m = tmphbar * tmphbar / (2.0 * pp.mass);
+	}
+	index = this->particleTypeIndexMapping[ParticleType::Dummy];
+	if (index > -1)
+	{
+		ParticleProperties& pp = this->particleProperties[index];
 		pp.mass = 0.5;
-		pp.hbarOver2m = 1.0;
+		pp.hbarOver2m = tmphbar * tmphbar / (2.0 * pp.mass);
 	}
 
 	//INFO: Pair potentials
+	double defaultStrength = 50.0;
+	double defaultRange = 0.2;
 	index = this->correlationIndexMapping[ParticleType::Boson][ParticleType::Boson];
 	if (index > -1)
 	{
 		ParticlePairProperties& ppp = this->particlePairProperties[index];
-		ppp.potential = new Potentials::SquareWell();
+		ppp.potential = new Potentials::Gauss(defaultStrength, defaultRange);
 	}
 	index = this->correlationIndexMapping[ParticleType::Boson][ParticleType::Impurity];
 	if (index > -1)
 	{
 		ParticlePairProperties& ppp = this->particlePairProperties[index];
-		ppp.potential = new Potentials::SquareWell();
+		ppp.potential = new Potentials::Gauss(defaultStrength, defaultRange);
+	}
+	index = this->correlationIndexMapping[ParticleType::Boson][ParticleType::Dummy];
+	if (index > -1)
+	{
+		ParticlePairProperties& ppp = this->particlePairProperties[index];
+		ppp.potential = new Potentials::Gauss(defaultStrength, defaultRange);
+	}
+	index = this->correlationIndexMapping[ParticleType::Impurity][ParticleType::Impurity];
+	if (index > -1)
+	{
+		ParticlePairProperties& ppp = this->particlePairProperties[index];
+		ppp.potential = new Potentials::Gauss(defaultStrength, defaultRange);
+	}
+	index = this->correlationIndexMapping[ParticleType::Impurity][ParticleType::Dummy];
+	if (index > -1)
+	{
+		ParticlePairProperties& ppp = this->particlePairProperties[index];
+		ppp.potential = new Potentials::Gauss(defaultStrength, defaultRange);
+	}
+	index = this->correlationIndexMapping[ParticleType::Dummy][ParticleType::Dummy];
+	if (index > -1)
+	{
+		ParticlePairProperties& ppp = this->particlePairProperties[index];
+		ppp.potential = new Potentials::Gauss(defaultStrength, defaultRange);
 	}
 
 	numOfOtherLocalOperators = 4; //INFO: potentialIntern, potentialInternComplex, potentialExtern, potentialExternComplex
@@ -157,13 +199,14 @@ void Bosons1DMixture::InitSystem()
 
 	halfLength = LBOX / 2.0;
 
+	int numOfSplinedFuncs = this->pcs.size();
 	if (globalNodes.empty())
 	{
 		//INFO: BC
 		//this is for SetBoundaryConditions3_1D_OR_2 and SetBoundaryConditions3_1D_CO_2
-		for (int i = -3; i < N_PARAM + 3; i++)
+		for (int i = -3; i < (N_PARAM / numOfSplinedFuncs) + 3; i++)
 		{
-			globalNodes.push_back((i * halfLength) / ((double) N_PARAM - 1));
+			globalNodes.push_back((i * halfLength) / ((double) (N_PARAM / numOfSplinedFuncs) - 1));
 		}
 	}
 	maxDistance = globalNodes[globalNodes.size() - 4];
@@ -171,6 +214,8 @@ void Bosons1DMixture::InitSystem()
 	int requiredParams = 0;
 	for (auto& pc : this->pcs)
 	{
+		pc.numOfParticlePairs_Inv = 1.0 / pc.numOfParticlePairs;
+
 		pc.nodes = this->globalNodes;
 		//numberOfSplines = N_PARAM + 1; //BC3.1D.CO.1
 		//numberOfSplines = N_PARAM + 2; //BC3.1D.CO.2
@@ -184,7 +229,8 @@ void Bosons1DMixture::InitSystem()
 		SplineFactory::SetBoundaryConditions3_1D_CO_2(pc.nodes, pc.bcFactorsEnd, maxDistance, true);
 		pc.numberOfSpecialParametersStart = pc.bcFactorsStart.size();
 		pc.numberOfSpecialParametersEnd = pc.bcFactorsEnd.size();
-		pc.numberOfStandardParameters = (N_PARAM / this->pcs.size()) - pc.numberOfSpecialParametersStart - pc.numberOfSpecialParametersEnd;
+		pc.numberOfStandardParameters = (N_PARAM / numOfSplinedFuncs) - pc.numberOfSpecialParametersStart - pc.numberOfSpecialParametersEnd;
+		pc.numberOfTotalParameters = pc.numberOfSpecialParametersStart + pc.numberOfSpecialParametersEnd + pc.numberOfStandardParameters;
 		pc.np1 = pc.numberOfSpecialParametersStart;
 		pc.np2 = pc.np1 + pc.numberOfStandardParameters;
 		pc.np3 = pc.np2 + pc.numberOfSpecialParametersEnd;
@@ -245,8 +291,28 @@ void Bosons1DMixture::InitSystem()
 	structureFactor.InitGrid(kNorms);
 	structureFactor.InitObservables( { "S(k)" });
 
+
+	density.name = "density";
+	density.InitGrid(0.0, LBOX, 0.1);
+	vector<string> particleNames;
+	for (int i = 0; i < this->ParticleType::ParticleType_COUNT; i++)
+	{
+		int idx = this->particleTypeIndexMapping[i];
+		if (idx >= 0)
+		{
+			particleNames.push_back(this->ParticleNames[idx]);
+		}
+	}
+	density.InitObservables(particleNames);
+
+	pairDistributionsByParticleTypes.name = "pairDistributionsByParticleTypes";
+	pairDistributionsByParticleTypes.InitGrid(0.0, globalNodes[globalNodes.size() - 4], globalNodes[globalNodes.size() - 4] / numOfPairDistributionValues);
+	pairDistributionsByParticleTypes.InitObservables(this->correlationNames);
+
 	additionalObservables.Add(&pairDistribution);
 	additionalObservables.Add(&structureFactor);
+	additionalObservables.Add(&density);
+	additionalObservables.Add(&pairDistributionsByParticleTypes);
 }
 
 void Bosons1DMixture::RefreshLocalOperators()
@@ -271,7 +337,7 @@ void Bosons1DMixture::RefreshLocalOperators()
 			this->localOperators[i + offset] = (pc.bcFactorsEnd[idx][0] * pc.splineSums[pc.numberOfSplines - 3] + pc.bcFactorsEnd[idx][1] * pc.splineSums[pc.numberOfSplines - 2] + pc.bcFactorsEnd[idx][2] * pc.splineSums[pc.numberOfSplines - 1]);
 			idx++;
 		}
-		offset += pc.numberOfStandardParameters;
+		offset += pc.numberOfTotalParameters;
 	}
 }
 
@@ -466,55 +532,58 @@ void Bosons1DMixture::CalculateExpectationValues(vector<double>& O, vector<doubl
 		int offset = 0;
 		for (auto& pc : this->pcs)
 		{
-			//INFO: BC
-			for (int i = 0; i < pc.np1; i++)
+			bool pcIsRelevant = pc.FirstParticleType == pt || pc.SecondParticleType == pt;
+			if (pcIsRelevant)
 			{
-				for (int a = 0; a < DIM; a++)
+				//INFO: BC
+				for (int i = 0; i < pc.np1; i++)
 				{
-					tmp = (pc.bcFactorsStart[i][0] * pc.splineSumsD[0][n][a] + pc.bcFactorsStart[i][1] * pc.splineSumsD[1][n][a] + pc.bcFactorsStart[i][2] * pc.splineSumsD[2][n][a]);
-					opd.vecKineticSumR1[a] += uR[i + offset] * tmp;
-					opd.vecKineticSumI1[a] += uI[i + offset] * tmp;
+					for (int a = 0; a < DIM; a++)
+					{
+						tmp = (pc.bcFactorsStart[i][0] * pc.splineSumsD[0][n][a] + pc.bcFactorsStart[i][1] * pc.splineSumsD[1][n][a] + pc.bcFactorsStart[i][2] * pc.splineSumsD[2][n][a]);
+						opd.vecKineticSumR1[a] += uR[i + offset] * tmp;
+						opd.vecKineticSumI1[a] += uI[i + offset] * tmp;
+					}
+					tmp = (pc.bcFactorsStart[i][0] * pc.splineSumsD2[0][n] + pc.bcFactorsStart[i][1] * pc.splineSumsD2[1][n] + pc.bcFactorsStart[i][2] * pc.splineSumsD2[2][n]);
+					opd.kineticSumR2 += uR[i + offset] * tmp;
+					opd.kineticSumI2 += uI[i + offset] * tmp;
 				}
-				tmp = (pc.bcFactorsStart[i][0] * pc.splineSumsD2[0][n] + pc.bcFactorsStart[i][1] * pc.splineSumsD2[1][n] + pc.bcFactorsStart[i][2] * pc.splineSumsD2[2][n]);
-				opd.kineticSumR2 += uR[i + offset] * tmp;
-				opd.kineticSumI2 += uI[i + offset] * tmp;
-			}
-			int spIdx = 3;
-			for (int i = pc.np1; i < pc.np2; i++)
-			{
-				for (int a = 0; a < DIM; a++)
+				int spIdx = 3;
+				for (int i = pc.np1; i < pc.np2; i++)
 				{
-					opd.vecKineticSumR1[a] += uR[i + offset] * pc.splineSumsD[spIdx][n][a];
-					opd.vecKineticSumI1[a] += uI[i + offset] * pc.splineSumsD[spIdx][n][a];
+					for (int a = 0; a < DIM; a++)
+					{
+						opd.vecKineticSumR1[a] += uR[i + offset] * pc.splineSumsD[spIdx][n][a];
+						opd.vecKineticSumI1[a] += uI[i + offset] * pc.splineSumsD[spIdx][n][a];
+					}
+					opd.kineticSumR2 += uR[i + offset] * pc.splineSumsD2[spIdx][n];
+					opd.kineticSumI2 += uI[i + offset] * pc.splineSumsD2[spIdx][n];
+					spIdx++;
 				}
-				opd.kineticSumR2 += uR[i + offset] * pc.splineSumsD2[spIdx][n];
-				opd.kineticSumI2 += uI[i + offset] * pc.splineSumsD2[spIdx][n];
-				spIdx++;
-			}
-			int idx = 0;
-			for (int i = pc.np2; i < pc.np3; i++)
-			{
-				for (int a = 0; a < DIM; a++)
+				int idx = 0;
+				for (int i = pc.np2; i < pc.np3; i++)
 				{
-					tmp = (pc.bcFactorsEnd[idx][0] * pc.splineSumsD[pc.numberOfSplines - 3][n][a] + pc.bcFactorsEnd[idx][1] * pc.splineSumsD[pc.numberOfSplines - 2][n][a] + pc.bcFactorsEnd[idx][2] * pc.splineSumsD[pc.numberOfSplines - 1][n][a]);
-					opd.vecKineticSumR1[a] += uR[i + offset] * tmp;
-					opd.vecKineticSumI1[a] += uI[i + offset] * tmp;
+					for (int a = 0; a < DIM; a++)
+					{
+						tmp = (pc.bcFactorsEnd[idx][0] * pc.splineSumsD[pc.numberOfSplines - 3][n][a] + pc.bcFactorsEnd[idx][1] * pc.splineSumsD[pc.numberOfSplines - 2][n][a] + pc.bcFactorsEnd[idx][2] * pc.splineSumsD[pc.numberOfSplines - 1][n][a]);
+						opd.vecKineticSumR1[a] += uR[i + offset] * tmp;
+						opd.vecKineticSumI1[a] += uI[i + offset] * tmp;
+					}
+					tmp = (pc.bcFactorsEnd[idx][0] * pc.splineSumsD2[pc.numberOfSplines - 3][n] + pc.bcFactorsEnd[idx][1] * pc.splineSumsD2[pc.numberOfSplines - 2][n] + pc.bcFactorsEnd[idx][2] * pc.splineSumsD2[pc.numberOfSplines - 1][n]);
+					opd.kineticSumR2 += uR[i + offset] * tmp;
+					opd.kineticSumI2 += uI[i + offset] * tmp;
+					idx++;
 				}
-				tmp = (pc.bcFactorsEnd[idx][0] * pc.splineSumsD2[pc.numberOfSplines - 3][n] + pc.bcFactorsEnd[idx][1] * pc.splineSumsD2[pc.numberOfSplines - 2][n] + pc.bcFactorsEnd[idx][2] * pc.splineSumsD2[pc.numberOfSplines - 1][n]);
-				opd.kineticSumR2 += uR[i + offset] * tmp;
-				opd.kineticSumI2 += uI[i + offset] * tmp;
-				idx++;
 			}
-
-			opd.kineticSumR1I1 += 2.0 * VectorDotProduct_DIM(opd.vecKineticSumR1, opd.vecKineticSumI1);
-			opd.kineticSumR1 += VectorNorm2_DIM(opd.vecKineticSumR1);
-			opd.kineticSumI1 += VectorNorm2_DIM(opd.vecKineticSumI1);
-
-			kineticR += -pp.hbarOver2m * (opd.kineticSumR1 - opd.kineticSumI1 + opd.kineticSumR2);
-			kineticI += -pp.hbarOver2m * (opd.kineticSumR1I1 + opd.kineticSumI2);
-
-			offset += pc.numberOfStandardParameters;
+			offset += pc.numberOfTotalParameters;
 		}
+
+		opd.kineticSumR1I1 += 2.0 * VectorDotProduct_DIM(opd.vecKineticSumR1, opd.vecKineticSumI1);
+		opd.kineticSumR1 += VectorNorm2_DIM(opd.vecKineticSumR1);
+		opd.kineticSumI1 += VectorNorm2_DIM(opd.vecKineticSumI1);
+
+		kineticR += -pp.hbarOver2m * (opd.kineticSumR1 - opd.kineticSumI1 + opd.kineticSumR2);
+		kineticI += -pp.hbarOver2m * (opd.kineticSumR1I1 + opd.kineticSumI2);
 	}
 
 	localEnergyR = kineticR + otherO[0] + otherO[2];
@@ -581,6 +650,12 @@ void Bosons1DMixture::CalculateAdditionalSystemProperties(vector<vector<double> 
 			{
 				pairDistribution.AddToHistogram(0, rni, weight);
 			}
+
+			int ct = this->correlationTypes[i][j];
+			if (rni < pairDistributionsByParticleTypes.grid.max)
+			{
+				pairDistributionsByParticleTypes.AddToHistogram(ct, rni, this->pcs[ct].numOfParticlePairs_Inv);
+			}
 		}
 	}
 
@@ -609,6 +684,14 @@ void Bosons1DMixture::CalculateAdditionalSystemProperties(vector<vector<double> 
 	{
 		sk[k] = (sumSCos[k] * sumSCos[k] + sumSSin[k] * sumSSin[k]) / ((double) (N * kValues[k].size()));
 		structureFactor.SetValueAtGridIndex(0, k, sk[k]);
+	}
+
+	//density
+	for (int i = 0; i < N; i++)
+	{
+		int pt = this->particleTypes[i];
+		double r = GetCoordinateNIC(R[i][0]) + LBOX_2; //to get results in the range [0, L/2]
+		density.AddToHistogram(this->particleTypeIndexMapping[pt], r, 1.0);
 	}
 }
 
@@ -711,21 +794,21 @@ void Bosons1DMixture::CalculateWFChange(vector<vector<double> >& R, vector<doubl
 		//INFO: BCx
 		for (int i = 0; i < pc.np1; i++)
 		{
-			sum += uR[i] * (pc.bcFactorsStart[i][0] * pc.splineSumsNew[0] + pc.bcFactorsStart[i][1] * pc.splineSumsNew[1] + pc.bcFactorsStart[i][2] * pc.splineSumsNew[2]);
+			sum += uR[i + offset] * (pc.bcFactorsStart[i][0] * pc.splineSumsNew[0] + pc.bcFactorsStart[i][1] * pc.splineSumsNew[1] + pc.bcFactorsStart[i][2] * pc.splineSumsNew[2]);
 		}
 		int spIdx = 3;
 		for (int i = pc.np1; i < pc.np2; i++)
 		{
-			sum += uR[i] * pc.splineSumsNew[spIdx];
+			sum += uR[i + offset] * pc.splineSumsNew[spIdx];
 			spIdx++;
 		}
 		int idx = 0;
 		for (int i = pc.np2; i < pc.np3; i++)
 		{
-			sum += uR[i] * (pc.bcFactorsEnd[idx][0] * pc.splineSumsNew[pc.numberOfSplines - 3] + pc.bcFactorsEnd[idx][1] * pc.splineSumsNew[pc.numberOfSplines - 2] + pc.bcFactorsEnd[idx][2] * pc.splineSumsNew[pc.numberOfSplines - 1]);
+			sum += uR[i + offset] * (pc.bcFactorsEnd[idx][0] * pc.splineSumsNew[pc.numberOfSplines - 3] + pc.bcFactorsEnd[idx][1] * pc.splineSumsNew[pc.numberOfSplines - 2] + pc.bcFactorsEnd[idx][2] * pc.splineSumsNew[pc.numberOfSplines - 1]);
 			idx++;
 		}
-		offset += pc.numberOfStandardParameters;
+		offset += pc.numberOfTotalParameters;
 	}
 
 	exponentNew = sum;

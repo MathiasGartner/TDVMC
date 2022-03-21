@@ -28,6 +28,7 @@ public:
 	int numberOfSpecialParametersStart;
 	int numberOfSpecialParametersEnd;
 	int numberOfStandardParameters;
+	int numberOfTotalParameters;
 	int np1;
 	int np2;
 	int np3;

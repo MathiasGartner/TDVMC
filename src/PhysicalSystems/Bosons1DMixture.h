@@ -30,8 +30,20 @@ protected:
 	{
 		Boson = 0,
 		Impurity,
+		Dummy,
 		ParticleType_COUNT
 	};
+	vector<string> ParticleNames = {
+			"Boson",
+			"Impurity",
+			"Dummy"
+	};
+	vector<string> ParticleShortNames = {
+			"B",
+			"I",
+			"D"
+	};
+	vector<string> correlationNames;
 
 	vector<double> globalNodes;
 
@@ -61,6 +73,8 @@ private:
 
 	Observables::ObservableVsOnGridWithScaling pairDistribution;
 	Observables::ObservableVsOnGrid structureFactor;
+	Observables::ObservableVsOnGrid density;
+	Observables::ObservableVsOnGrid pairDistributionsByParticleTypes;
 
 private:
 	double GetExternalPotential(vector<double>& r);

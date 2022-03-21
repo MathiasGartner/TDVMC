@@ -5,12 +5,12 @@
 namespace Potentials
 {
 
-class SquareWell: public StrengthAndRangePotential
+class Gauss: public StrengthAndRangePotential
 {
 
 public:
-	SquareWell();
-	SquareWell(double strength_, double range_);
+	Gauss();
+	Gauss(double strength_, double range_);
 
 	double GetPotential(double r) override;
 };

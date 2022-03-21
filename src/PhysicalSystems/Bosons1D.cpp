@@ -84,8 +84,7 @@ double Bosons1D::CalculateOBDMKernel(vector<double>& r, vector<vector<double> >&
 			rni = VectorDisplacementNIC_DIM(R[n], firstParticleR[part], vecrni);
 			if (rni <= maxDistance)
 			{
-				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
-				bin = interval - nodes.begin() - 1;
+				bin = GetBinIndex(nodes, rni);
 				rni2 = rni * rni;
 				rni3 = rni2 * rni;
 
@@ -303,8 +302,7 @@ void Bosons1D::CalculateLocalOperators(vector<vector<double> >& R)
 			rni = VectorDisplacementNIC_DIM(R[n], R[i], vecrni);
 			if (rni <= maxDistance)
 			{
-				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
-				bin = interval - nodes.begin() - 1;
+				bin = GetBinIndex(nodes, rni);
 				rni2 = rni * rni;
 				rni3 = rni2 * rni;
 
@@ -387,14 +385,14 @@ void Bosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
 				if (i < n)
 				{
 					//Gauss
-					//double rnia = rni / a;
-					//potentialIntern += b * exp(-(rnia * rnia) / 2.0);
+					double rnia = rni / a;
+					potentialIntern += b * exp(-(rnia * rnia) / 2.0);
 
 					//square well
-					if (rni < a)
-					{
-						potentialIntern += b;
-					}
+					//if (rni < a)
+					//{
+					//	potentialIntern += b;
+					//}
 
 					//Rydberg U_0 / (1 + (r/R_0)^6))
 					//R_0 = a, U_0 = b;
@@ -416,8 +414,7 @@ void Bosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
 				//		otherwise values are calculated multiple times
 				if (i != n) //TODO: also include in (i < n) branch -> then only loop over i < n in "for (int i = 0; i < N; i++)"
 				{
-					auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
-					bin = interval - nodes.begin() - 1;
+					bin = GetBinIndex(nodes, rni);
 					rni2 = rni * rni;
 
 					for (int p = 0; p < s; p++)
@@ -684,8 +681,7 @@ void Bosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR,
 			rni = VectorDisplacementNIC_DIM(R[i], oldPosition, vecrni);
 			if (rni <= maxDistance)
 			{
-				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
-				bin = interval - nodes.begin() - 1;
+				bin = GetBinIndex(nodes, rni);
 				if (bin >= numberOfSplines)
 				{
 					cout << "!!!!" << endl;
@@ -716,8 +712,7 @@ void Bosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR,
 			rni = VectorDisplacementNIC_DIM(R[i], R[changedParticleIndex], vecrni);
 			if (rni <= maxDistance)
 			{
-				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
-				bin = interval - nodes.begin() - 1;
+				bin = GetBinIndex(nodes, rni);
 				rni2 = rni * rni;
 				rni3 = rni2 * rni;
 

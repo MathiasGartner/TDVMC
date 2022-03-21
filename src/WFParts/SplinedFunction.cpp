@@ -15,10 +15,10 @@ SplinedFunction::SplinedFunction(int splineOrder_)
 	numberOfSpecialParametersStart = 0;
 	numberOfSpecialParametersEnd = 0;
 	numberOfStandardParameters = 0;
+	numberOfTotalParameters = 0;
 	np1 = 0;
 	np2 = 0;
 	np3 = 0;
-
 }
 
 void SplinedFunction::Init()

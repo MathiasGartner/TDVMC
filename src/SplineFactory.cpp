@@ -53,6 +53,7 @@ vector<vector<vector<double> > > GetWeights0(vector<double> n)
 
 vector<vector<vector<double> > > GetWeights3(vector<double> n)
 {
+	//see file NonUniformSplines_new_v2.nb -> Own spline implementation -> third order -> Part 1/2/3/4
 	vector<vector<vector<double> > > weights; //INFO: indices (s, p, c): s...spline, p...part of spline, c...polynomial coefficients
 
 	int nOrder = 3;

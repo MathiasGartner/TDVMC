@@ -544,6 +544,7 @@ void Init()
 	if (USE_PARAM_START == 0 && USE_PARAM_END == 0)
 	{
 		USED_PARAM_COUNT = N_PARAM;
+		USE_PARAM_END = N_PARAM - 1;
 	}
 	else
 	{
@@ -3553,6 +3554,20 @@ int mainMPI(int argc, char** argv)
 					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
 					{
 						AppendDataToFile(o->observablesV[0].values, "sk");
+					}
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
+					{
+						for (unsigned int i = 0; i < o->observablesV.size(); i++)
+						{
+							AppendDataToFile(o->observablesV[i].values, "rho_" + o->observablesV[i].name);
+						}
+					}
+					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[3]))
+					{
+						for (unsigned int i = 0; i < o->observablesV.size(); i++)
+						{
+							AppendDataToFile(o->observablesV[i].values, "g_" + o->observablesV[i].name);
+						}
 					}
 				}
 				else if (auto s = dynamic_cast<PhysicalSystems::BosonsBulk*>(sys))

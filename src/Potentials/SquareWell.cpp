@@ -5,20 +5,22 @@ using namespace std;
 namespace Potentials
 {
 
-SquareWell::SquareWell()
+SquareWell::SquareWell() : StrengthAndRangePotential()
 {
 	this->description = "SquareWell";
+}
 
-	this->strength = 1.0;
-	this->width = 1.0;
+SquareWell::SquareWell(double strength_, double range_) : StrengthAndRangePotential(strength_, range_)
+{
+	this->description = "SquareWell";
 }
 
 double SquareWell::GetPotential(double r)
 {
 	double pot = 0;
-	if (r < width)
+	if (r < this->range)
 	{
-		pot = strength;
+		pot = this->strength;
 	}
 	return pot;
 }
