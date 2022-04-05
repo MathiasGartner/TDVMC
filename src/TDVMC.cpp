@@ -4385,11 +4385,11 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BulkSplines";
 		//SYSTEM_TYPE = "BulkSplinesScaled";
 		//SYSTEM_TYPE = "HeDrop";
-		//SYSTEM_TYPE = "Bosons1D";
+		SYSTEM_TYPE = "Bosons1D";
 		//SYSTEM_TYPE = "Bosons1D0th";
 		//SYSTEM_TYPE = "Bosons1D4th";
 		//SYSTEM_TYPE = "Bosons1DSp";
-		SYSTEM_TYPE = "Bosons1DMixture";
+		//SYSTEM_TYPE = "Bosons1DMixture";
 		//SYSTEM_TYPE = "BosonsBulk";
 		//SYSTEM_TYPE = "BosonCluster";
 		//SYSTEM_TYPE = "BosonClusterWithLog";
@@ -4448,7 +4448,8 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "Bosons1DMixture")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/B1DMix.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/B1DMix.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/B1DMix_QU.config";
 		}
 		else if (SYSTEM_TYPE == "BosonsBulk")
 		{

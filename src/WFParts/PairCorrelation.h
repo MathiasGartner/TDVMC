@@ -16,7 +16,7 @@ public:
 	PairCorrelation(int splineOrder_);
 
 	int numOfParticlePairs;
-	int numOfParticlePairs_Inv;
+	double numOfParticlePairs_Inv;
 	int FirstParticleType;
 	int SecondParticleType;
 };

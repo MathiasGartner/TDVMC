@@ -140,7 +140,7 @@ void Bosons1DMixture::InitSystem()
 	if (index > -1)
 	{
 		ParticleProperties& pp = this->particleProperties[index];
-		pp.mass = 0.5*4.0;
+		pp.mass = 0.5*2.0;
 		pp.hbarOver2m = tmphbar * tmphbar / (2.0 * pp.mass);
 	}
 	index = this->particleTypeIndexMapping[ParticleType::Dummy];
@@ -152,8 +152,8 @@ void Bosons1DMixture::InitSystem()
 	}
 
 	//INFO: Pair potentials
-	double defaultStrength = 50.0;
-	double defaultRange = 0.2;
+	double defaultStrength = 10.0;
+	double defaultRange = 0.1;
 	index = this->correlationIndexMapping[ParticleType::Boson][ParticleType::Boson];
 	if (index > -1)
 	{
@@ -164,7 +164,7 @@ void Bosons1DMixture::InitSystem()
 	if (index > -1)
 	{
 		ParticlePairProperties& ppp = this->particlePairProperties[index];
-		ppp.potential = new Potentials::Gauss(defaultStrength, defaultRange);
+		ppp.potential = new Potentials::Gauss(defaultStrength*2.0, defaultRange);
 	}
 	index = this->correlationIndexMapping[ParticleType::Boson][ParticleType::Dummy];
 	if (index > -1)
