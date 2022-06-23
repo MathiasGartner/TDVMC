@@ -4,6 +4,7 @@ ParticleProperties::ParticleProperties()
 {
 	mass = 0;
 	hbarOver2m = 0;
+	kineticEnergyFactor = 0.0;
 
 	densityProfileMaxDistance = 0;
 	numOfDensityProfileValues = 0;

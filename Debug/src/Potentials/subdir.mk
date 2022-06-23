@@ -13,6 +13,7 @@ CPP_SRCS += \
 ../src/Potentials/LJ.cpp \
 ../src/Potentials/LJ_He_He.cpp \
 ../src/Potentials/LJ_XSplit.cpp \
+../src/Potentials/None.cpp \
 ../src/Potentials/SquareWell.cpp 
 
 OBJS += \
@@ -25,6 +26,7 @@ OBJS += \
 ./src/Potentials/LJ.o \
 ./src/Potentials/LJ_He_He.o \
 ./src/Potentials/LJ_XSplit.o \
+./src/Potentials/None.o \
 ./src/Potentials/SquareWell.o 
 
 CPP_DEPS += \
@@ -37,6 +39,7 @@ CPP_DEPS += \
 ./src/Potentials/LJ.d \
 ./src/Potentials/LJ_He_He.d \
 ./src/Potentials/LJ_XSplit.d \
+./src/Potentials/None.d \
 ./src/Potentials/SquareWell.d 
 
 

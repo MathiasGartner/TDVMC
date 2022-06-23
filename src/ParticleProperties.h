@@ -9,6 +9,7 @@ class ParticleProperties
 public:
 	double mass;
 	double hbarOver2m;
+	double kineticEnergyFactor;
 
 	double densityProfileMaxDistance;
 	int numOfDensityProfileValues;

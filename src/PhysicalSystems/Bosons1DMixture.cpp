@@ -1,6 +1,7 @@
 #include "Bosons1DMixture.h"
 
 #include "../Potentials/Gauss.h"
+#include "../Potentials/None.h"
 #include "../Potentials/SquareWell.h"
 #include "../SplineFactory.h"
 
@@ -135,13 +136,15 @@ void Bosons1DMixture::InitSystem()
 		ParticleProperties& pp = this->particleProperties[index];
 		pp.mass = 0.5;
 		pp.hbarOver2m = tmphbar * tmphbar / (2.0 * pp.mass);
+		pp.kineticEnergyFactor = 1.0;
 	}
 	index = this->particleTypeIndexMapping[ParticleType::Impurity];
 	if (index > -1)
 	{
 		ParticleProperties& pp = this->particleProperties[index];
-		pp.mass = 0.5*2.0;
+		pp.mass = 0.5;//*2.0;
 		pp.hbarOver2m = tmphbar * tmphbar / (2.0 * pp.mass);
+		pp.kineticEnergyFactor = 87.0 / 41.0; //INFO: mass ratio of m_B and m_I according to Catani 10.1103/PhysRevA.85.023623
 	}
 	index = this->particleTypeIndexMapping[ParticleType::Dummy];
 	if (index > -1)
@@ -149,22 +152,34 @@ void Bosons1DMixture::InitSystem()
 		ParticleProperties& pp = this->particleProperties[index];
 		pp.mass = 0.5;
 		pp.hbarOver2m = tmphbar * tmphbar / (2.0 * pp.mass);
+		pp.kineticEnergyFactor = 1.0;
 	}
 
 	//INFO: Pair potentials
 	double defaultStrength = 10.0;
 	double defaultRange = 0.1;
+	double defaultGamma = 2.0 * 2.0 / 144.0 * 0.0;
+	double eta = 10.0;
+	eta = params[0];
 	index = this->correlationIndexMapping[ParticleType::Boson][ParticleType::Boson];
 	if (index > -1)
 	{
 		ParticlePairProperties& ppp = this->particlePairProperties[index];
-		ppp.potential = new Potentials::Gauss(defaultStrength, defaultRange);
+		//ppp.potential = new Potentials::Gauss(defaultStrength, defaultRange);
+		ppp.potential = new Potentials::None();
+		PairCorrelation& pc = this->pcs[index];
+		pc.useContactInteractionBoundaryCondition = true;
+		pc.gamma = defaultGamma;
 	}
 	index = this->correlationIndexMapping[ParticleType::Boson][ParticleType::Impurity];
 	if (index > -1)
 	{
 		ParticlePairProperties& ppp = this->particlePairProperties[index];
-		ppp.potential = new Potentials::Gauss(defaultStrength*2.0, defaultRange);
+		//ppp.potential = new Potentials::Gauss(defaultStrength*2.0, defaultRange);
+		ppp.potential = new Potentials::None();
+		PairCorrelation& pc = this->pcs[index];
+		pc.useContactInteractionBoundaryCondition = true;
+		pc.gamma = defaultGamma * eta;
 	}
 	index = this->correlationIndexMapping[ParticleType::Boson][ParticleType::Dummy];
 	if (index > -1)
@@ -176,7 +191,11 @@ void Bosons1DMixture::InitSystem()
 	if (index > -1)
 	{
 		ParticlePairProperties& ppp = this->particlePairProperties[index];
-		ppp.potential = new Potentials::Gauss(defaultStrength, defaultRange);
+		//ppp.potential = new Potentials::Gauss(defaultStrength, defaultRange);
+		ppp.potential = new Potentials::None();
+		PairCorrelation& pc = this->pcs[index];
+		pc.useContactInteractionBoundaryCondition = true;
+		pc.gamma = defaultGamma;
 	}
 	index = this->correlationIndexMapping[ParticleType::Impurity][ParticleType::Dummy];
 	if (index > -1)
@@ -217,6 +236,7 @@ void Bosons1DMixture::InitSystem()
 		pc.numOfParticlePairs_Inv = 1.0 / pc.numOfParticlePairs;
 
 		pc.nodes = this->globalNodes;
+		pc.nodeSpacing = pc.nodes[1] - pc.nodes[0];
 		//numberOfSplines = N_PARAM + 1; //BC3.1D.CO.1
 		//numberOfSplines = N_PARAM + 2; //BC3.1D.CO.2
 		//numberOfSplines = N_PARAM + 3; //BC3.1D.CO.2 + BC3.1D.OR.1
@@ -401,6 +421,7 @@ void Bosons1DMixture::CalculateOtherLocalOperators(vector<vector<double> >& R)
 	double potentialInternComplex = 0;
 
 	//potential parameters (a -> width; b -> height)
+	/*
 	double a = params[0];
 	double b = params[1];
 	if (params.size() > 2 && this->time >= params[2])
@@ -408,6 +429,7 @@ void Bosons1DMixture::CalculateOtherLocalOperators(vector<vector<double> >& R)
 		a = params[3];
 		b = params[4];
 	}
+	*/
 
 	for (auto& pc : this->pcs)
 	{
@@ -536,6 +558,18 @@ void Bosons1DMixture::CalculateExpectationValues(vector<double>& O, vector<doubl
 			if (pcIsRelevant)
 			{
 				//INFO: BC
+				if (pc.useContactInteractionBoundaryCondition)
+				{
+					for (int a = 0; a < DIM; a++)
+					{
+						tmp = -2.0 * pc.gamma * pc.nodeSpacing * pc.splineSumsD[0][n][a];
+						opd.vecKineticSumR1[a] += tmp;
+						//opd.vecKineticSumI1[a] += tmp; //INFO: imaginary part of boundary condition is zero
+					}
+					tmp = -2.0 * pc.gamma * pc.nodeSpacing * pc.splineSumsD2[0][n];
+					opd.kineticSumR2 += tmp;
+					//kineticSumI2 += tmp; //INFO: imaginary part of boundary condition is zero
+				}
 				for (int i = 0; i < pc.np1; i++)
 				{
 					for (int a = 0; a < DIM; a++)
@@ -582,8 +616,8 @@ void Bosons1DMixture::CalculateExpectationValues(vector<double>& O, vector<doubl
 		opd.kineticSumR1 += VectorNorm2_DIM(opd.vecKineticSumR1);
 		opd.kineticSumI1 += VectorNorm2_DIM(opd.vecKineticSumI1);
 
-		kineticR += -pp.hbarOver2m * (opd.kineticSumR1 - opd.kineticSumI1 + opd.kineticSumR2);
-		kineticI += -pp.hbarOver2m * (opd.kineticSumR1I1 + opd.kineticSumI2);
+		kineticR += -pp.kineticEnergyFactor * (opd.kineticSumR1 - opd.kineticSumI1 + opd.kineticSumR2);
+		kineticI += -pp.kineticEnergyFactor * (opd.kineticSumR1I1 + opd.kineticSumI2);
 	}
 
 	localEnergyR = kineticR + otherO[0] + otherO[2];
@@ -699,6 +733,13 @@ void Bosons1DMixture::CalculateWavefunction(vector<double>& O, vector<double>& u
 {
 	double sum = 0;
 
+	for (auto& pc : this->pcs)
+	{
+		if (pc.useContactInteractionBoundaryCondition)
+		{
+			sum += -2.0 * pc.gamma * pc.nodeSpacing * pc.splineSums[0];
+		}
+	}
 	for (int i = 0; i < N_PARAM; i++)
 	{
 		sum += uR[i] * O[i];
@@ -792,6 +833,10 @@ void Bosons1DMixture::CalculateWFChange(vector<vector<double> >& R, vector<doubl
 	for (auto& pc : this->pcs)
 	{
 		//INFO: BCx
+		if (pc.useContactInteractionBoundaryCondition)
+		{
+			sum += -2.0 * pc.gamma * pc.nodeSpacing * pc.splineSumsNew[0];
+		}
 		for (int i = 0; i < pc.np1; i++)
 		{
 			sum += uR[i + offset] * (pc.bcFactorsStart[i][0] * pc.splineSumsNew[0] + pc.bcFactorsStart[i][1] * pc.splineSumsNew[1] + pc.bcFactorsStart[i][2] * pc.splineSumsNew[2]);

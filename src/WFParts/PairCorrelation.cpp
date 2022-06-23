@@ -13,6 +13,9 @@ PairCorrelation::PairCorrelation(int splineOrder_) : SplinedFunction(splineOrder
 	this->SecondParticleType = -1;
 	this->numOfParticlePairs = 0;
 	this->numOfParticlePairs_Inv = 0.0;
+
+	this->useContactInteractionBoundaryCondition = false;
+	this->gamma = 0.0;
 }
 
 }

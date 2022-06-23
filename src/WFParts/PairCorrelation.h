@@ -19,6 +19,9 @@ public:
 	double numOfParticlePairs_Inv;
 	int FirstParticleType;
 	int SecondParticleType;
+
+	bool useContactInteractionBoundaryCondition;
+	double gamma;
 };
 
 }
