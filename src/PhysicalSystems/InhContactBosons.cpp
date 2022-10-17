@@ -75,15 +75,15 @@ void InhContactBosons::InitSystem()
 	{
 		//INFO: use half of the parameters for spf
 		int nparam_2 = N_PARAM / 2;
-		spf.nodeSpacing =  LBOX / (double) nparam_2;
+		spf.nodeSpacing = LBOX / (double) nparam_2;
 		for (int i = -3; i < nparam_2 + 4; i++)
 		{
 			spf.nodes.push_back((i * LBOX) / ((double) nparam_2));
 		}
 	}
-	
+
 	if (pc.nodes.empty())
-	{		
+	{
 		//INFO: use half of the parameters for pc
 		//INFO: BC
 		//this is for SetBoundaryConditions3_1D_OR_2 and SetBoundaryConditions3_1D_CO_2
@@ -107,7 +107,7 @@ void InhContactBosons::InitSystem()
 	spf.numberOfStandardParameters = spf.nodes.size() - 2 * spf.splineOrder - spf.numberOfSpecialParametersStart - 1;
 	spf.np1 = spf.numberOfSpecialParametersStart;
 	spf.np2 = spf.np1 + spf.numberOfStandardParameters;
-	spf.np3 = spf.np2;// + spf.numberOfSpecialParametersEnd;
+	spf.np3 = spf.np2; // + spf.numberOfSpecialParametersEnd;
 
 	pc.numberOfSplines = pc.nodes.size() - (3 + 1); //3rd order splines -(d+1)
 	pc.splineWeights = SplineFactory::GetWeights(pc.nodes);
@@ -121,7 +121,7 @@ void InhContactBosons::InitSystem()
 	pc.np3 = pc.np2 + pc.numberOfSpecialParametersEnd;
 
 	int requiredParams = spf.numberOfSplines - (3 - spf.numberOfSpecialParametersStart) - (3 - spf.numberOfSpecialParametersEnd) - 3 + //INFO: last -3 is because the last three parameters are identical to the first three parameters
-						 pc.numberOfSplines - (3 - pc.numberOfSpecialParametersStart) - (3 - pc.numberOfSpecialParametersEnd);
+			pc.numberOfSplines - (3 - pc.numberOfSpecialParametersStart) - (3 - pc.numberOfSpecialParametersEnd);
 	if (N_PARAM != requiredParams)
 	{
 		cout << "!!! WRONG NUMBER OF PARAMETERS !!!" << endl;
@@ -181,7 +181,7 @@ void InhContactBosons::InitSystem()
 	density.InitObservables( { "rho(r)" });
 
 	pairDensity.name = "pairDensity";
-	pairDensity.InitGrid({{0.0, LBOX, LBOX / numOfPairDistributionValues}, {0.0, LBOX, LBOX / numOfPairDistributionValues}});	
+	pairDensity.InitGrid( { { 0.0, LBOX, LBOX / numOfPairDistributionValues }, { 0.0, LBOX, LBOX / numOfPairDistributionValues } });
 	pairDensity.grids[0].name = "r_i";
 	pairDensity.grids[1].name = "r_j";
 	pairDensity.InitObservables( { "rho_2(r_i,r_j)" });
@@ -358,7 +358,6 @@ void InhContactBosons::CalculateOtherLocalOperators(vector<vector<double> >& R)
 			spftmp2[spf.numOfSplineParts - 1 - p] = 2.0 * spf.splineWeights[bin - p][p][2] + 6.0 * spf.splineWeights[bin - p][p][3] * r;
 		}
 
-
 		evecr[0] = 1.0; //TODO: is this the unit vector? do not calculate again
 		bool outsideL2 = false;
 		double firstDerivativeFactor = outsideL2 ? -1.0 : 1.0;
@@ -487,13 +486,14 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 		//for (double i = 1; i <= LBOX_2; i += 1)
 		{
 			//pulseK = params[10] + i * 0.05;
-			pulseK = 1.0 / LBOX * kf;
+			//pulseK = 1.0 / LBOX * kf; //pulse lowest possible k
+			pulseK = 0.5 * kf; //pulse on center of BZ
 			double pulse = sin(pulseK * x);
 			pulse *= pulse; //sin^2
 			pulse -= 0.5; //symmetric around zero
 			pulse *= pulseStrength;
 			pulse *= k * k;
-			pulse *= exp(-pow((this->time - params[9])/(params[9] * 0.4), 2.0));
+			pulse *= exp(-pow((this->time - params[9]) / (params[9] * 0.4), 2.0));
 			value += pulse;
 		}
 	}
@@ -510,6 +510,7 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 	}
 	//value = 0.0;
 	//value = abs(x);
+	//value = 1.0;
 	return value;
 }
 
@@ -644,14 +645,15 @@ void InhContactBosons::CalculateExpectationValues(vector<double>& O, vector<vect
 	localEnergyR = kineticR + otherO[0] + otherO[2];
 	localEnergyI = kineticI + otherO[1];
 
-	//cout << "potentialExtern=" << potentialExtern << endl;
-	//cout << "potentialIntern=" << potentialIntern << endl;
+	//cout << "potentialExtern=" << otherO[2] << endl;
+	//cout << "potentialIntern=" << otherO[0] << endl;
 	//cout << "kineticSumR1=" << kineticSumR1 << endl;
 	//cout << "kineticSumI1=" << kineticSumI1 << endl;
 	//cout << "kineticSumR2=" << kineticSumR2 << endl;
 	//cout << "kineticSumI2=" << kineticSumI2 << endl;
 	//cout << "kineticSumR1I1=" << kineticSumR1I1 << endl;
 	//cout << "kineticR=" << kineticR << endl;
+	//cout << "kineticI=" << kineticI << endl;
 
 	localOperators = O; //INFO: for providing the localOperators to TDVMC.cpp via IPhysicalSystem.GetLocalOperators()
 	for (int k = 0; k < N_PARAM; k++)
@@ -710,7 +712,7 @@ void InhContactBosons::CalculateAdditionalSystemProperties(vector<vector<double>
 	}
 
 	//pairDensity, pairDistribution
-	weight = 1.0 / ((double)(N - 1));
+	weight = 1.0 / ((double) (N - 1));
 	weight2 = 1.0;
 	for (int i = 0; i < N; i++)
 	{
@@ -869,7 +871,6 @@ void InhContactBosons::CalculateWFChange(vector<vector<double> >& R, vector<doub
 	{
 		pc.splineSumsNew[i] = max(0.0, pc.splineSums[i] - pc.sumOldPerBin[i] + pc.sumNewPerBin[i]);
 	}
-
 
 	int offset;
 	int spIdx;

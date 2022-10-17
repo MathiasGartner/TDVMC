@@ -40,7 +40,7 @@ public:
 public:
 	SplinedFunction(int splineOrder_);
 
-	void Init();
+	virtual void Init();
 	int BinIndex(double r);
 };
 

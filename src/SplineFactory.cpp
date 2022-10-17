@@ -423,7 +423,7 @@ void SetBoundaryConditions3_1D_OR_1(vector<double> n, vector<vector<double> >& b
 
 void SetBoundaryConditions3_1D_OR_2(vector<double> n, vector<vector<double> >& bcs, bool uniform)
 {
-	//first derivatie = 0
+	//first derivative = 0
 	vector<double> bc(3);
 
 	if (uniform)
@@ -493,7 +493,7 @@ void SetBoundaryConditions3_1D_OR_3(vector<double> n, vector<vector<double> >& b
 
 void SetBoundaryConditions3_1D_OR_4(vector<double> n, vector<vector<double> >& bcs, bool uniform)
 {
-	//first derivatie = 0, second derivative = 0
+	//first derivative = 0, second derivative = 0
 	vector<double> bc(3);
 
 	if (uniform)
@@ -517,7 +517,7 @@ void SetBoundaryConditions3_1D_OR_4(vector<double> n, vector<vector<double> >& b
 
 void SetBoundaryConditions3_1D_CO_1(vector<double> n, vector<vector<double> >& bcs, double rc, bool uniform)
 {
-	//first derivatie = 0
+	//no bc
 	vector<double> bc(3);
 
 	if (uniform)
@@ -563,7 +563,7 @@ void SetBoundaryConditions3_1D_CO_1(vector<double> n, vector<vector<double> >& b
 
 void SetBoundaryConditions3_1D_CO_2(vector<double> n, vector<vector<double> >& bcs, double rc, bool uniform)
 {
-	//first derivatie = 0
+	//first derivative = 0
 	vector<double> bc(3);
 
 	if (uniform)
@@ -598,7 +598,7 @@ void SetBoundaryConditions3_1D_CO_2(vector<double> n, vector<vector<double> >& b
 
 void SetBoundaryConditions3_1D_CO_3(vector<double> n, vector<vector<double> >& bcs, double rc, bool uniform)
 {
-	//first derivatie = 0
+	//second derivative = 0
 	vector<double> bc(3);
 
 	if (uniform)
@@ -633,7 +633,7 @@ void SetBoundaryConditions3_1D_CO_3(vector<double> n, vector<vector<double> >& b
 
 void SetBoundaryConditions3_1D_CO_4(vector<double> n, vector<vector<double> >& bcs, double rc, bool uniform)
 {
-	//first derivatie = 0, second derivative = 0
+	//first derivative = 0, second derivative = 0
 	vector<double> bc(3);
 
 	if (uniform)

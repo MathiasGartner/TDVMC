@@ -52,7 +52,7 @@ void BosonsBulk::InitSystem()
 {
 	numOfOtherLocalOperators = 4; //INFO: potentialIntern, potentialInternComplex, potentialExtern, potentialExternComplex
 	otherLocalOperators.resize(numOfOtherLocalOperators);	
-	numOfkValues = 50;
+	numOfkValues = 150;
 	numOfOtherExpectationValues = 9;
 	numOfAdditionalSystemProperties = numOfOtherExpectationValues;
 
@@ -60,7 +60,7 @@ void BosonsBulk::InitSystem()
 
 	if (nodes.empty())
 	{
-		for (int i = -3; i < N_PARAM + 3;  i++)
+		for (int i = -3; i < N_PARAM + 3; i++)
 		{
 			nodes.push_back((i * halfLength) / ((double)N_PARAM - 1));
 		}
@@ -194,8 +194,7 @@ void BosonsBulk::CalculateLocalOperators(vector<vector<double> >& R)
 			rni = VectorDisplacementNIC_DIM(R[n], R[i], vecrni);
 			if (rni <= maxDistance)
 			{
-				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
-				bin = interval - nodes.begin() - 1;
+				bin = GetBinIndex(nodes, rni);
 				rni2 = rni * rni;
 				rni3 = rni2 * rni;
 
@@ -265,16 +264,16 @@ void BosonsBulk::CalculateOtherLocalOperators(vector<vector<double> >& R)
 					//potentialIntern += b * exp(-(rnia * rnia) / 2.0);
 
 					//square
-					if (rni < a)
-					{
-						potentialIntern += b;
-					}
+					//if (rni < a)
+					//{
+					//	potentialIntern += b;
+					//}
 
 					//Rydberg U_0 / (1 + (r/R_0)^6))
 					//R_0 = a, U_0 = b;
-					//double rniR0 = rni / a;
-					//double rniR03 = rniR0 * rniR0 * rniR0;
-					//potentialIntern += b / (1 + rniR03 * rniR03);
+					double rniR0 = rni / a;
+					double rniR03 = rniR0 * rniR0 * rniR0;
+					potentialIntern += b / (1 + rniR03 * rniR03);
 
 					//double rniAbsorption = rni - 4.5;
 					//double absorptionFactor = 0.0;//-3e-6;
@@ -289,8 +288,7 @@ void BosonsBulk::CalculateOtherLocalOperators(vector<vector<double> >& R)
 				//		otherwise values are calculated multiple times
 				if (i != n) //TODO: also include in (i < n) branch -> then only loop over i < n in "for (int i = 0; i < N; i++)"
 				{
-					auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
-					bin = interval - nodes.begin() - 1;
+					bin = GetBinIndex(nodes, rni);
 					rni2 = rni * rni;
 
 					for (int p = 0; p < s; p++)
@@ -570,8 +568,7 @@ void BosonsBulk::CalculateWFChange(vector<vector<double> >& R, vector<double>& u
 			rni = VectorDisplacementNIC_DIM(R[i], oldPosition, vecrni);
 			if (rni <= maxDistance)
 			{
-				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
-				bin = interval - nodes.begin() - 1;
+				bin = GetBinIndex(nodes, rni);
 				if (bin >= numberOfSplines)
 				{
 					cout << "!!!!" << endl;
@@ -592,8 +589,7 @@ void BosonsBulk::CalculateWFChange(vector<vector<double> >& R, vector<double>& u
 			rni = VectorDisplacementNIC_DIM(R[i], R[changedParticleIndex], vecrni);
 			if (rni < maxDistance)
 			{
-				auto interval = lower_bound(nodes.begin(), nodes.end(), rni);
-				bin = interval - nodes.begin() - 1;
+				bin = GetBinIndex(nodes, rni);
 				rni2 = rni * rni;
 				rni3 = rni2 * rni;
 

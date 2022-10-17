@@ -2,8 +2,6 @@
 
 #include "SplinedFunction.h"
 
-#include <vector>
-
 using namespace std;
 
 namespace WFParts
@@ -21,7 +19,19 @@ public:
 	int SecondParticleType;
 
 	bool useContactInteractionBoundaryCondition;
+	bool useContactInteractionBoundaryConditionExp;
 	double gamma;
+	double contactLengthscale;
+
+	double contactSum;
+	double contactSumNew;
+	vector<vector<double> > contactSumD;
+	vector<double> contactSumD2;
+	double contactOld;
+	double contactNew;
+
+public:
+	void Init();
 };
 
 }
