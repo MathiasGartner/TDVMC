@@ -6,6 +6,7 @@
 
 #include "../Constants.h"
 #include "../CSDataBulkSplines.h"
+#include "../CSDataBosons1D.h"
 #include "../MathOperators.h"
 #include "../Utils.h"
 
@@ -59,24 +60,49 @@ private:
 	//double preCalcSplineValues[103][4][100000];
 	bool usePreCalcSplineValues;
 
+	Observables::Observable randNum;
 	Observables::ObservableVsOnGridWithScaling pairDistribution;
 	Observables::ObservableVsOnGrid structureFactor;
+	Observables::ObservableVsOnGrid structureFactorCos;
+	Observables::ObservableVsOnGrid structureFactorSin;
 
+	Observables::ObservableV overlapToInitialState; //real part, imaginary part, absolute value
+
+	vector<double> tmpLocalOperators;
+	vector<double> tmpSplineSums;
 	int particleStartIndexForReducedSampling;
+
+	double exponentI;
+	double exponentNewI;
+	vector<double> initialParamsR;
+	vector<double> initialParamsI;
+	double initialParamPhiR;
+	double initialParamPhiI;
+
+	vector<CSDataBosons1D*> initialSamples;
+	int sampleNo;
+	bool calculateOverlap;
 
 private:
 	double GetExternalPotential(vector<double>& r);
 	void RefreshLocalOperators();
+	void RefreshLocalOperators(vector<double>& locO, vector<double>& sSums);
 	void CalculateLocalOperators(vector<vector<double> >& R);
+	void CalculateLocalOperators(vector<vector<double> >& R, vector<double>& locO, vector<double>& sSums);
 	void CalculateExpectationValues(vector<double>& O, vector<vector<vector<double> > >& sD, vector<vector<double> >& sD2, vector<double>& otherO, vector<double>& gr, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
 	void CalculateWavefunction(vector<double>& O, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
+	void CalculateWavefunction(vector<vector<double> >& R, vector<double>& locO, vector<double>& sSums, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
 
 public:
 	void SetNodes(vector<double> n);
 	void SetPairDistributionBinCount(double n);
+	void SetInitialParameters(vector<double>& uR, vector<double>& uI, double phiR, double phiI);
 	void SetParticleStartIndexForReducedSampling(int n);
 
 	double CalculateOBDMKernel(vector<double>& r, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI);
+
+	void AddToInitialSamples(vector<vector<double> >& R, Observables::ObservableCollection& data);
+	void SetSampleNo(int sampleNo, bool calculateOverlap);
 
 //Implementation of IPhysicalSystem
 public:

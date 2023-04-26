@@ -33,6 +33,14 @@ Bosons1D::Bosons1D(vector<double>& params, string configDirectory) :
 	changedParticleIndex = 0;
 
 	particleStartIndexForReducedSampling = 0;
+
+	exponentI = 0;
+	exponentNewI = 0;
+	initialParamPhiR = 0;
+	initialParamPhiI = 0;
+
+	this->sampleNo = 0;
+	this->calculateOverlap = false;
 }
 
 void Bosons1D::SetNodes(vector<double> n)
@@ -49,6 +57,19 @@ void Bosons1D::SetNodes(vector<double> n)
 void Bosons1D::SetPairDistributionBinCount(double n)
 {
 	this->numOfPairDistributionValues = n;
+}
+
+void Bosons1D::SetInitialParameters(vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+	this->initialParamsR.resize(N_PARAM);
+	this->initialParamsI.resize(N_PARAM);
+	for (int i = 0; i < N_PARAM; i++)
+	{
+		this->initialParamsR[i] = uR[i];
+		this->initialParamsI[i] = uI[i];
+	}
+	this->initialParamPhiR = phiR;
+	this->initialParamPhiI = phiI;
 }
 
 void Bosons1D::SetParticleStartIndexForReducedSampling(int n)
@@ -130,6 +151,20 @@ double Bosons1D::CalculateOBDMKernel(vector<double>& r, vector<vector<double> >&
 	//result = sumParts[0];
 
 	return result;
+}
+
+void Bosons1D::AddToInitialSamples(vector<vector<double> >& R, Observables::ObservableCollection& data)
+{
+	CSDataBosons1D* sample = new CSDataBosons1D();
+	sample->R = R;
+	sample->data = this->GetAdditionalObservablesClone();
+	this->initialSamples.push_back(sample);
+}
+
+void Bosons1D::SetSampleNo(int sampleNo, bool calculateOverlap)
+{
+	this->sampleNo = sampleNo;
+	this->calculateOverlap = calculateOverlap;
 }
 
 void Bosons1D::InitSystem()
@@ -229,8 +264,24 @@ void Bosons1D::InitSystem()
 	structureFactor.InitGrid(kNorms);
 	structureFactor.InitObservables( { "S(k)" });
 
+	structureFactorCos.name = "structureFactorCos";
+	structureFactorCos.grid.name = "k";
+	structureFactorCos.InitGrid(kNorms);
+	structureFactorCos.InitObservables( { "S(k)_cos" });
+
+	structureFactorSin.name = "structureFactorSin";
+	structureFactorSin.grid.name = "k";
+	structureFactorSin.InitGrid(kNorms);
+	structureFactorSin.InitObservables( { "S(k)_sin" });
+
+	overlapToInitialState.Init(2*(3+4), "overlap");
+
 	additionalObservables.Add(&pairDistribution);
 	additionalObservables.Add(&structureFactor);
+	//additionalObservables.Add(&structureFactorCos);
+	//additionalObservables.Add(&structureFactorSin);
+	additionalObservables.Add(&overlapToInitialState);
+	//additionalObservables.Add(&randNum);
 
 	//Precalculate spline values:
 	if (usePreCalcSplineValues)
@@ -262,30 +313,43 @@ void Bosons1D::InitSystem()
 			}
 		}
 	}
+
+	tmpLocalOperators.resize(this->localOperators.size());
+	tmpSplineSums.resize(this->splineSums.size());
 }
 
 void Bosons1D::RefreshLocalOperators()
 {
+	RefreshLocalOperators(this->localOperators, this->splineSums);
+}
+
+void Bosons1D::RefreshLocalOperators(vector<double>& locO, vector<double>& sSums)
+{
 	//INFO: BC
 	for (int i = 0; i < np1; i++)
 	{
-		this->localOperators[i] = (bcFactorsStart[i][0] * splineSums[0] + bcFactorsStart[i][1] * splineSums[1] + bcFactorsStart[i][2] * splineSums[2]);
+		locO[i] = (bcFactorsStart[i][0] * sSums[0] + bcFactorsStart[i][1] * sSums[1] + bcFactorsStart[i][2] * sSums[2]);
 	}
 	int spIdx = 3;
 	for (int i = np1; i < np2; i++)
 	{
-		this->localOperators[i] = splineSums[spIdx];
+		locO[i] = sSums[spIdx];
 		spIdx++;
 	}
 	int idx = 0;
 	for (int i = np2; i < np3; i++)
 	{
-		this->localOperators[i] = (bcFactorsEnd[idx][0] * splineSums[numberOfSplines - 3] + bcFactorsEnd[idx][1] * splineSums[numberOfSplines - 2] + bcFactorsEnd[idx][2] * splineSums[numberOfSplines - 1]);
+		locO[i] = (bcFactorsEnd[idx][0] * sSums[numberOfSplines - 3] + bcFactorsEnd[idx][1] * sSums[numberOfSplines - 2] + bcFactorsEnd[idx][2] * sSums[numberOfSplines - 1]);
 		idx++;
 	}
 }
 
 void Bosons1D::CalculateLocalOperators(vector<vector<double> >& R)
+{
+	this->CalculateLocalOperators(R, this->localOperators, this->splineSums);
+}
+
+void Bosons1D::CalculateLocalOperators(vector<vector<double> >& R, vector<double>& locO, vector<double>& sSums)
 {
 	int bin;
 	double rni;
@@ -293,7 +357,7 @@ void Bosons1D::CalculateLocalOperators(vector<vector<double> >& R)
 	double rni3;
 	vector<double> vecrni(DIM);
 
-	ClearVector(splineSums);
+	ClearVector(sSums);
 
 	for (int n = particleStartIndexForReducedSampling; n < N; n++)
 	{
@@ -311,14 +375,14 @@ void Bosons1D::CalculateLocalOperators(vector<vector<double> >& R)
 					int rniBin = (rni - nodes[bin]) * binSizePerNode_R[bin + 3];
 					for (int p = 0; p < 4; p++)
 					{
-						splineSums[bin - p] += preCalcSplineValues[bin - p][p][rniBin];
+						sSums[bin - p] += preCalcSplineValues[bin - p][p][rniBin];
 					}
 				}
 				else
 				{
 					for (int p = 0; p < 4; p++)
 					{
-						splineSums[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rni + splineWeights[bin - p][p][2] * rni2 + splineWeights[bin - p][p][3] * rni3;
+						sSums[bin - p] += splineWeights[bin - p][p][0] + splineWeights[bin - p][p][1] * rni + splineWeights[bin - p][p][2] * rni2 + splineWeights[bin - p][p][3] * rni3;
 					}
 				}
 			}
@@ -331,14 +395,14 @@ void Bosons1D::CalculateLocalOperators(vector<vector<double> >& R)
 	//INFO: with preCalcsplineValues
 	//double sum = 0;
 	//double sum2 = 0;
-	//for (unsigned int i = 0; i < splineSums.size(); i++)
+	//for (unsigned int i = 0; i < sSums.size(); i++)
 	//{
-	//	cout << (splineSums[i] - splineSumsPreCalc[i]) << "(" << splineSums[i] << " - " << splineSumsPreCalc[i] << ")" << endl;
-	//	sum += (splineSums[i] - splineSumsPreCalc[i]);
-	//	sum2 += sqrt((splineSums[i] - splineSumsPreCalc[i]) * (splineSums[i] - splineSumsPreCalc[i]));
+	//	cout << (sSums[i] - sSumsPreCalc[i]) << "(" << sSums[i] << " - " << sSumsPreCalc[i] << ")" << endl;
+	//	sum += (sSums[i] - sSumsPreCalc[i]);
+	//	sum2 += sqrt((sSums[i] - sSumsPreCalc[i]) * (sSums[i] - sSumsPreCalc[i]));
 	//}
 	//cout << "sum=" << sum << ", sum2=" << sum2 << endl;
-	RefreshLocalOperators();
+	RefreshLocalOperators(locO, sSums);
 }
 
 void Bosons1D::CalculateOtherLocalOperators(vector<vector<double> >& R)
@@ -611,43 +675,114 @@ void Bosons1D::CalculateAdditionalSystemProperties(vector<vector<double> >& R, v
 
 	//structureFactor
 	//according to Zhang, Kai. "On the concept of static structure factor." arXiv preprint arXiv:1606.03610 (2016).
-	double sumS;
+	double kr;
 	vector<double> sumSCos;
 	vector<double> sumSSin;
 	vector<double> sk;
+	vector<double> skCos;
+	vector<double> skSin;
 	InitVector(sumSCos, numOfkValues, 0.0);
 	InitVector(sumSSin, numOfkValues, 0.0);
 	InitVector(sk, numOfkValues, 0.0);
+	InitVector(skCos, numOfkValues, 0.0);
+	InitVector(skSin, numOfkValues, 0.0);
 	for (int i = 0; i < N; i++)
 	{
 		for (int k = 0; k < numOfkValues; k++)
 		{
 			for (unsigned int kn = 0; kn < kValues[k].size(); kn++)
 			{
-				sumS = VectorDotProduct_DIM(kValues[k][kn], R[i]);
-				sumSCos[k] += cos(sumS);
-				sumSSin[k] += sin(sumS);
+				vector<double> r = {GetCoordinateNIC(R[i][0])};
+				kr = VectorDotProduct_DIM(kValues[k][kn], r);
+				sumSCos[k] += cos(kr);
+				sumSSin[k] += sin(kr);
 			}
 		}
 	}
 	for (int k = 0; k < numOfkValues; k++)
 	{
 		sk[k] = (sumSCos[k] * sumSCos[k] + sumSSin[k] * sumSSin[k]) / ((double) (N * kValues[k].size()));
+		skCos[k] = (sumSCos[k] * sumSCos[k]) / ((double) (N * kValues[k].size()));
+		skSin[k] = (sumSSin[k] * sumSSin[k]) / ((double) (N * kValues[k].size()));
 		structureFactor.SetValueAtGridIndex(0, k, sk[k]);
+		structureFactorCos.SetValueAtGridIndex(0, k, skCos[k]);
+		structureFactorSin.SetValueAtGridIndex(0, k, skSin[k]);
 	}
+
+	//sample from |Psi(t)|^2
+	double tmpExponent = this->exponent;
+	double tmpExponentI = this->exponentI;
+	double tmpWf = this->wf;
+	CalculateWavefunction(R, this->tmpLocalOperators, this->tmpSplineSums, initialParamsR, initialParamsI, initialParamPhiR, initialParamPhiI);
+	double exponentInitialParamsR = exponent + initialParamPhiR;
+	double exponentInitialParamsI = exponentI + initialParamPhiI;
+
+	this->exponent = tmpExponent;
+	this->exponentI = tmpExponentI;
+	this->wf = tmpWf;
+	double exponentCurrentR = exponent + phiR;
+	double exponentCurrentI = exponentI + phiI;
+
+	double f = exp(exponentInitialParamsR - exponentCurrentR);
+	double imagDiff = exponentInitialParamsI - exponentCurrentI;
+	double overlapR = f * cos(imagDiff);
+	double overlapI = - f * sin(imagDiff);
+	overlapToInitialState.values[0] = overlapR;
+	overlapToInitialState.values[1] = overlapI;
+	overlapToInitialState.values[2] = sqrt(overlapR * overlapR + overlapI * overlapI);
+	overlapToInitialState.values[3] = exponentInitialParamsR;
+	overlapToInitialState.values[4] = exponentInitialParamsI;
+	overlapToInitialState.values[5] = exponentCurrentR;
+	overlapToInitialState.values[6] = exponentCurrentI;
+
+	//sample from |Psi(0)|^2
+	if (this->initialSamples.size() > 0 && this->calculateOverlap)
+	{
+		auto sample = dynamic_cast<CSDataBosons1D*>(this->initialSamples[this->sampleNo]);
+		auto sampleData = dynamic_cast<Observables::ObservableV*>(sample->data.observables[2]);
+		exponentInitialParamsR = sampleData->values[5];
+		exponentInitialParamsI = sampleData->values[6];
+
+		tmpExponent = this->exponent;
+		tmpExponentI = this->exponentI;
+		tmpWf = this->wf;
+		CalculateWavefunction(R, uR, uI, phiR, phiI);
+		exponentCurrentR = exponent + initialParamPhiR;
+		exponentCurrentI = exponentI + initialParamPhiI;
+		this->exponent = tmpExponent;
+		this->exponentI = tmpExponentI;
+		this->wf = tmpWf;
+
+		f = exp(exponentCurrentR - exponentInitialParamsR);
+		imagDiff = exponentCurrentI - exponentInitialParamsI;
+		overlapR = f * cos(imagDiff);
+		overlapI = + f * sin(imagDiff);
+		overlapToInitialState.values[7 + 0] = overlapR;
+		overlapToInitialState.values[7 + 1] = overlapI;
+		overlapToInitialState.values[7 + 2] = sqrt(overlapR * overlapR + overlapI * overlapI);
+		overlapToInitialState.values[7 + 3] = exponentInitialParamsR;
+		overlapToInitialState.values[7 + 4] = exponentInitialParamsI;
+		overlapToInitialState.values[7 + 5] = exponentCurrentR;
+		overlapToInitialState.values[7 + 6] = exponentCurrentI;
+	}
+
+	randNum.value = random01();
 }
 
 void Bosons1D::CalculateWavefunction(vector<double>& O, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
 	double sum = 0;
+	double sumI = 0;
 
 	for (int i = 0; i < N_PARAM; i++)
 	{
 		sum += uR[i] * O[i];
+		sumI += uI[i] * O[i];
 	}
 
 	//cout << scientific << setprecision(16) << "sum:" << sum << endl;
 	exponent = sum;
+	exponentI = sumI;
 	wf = exp(exponent + phiR);
 }
 
@@ -655,6 +790,12 @@ void Bosons1D::CalculateWavefunction(vector<vector<double> >& R, vector<double>&
 {
 	CalculateLocalOperators(R);
 	CalculateWavefunction(this->localOperators, uR, uI, phiR, phiI);
+}
+
+void Bosons1D::CalculateWavefunction(vector<vector<double> >& R, vector<double>& locO, vector<double>& sSums, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
+{
+	CalculateLocalOperators(R, locO, sSums);
+	CalculateWavefunction(locO, uR, uI, phiR, phiI);
 }
 
 void Bosons1D::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
@@ -666,6 +807,7 @@ void Bosons1D::CalculateWavefunction(ICorrelatedSamplingData* sample, vector<dou
 void Bosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int changedParticleIndex, vector<double>& oldPosition)
 {
 	double sum = 0;
+	double sumI = 0;
 	int bin;
 	double rni;
 	double rni2;
@@ -748,21 +890,25 @@ void Bosons1D::CalculateWFChange(vector<vector<double> >& R, vector<double>& uR,
 	for (int i = 0; i < np1; i++)
 	{
 		sum += uR[i] * (bcFactorsStart[i][0] * splineSumsNew[0] + bcFactorsStart[i][1] * splineSumsNew[1] + bcFactorsStart[i][2] * splineSumsNew[2]);
+		sumI += uI[i] * (bcFactorsStart[i][0] * splineSumsNew[0] + bcFactorsStart[i][1] * splineSumsNew[1] + bcFactorsStart[i][2] * splineSumsNew[2]);
 	}
 	int spIdx = 3;
 	for (int i = np1; i < np2; i++)
 	{
 		sum += uR[i] * splineSumsNew[spIdx];
+		sumI += uI[i] * splineSumsNew[spIdx];
 		spIdx++;
 	}
 	int idx = 0;
 	for (int i = np2; i < np3; i++)
 	{
 		sum += uR[i] * (bcFactorsEnd[idx][0] * splineSumsNew[numberOfSplines - 3] + bcFactorsEnd[idx][1] * splineSumsNew[numberOfSplines - 2] + bcFactorsEnd[idx][2] * splineSumsNew[numberOfSplines - 1]);
+		sumI += uI[i] * (bcFactorsEnd[idx][0] * splineSumsNew[numberOfSplines - 3] + bcFactorsEnd[idx][1] * splineSumsNew[numberOfSplines - 2] + bcFactorsEnd[idx][2] * splineSumsNew[numberOfSplines - 1]);
 		idx++;
 	}
 
 	exponentNew = sum;
+	exponentNewI = sumI;
 	wfNew = exp(exponentNew + phiR);
 }
 
@@ -780,6 +926,7 @@ void Bosons1D::AcceptMove()
 {
 	wf = wfNew;
 	exponent = exponentNew;
+	exponentI = exponentNewI;
 	splineSums = splineSumsNew;
 }
 
