@@ -23,6 +23,14 @@ void ObservableVsOnMultiGrid::ClearValues()
 	}
 }
 
+void ObservableVsOnMultiGrid::ApplySquareRoot()
+{
+	for (auto& v : this->observablesV)
+	{
+		v.ApplySquareRoot();
+	}
+}
+
 void ObservableVsOnMultiGrid::InitGrid(vector<vector<double> > gridProperties)
 {
 	totalGridPoints = 1;
@@ -79,6 +87,15 @@ IObservable& ObservableVsOnMultiGrid::operator*=(double d)
 	for (unsigned int i = 0; i < this->observablesV.size(); i++)
 	{
 		this->observablesV[i] *= d;
+	}
+	return *this;
+}
+
+IObservable& ObservableVsOnMultiGrid::operator*=(const IObservable& oc)
+{
+	for (unsigned int i = 0; i < this->observablesV.size(); i++)
+	{
+		this->observablesV[i] *= dynamic_cast<const ObservableVsOnMultiGrid&>(oc).observablesV[i];
 	}
 	return *this;
 }

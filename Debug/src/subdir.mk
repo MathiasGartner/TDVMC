@@ -4,6 +4,7 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
+../src/CSDataBosons1D.cpp \
 ../src/CSDataBulkSplines.cpp \
 ../src/CSDataBulkSplinesBR.cpp \
 ../src/ConfigItem.cpp \
@@ -18,6 +19,7 @@ CPP_SRCS += \
 ../src/Utils.cpp 
 
 OBJS += \
+./src/CSDataBosons1D.o \
 ./src/CSDataBulkSplines.o \
 ./src/CSDataBulkSplinesBR.o \
 ./src/ConfigItem.o \
@@ -32,6 +34,7 @@ OBJS += \
 ./src/Utils.o 
 
 CPP_DEPS += \
+./src/CSDataBosons1D.d \
 ./src/CSDataBulkSplines.d \
 ./src/CSDataBulkSplinesBR.d \
 ./src/ConfigItem.d \

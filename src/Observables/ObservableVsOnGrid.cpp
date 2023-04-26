@@ -22,6 +22,14 @@ void ObservableVsOnGrid::ClearValues()
 	}
 }
 
+void ObservableVsOnGrid::ApplySquareRoot()
+{
+	for (auto& v : this->observablesV)
+	{
+		v.ApplySquareRoot();
+	}
+}
+
 void ObservableVsOnGrid::InitGrid(double min, double max, double spacing)
 {
 	this->grid.Init(min, max, spacing);
@@ -76,6 +84,15 @@ IObservable& ObservableVsOnGrid::operator*=(double d)
 	for (unsigned int i = 0; i < this->observablesV.size(); i++)
 	{
 		this->observablesV[i] *= d;
+	}
+	return *this;
+}
+
+IObservable& ObservableVsOnGrid::operator*=(const IObservable& oc)
+{
+	for (unsigned int i = 0; i < this->observablesV.size(); i++)
+	{
+		this->observablesV[i] *= dynamic_cast<const ObservableVsOnGrid&>(oc).observablesV[i];
 	}
 	return *this;
 }

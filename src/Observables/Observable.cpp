@@ -18,6 +18,11 @@ void Observable::ClearValues()
 	this->value = 0.0;
 }
 
+void Observable::ApplySquareRoot()
+{
+	this->value = sqrt(this->value);
+}
+
 IObservable& Observable::operator+=(const IObservable& oc)
 {
 	this->value += dynamic_cast<const Observable&>(oc).value;
@@ -33,6 +38,12 @@ IObservable& Observable::operator-=(const IObservable& oc)
 IObservable& Observable::operator*=(double d)
 {
 	this->value *= d;
+	return *this;
+}
+
+IObservable& Observable::operator*=(const IObservable& oc)
+{
+	this->value *= dynamic_cast<const Observable&>(oc).value;
 	return *this;
 }
 

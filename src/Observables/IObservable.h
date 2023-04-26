@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <string>
 
 using namespace std;
@@ -24,10 +25,12 @@ public:
 	virtual IObservable* Clone() const = 0;
 
 	virtual void ClearValues() = 0;
+	virtual void ApplySquareRoot() = 0;
 
 	virtual IObservable& operator+=(const IObservable& oc) = 0;
 	virtual IObservable& operator-=(const IObservable& oc) = 0;
 	virtual IObservable& operator*=(double d) = 0;
+	virtual IObservable& operator*=(const IObservable& oc) = 0;
 	virtual IObservable& operator/=(double d) = 0;
 };
 

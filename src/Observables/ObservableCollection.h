@@ -26,10 +26,12 @@ public:
 	void Add(IObservable* obs);
 
 	void ClearValues();
+	void ApplySquareRoot();
 
 	ObservableCollection& operator+=(const ObservableCollection& oc);
 	ObservableCollection& operator-=(const ObservableCollection& oc);
 	ObservableCollection& operator*=(double d);
+	ObservableCollection& operator*=(ObservableCollection& oc);
 	ObservableCollection& operator/=(double d);
 
 };

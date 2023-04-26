@@ -57,6 +57,15 @@ vector<double>& operator*=(vector<double>& v, double x)
 	return v;
 }
 
+vector<double>& operator*=(vector<double>& v, const vector<double>& v2)
+{
+	for (unsigned int i = 0; i < v.size(); i++)
+	{
+		v[i] *= v2[i];
+	}
+	return v;
+}
+
 vector<double>& operator/=(vector<double>& v, double x)
 {
 	for (unsigned int i = 0; i < v.size(); i++)
@@ -163,6 +172,13 @@ Observables::ObservableCollection operator-(Observables::ObservableCollection lh
 }
 
 Observables::ObservableCollection operator*(Observables::ObservableCollection lhs, double rhs)
+{
+	auto result = lhs.Clone();
+	result *= rhs;
+	return result;
+}
+
+Observables::ObservableCollection operator*(Observables::ObservableCollection lhs, Observables::ObservableCollection& rhs)
 {
 	auto result = lhs.Clone();
 	result *= rhs;

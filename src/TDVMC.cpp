@@ -154,6 +154,10 @@ vector<double> localOperatorlocalEnergyI; // for <O_k E^I>
 vector<double> otherExpectationValues; // eg. for potential and kinetic energy
 vector<double> additionalSystemProperties; // for properties at the end of the simulation
 Observables::ObservableCollection additionalObservablesMean; //for properties at the end of the simulation; replacement for vector<double> additionalSystemProperties;
+Observables::ObservableCollection additionalObservablesVar2; //sigma^2
+Observables::ObservableCollection additionalObservablesErr; //sqrt(sigma^2/N)
+vector<double> testSamples;
+vector<double> testSamples2;
 
 bool doNotAcceptStep = false;
 vector<vector<double> > uRList;
@@ -175,6 +179,8 @@ vector<vector<double> > AllAdditionalSystemProperties;
 
 int currentSampleIndexForUpdate;
 vector<ICorrelatedSamplingData*> correlatedSamplingData;
+
+bool storeSamples = false;
 
 vector<double> times;
 vector<double> previousStepWeights = { 0.982014, 0.952574, 0.880797, 0.731059, 0.5, 0.268941, 0.119203, 0.0474259, 0.0179862, 0.00669285 };
@@ -630,6 +636,8 @@ void PostSystemInit()
 	AllAdditionalSystemProperties.resize(0);
 
 	additionalObservablesMean = sys->GetAdditionalObservablesClone();
+	additionalObservablesVar2 = sys->GetAdditionalObservablesClone();
+	additionalObservablesErr = sys->GetAdditionalObservablesClone();
 	//additionalObservablesMean.observables[0]->name = "test";
 	//additionalObservablesMean.observables[0]->name = "test2";
 }
@@ -1180,9 +1188,18 @@ void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>&
 
 	//Log("localOperators" + to_string(processRank));
 	//WriteDataToFile(localOperators, "localOperators" + to_string(processRank), "localOperators");
+	//INFO: sometimes (not reproducible) the following error occurs on mach
+	//		MPT ERROR: rank:0, function:MPI_REDUCE, Message truncated on receive: sender sent too much data
+	//		in MPIMethods::ReduceToAverage(double*) ()
+	//INFO: so I try to fix this with MPI Barriers
 	MPIMethods::ReduceToAverage(localOperators);
+	MPIMethods::Barrier();
+	//Log("ER=" + localEnergyR);
 	MPIMethods::ReduceToAverage(&localEnergyR);
+	MPIMethods::Barrier();
+	//Log("EI=" + localEnergyI);
 	MPIMethods::ReduceToAverage(&localEnergyI);
+	MPIMethods::Barrier();
 	MPIMethods::ReduceToAverage(localOperatorsMatrix);
 	MPIMethods::ReduceToAverage(localOperatorlocalEnergyR);
 	MPIMethods::ReduceToAverage(localOperatorlocalEnergyI);
@@ -1334,6 +1351,9 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
 {
 	int percent = 0;
 	additionalObservablesMean.ClearValues();
+	additionalObservablesVar2.ClearValues();
+	testSamples.clear();
+	testSamples2.clear();
 
 	sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
 	for (int i = 0; i < MC_NADDITIONALINITIALIZATIONSTEPS; i++)
@@ -1347,7 +1367,21 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
 			DoMetropolisStep(R, uR, uI, phiR, phiI);
 		}
 
+		if (SYSTEM_TYPE == "Bosons1D")
+		{
+			dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->SetSampleNo(i, !storeSamples);
+		}
+
 		sys->CalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
+
+		if (storeSamples)
+		{
+			if (SYSTEM_TYPE == "Bosons1D")
+			{
+				auto sampleData = sys->GetAdditionalObservablesClone();
+				dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->AddToInitialSamples(R, sampleData);
+			}
+		}
 
 		//INFO: calculate contribution to average value
 		additionalSystemProperties += sys->GetAdditionalSystemProperties() / mc_nadditionalsteps;
@@ -1356,11 +1390,36 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
 
 		//additionalObservablesMean = additionalObservablesMean + (sys->GetAdditionalObservables() - additionalObservablesMean) / (i + 1.0);
 		//additionalObservablesMean += (sys->GetAdditionalObservables() - additionalObservablesMean) / (i + 1.0);
+
+		/*
 		auto tmp = sys->GetAdditionalObservablesClone();
 		tmp -= additionalObservablesMean;
 		tmp /= (i + 1.0);
 		additionalObservablesMean += tmp;
 		tmp.Destroy();
+		*/
+
+		//INFO: most probably very inefficient...every observable should hold its own mean and error
+		auto data = sys->GetAdditionalObservablesClone();
+
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(data.observables[1]))
+		{
+			double tmp = o->observablesV[0].values[0];
+			testSamples.push_back(tmp);
+			tmp = o->observablesV[0].values[50];
+			testSamples2.push_back(tmp);
+		}
+
+		auto delta = sys->GetAdditionalObservablesClone();
+		delta -= additionalObservablesMean;
+		delta /= (i + 1.0);
+		additionalObservablesMean += delta;
+		data -= additionalObservablesMean;
+		delta *= (i + 1.0);
+		delta *= data;
+		additionalObservablesVar2 += delta;
+		data.Destroy();
+		delta.Destroy();
 
 		if ((100 * i) % MC_NADDITIONALSTEPS == 0)
 		{
@@ -1374,6 +1433,7 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
 			}
 		}
 	}
+	additionalObservablesVar2 *= (1.0 / ((double)MC_NADDITIONALSTEPS - 1.0));
 	if (isRootRank)
 	{
 		cout << endl;
@@ -1442,6 +1502,14 @@ void ParallelCalculateAdditionalSystemProperties(vector<vector<double> >& R, vec
 
 	//MPIMethods::ReduceToAverage(additionalSystemProperties);
 	MPIMethods::ReduceToAverage(additionalObservablesMean);
+	MPIMethods::ReduceToAverage(additionalObservablesVar2); //TODO: not correct!!!! but okay for large MC_NADDITIONALSTEPS
+	if (isRootRank)
+	{
+		additionalObservablesErr.Destroy();
+		additionalObservablesErr = additionalObservablesVar2.Clone();
+		additionalObservablesErr *= (1.0 / ((double)MC_NADDITIONALSTEPS * numOfProcesses));
+		additionalObservablesErr.ApplySquareRoot();
+	}
 }
 
 /////////////////////////////////
@@ -1685,6 +1753,7 @@ void CalculatePhiDot(vector<double>& uDotR, vector<double>& uDotI, double *phiDo
 	else if (IMAGINARY_TIME == 0)
 	{
 		*phiDotI -= localEnergyR;
+		//TODO: also include here localEnergyI??
 	}
 	else //INFO: IMAGINARY_TIME == 1
 	{
@@ -1745,7 +1814,7 @@ void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double 
 		{
 			PreconditionEquationSystemByScaling(matrix, energiesReal, energiesImag, preconditionScalings);
 		}
-		RegularizeEquationSystem(matrix, 0.001);
+		RegularizeEquationSystem(matrix, 0.0002);
 
 		//if (sys->GetStep() == 1)
 		//{
@@ -1778,7 +1847,7 @@ void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double 
 		if (USE_PRECONDITIONING == 1)
 		{
 			PreconditionEquationSystemByScaling(matrix, energiesReal, energiesImag, preconditionScalings);
-			RegularizeEquationSystem(matrix, 0.002);
+			RegularizeEquationSystem(matrix, 0.0002);
 		}
 
 		Eigen::MatrixXd e_matrix(matrix.size(), matrix.size());
@@ -2826,6 +2895,7 @@ bool InitializePhysicalSystem()
 			dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->SetNodes(NURBS_GRID);
 		}
 		dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->SetPairDistributionBinCount(GR_BIN_COUNT);
+		dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->SetInitialParameters(PARAMS_REAL, PARAMS_IMAGINARY, PARAM_PHIR, PARAM_PHII);
 	}
 	else if (SYSTEM_TYPE == "Bosons1D0th")
 	{
@@ -3430,6 +3500,9 @@ int mainMPI(int argc, char** argv)
 	////////////////////////
 
 	Timer t;
+	Timer tFull;
+	Timer tExp;
+	tFull.start();
 	int step = 0;
 	int acceptNewParams;
 	int nrOfAcceptParameterTrials;
@@ -3497,6 +3570,16 @@ int mainMPI(int argc, char** argv)
 		//cout << "phiR=" << phiR << ", phiI=" << phiI << endl;
 
 		//////////////////////////////////////////////
+		/// generate samples on initial system     ///
+		//////////////////////////////////////////////
+		if (currentTime == 0)
+		{
+			storeSamples = true;
+			ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
+			storeSamples = false;
+		}
+
+		//////////////////////////////////////////////
 		/// calculate additional system properties ///
 		/// for visualization of dynamic data      ///
 		//////////////////////////////////////////////
@@ -3505,6 +3588,10 @@ int mainMPI(int argc, char** argv)
 			if (isRootRank)
 			{
 				AppendDataToFile(currentTime, "timesAdditional");
+				tFull.stop();
+				Log("duration for full time evolution between two calculate additional system properties steps: " + to_string(tFull.duration()) + " ms", WARNING);
+				AppendDataToFile(tFull.duration(), "timings");
+				tFull.start();
 			}
 			ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
 			//TODO: generalize this for all types of IPhysicalSystems and all types of IObservable
@@ -3519,6 +3606,10 @@ int mainMPI(int argc, char** argv)
 					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
 					{
 						AppendDataToFile(o->observablesV[0].values, "sk");
+					}
+					if (auto o = dynamic_cast<Observables::ObservableV*>(additionalObservablesMean.observables[2]))
+					{
+						AppendDataToFile(o->values, "overlap");
 					}
 				}
 				else if (auto s = dynamic_cast<PhysicalSystems::Bosons1D0th*>(sys))
@@ -3710,7 +3801,19 @@ int mainMPI(int argc, char** argv)
 
 			if (step == 0 || UPDATE_SAMPLES_EVERY_NTH_STEP == 0)
 			{
+				if (isRootRank)
+				{
+					tExp.start();
+				}
+
 				ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
+
+				if (isRootRank)
+				{
+					AppendDataToFile(tExp.duration(), "timings_exp");
+					//Log("duration for calculating expectation values: " + to_string(tExp.duration()) + " ms", WARNING);
+					tExp.stop();
+				}
 				//if (ODE_SOLVER_TYPE == 4 || ODE_SOLVER_TYPE == 6)
 				//{
 				//	dynTimestep = 0.01 * TIMESTEP;
@@ -4061,6 +4164,10 @@ int mainMPI(int argc, char** argv)
 		//WriteDataToFile(additionalSystemProperties, "AdditionalSystemProperties", "g(r), ...");
 		//WriteDataToFile(AllAdditionalSystemProperties, "AllAdditionalSystemProperties", "g(r), ...");
 		WriteDataToFile(additionalObservablesMean, "AdditionalObservables");
+		WriteDataToFile(additionalObservablesVar2, "AdditionalObservablesVar2");
+		WriteDataToFile(additionalObservablesErr, "AdditionalObservablesErr");
+		WriteDataToFile(testSamples, "testSamples", "testSamples", 1);
+		WriteDataToFile(testSamples2, "testSamples2", "testSamples2", 1);
 	}
 
 	// Write config file for successive simulations
@@ -4105,6 +4212,8 @@ int mainMPI(int argc, char** argv)
 		delete correlatedSamplingData[i];
 	}
 	additionalObservablesMean.Destroy();
+	additionalObservablesVar2.Destroy();
+	additionalObservablesErr.Destroy();
 
 	//Log("finalize ...");
 	MPIMethods::Barrier();
@@ -4394,11 +4503,11 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BulkSplines";
 		//SYSTEM_TYPE = "BulkSplinesScaled";
 		//SYSTEM_TYPE = "HeDrop";
-		//SYSTEM_TYPE = "Bosons1D";
+		SYSTEM_TYPE = "Bosons1D";
 		//SYSTEM_TYPE = "Bosons1D0th";
 		//SYSTEM_TYPE = "Bosons1D4th";
 		//SYSTEM_TYPE = "Bosons1DSp";
-		SYSTEM_TYPE = "Bosons1DMixture";
+		//SYSTEM_TYPE = "Bosons1DMixture";
 		//SYSTEM_TYPE = "BosonsBulk";
 		//SYSTEM_TYPE = "BosonCluster";
 		//SYSTEM_TYPE = "BosonClusterWithLog";
@@ -4438,7 +4547,10 @@ int main(int argc, char **argv)
 		}
 		else if (SYSTEM_TYPE == "Bosons1D")
 		{
-			configFilePath = "/home/gartner/Sources/TDVMC/config/B1D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/B1D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/B1DGauss.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/B1DNorm.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/B1DNormDynamic.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/SW2D.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/SW1D_Carleo.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/obdm_test.config";
@@ -4465,7 +4577,8 @@ int main(int argc, char **argv)
 		else if (SYSTEM_TYPE == "BosonsBulk")
 		{
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/BosonsBulk2D.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonsBulk3D.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/BosonsBulk3D.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/BosonsBulk2DRydberg.config";
 		}
 		else if (SYSTEM_TYPE == "BosonsBulkDamped")
 		{

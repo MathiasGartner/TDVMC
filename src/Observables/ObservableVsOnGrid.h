@@ -25,6 +25,7 @@ public:
 	virtual ObservableVsOnGrid* Clone() const override;
 
 	void ClearValues() override;
+	void ApplySquareRoot() override;
 
 	void InitGrid(double min, double max, double spacing);
 	void InitGrid(vector<double> g);
@@ -35,6 +36,7 @@ public:
 	IObservable& operator+=(const IObservable& oc) override;
 	IObservable& operator-=(const IObservable& oc) override;
 	IObservable& operator*=(double d) override;
+	IObservable& operator*=(const IObservable& oc) override;
 	IObservable& operator/=(double d) override;
 };
 

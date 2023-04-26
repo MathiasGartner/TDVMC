@@ -42,6 +42,14 @@ void ObservableCollection::ClearValues()
 	}
 }
 
+void ObservableCollection::ApplySquareRoot()
+{
+	for (auto& obs : this->observables)
+	{
+		obs->ApplySquareRoot();
+	}
+}
+
 ObservableCollection& ObservableCollection::operator+=(const ObservableCollection& oc)
 {
 	for (unsigned int i = 0; i < this->observables.size(); i++)
@@ -65,6 +73,15 @@ ObservableCollection& ObservableCollection::operator*=(double d)
 	for (unsigned int i = 0; i < this->observables.size(); i++)
 	{
 		*(this->observables[i]) *= d;
+	}
+	return *this;
+}
+
+ObservableCollection& ObservableCollection::operator*=(ObservableCollection& oc)
+{
+	for (unsigned int i = 0; i < this->observables.size(); i++)
+	{
+		*(this->observables[i]) *= *(oc.observables[i]);
 	}
 	return *this;
 }
