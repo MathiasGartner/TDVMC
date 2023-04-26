@@ -55,6 +55,8 @@ private:
 
 	Observables::ObservableVsOnGridWithScaling pairDistribution;
 	Observables::ObservableVsOnGrid structureFactor;
+	Observables::ObservableVsOnGrid structureFactorCos;
+	Observables::ObservableVsOnGrid structureFactorSin;
 
 protected:
 	vector<double> scalingFactors;

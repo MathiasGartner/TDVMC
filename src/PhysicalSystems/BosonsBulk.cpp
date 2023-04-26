@@ -53,6 +53,9 @@ void BosonsBulk::InitSystem()
 	numOfOtherLocalOperators = 4; //INFO: potentialIntern, potentialInternComplex, potentialExtern, potentialExternComplex
 	otherLocalOperators.resize(numOfOtherLocalOperators);	
 	numOfkValues = 150;
+	if (DIM == 2) {
+		numOfkValues = 400;
+	}
 	numOfOtherExpectationValues = 9;
 	numOfAdditionalSystemProperties = numOfOtherExpectationValues;
 
@@ -151,8 +154,20 @@ void BosonsBulk::InitSystem()
 	structureFactor.InitGrid(kNorms);
 	structureFactor.InitObservables({"S(k)"});
 
+	structureFactorCos.name = "structureFactorCos";
+	structureFactorCos.grid.name = "k";
+	structureFactorCos.InitGrid(kNorms);
+	structureFactorCos.InitObservables( { "S(k)_cos" });
+
+	structureFactorSin.name = "structureFactorSin";
+	structureFactorSin.grid.name = "k";
+	structureFactorSin.InitGrid(kNorms);
+	structureFactorSin.InitObservables( { "S(k)_sin" });
+
 	additionalObservables.Add(&pairDistribution);
 	additionalObservables.Add(&structureFactor);
+	additionalObservables.Add(&structureFactorCos);
+	additionalObservables.Add(&structureFactorSin);
 }
 
 void BosonsBulk::RefreshLocalOperators()
@@ -498,11 +513,20 @@ void BosonsBulk::CalculateAdditionalSystemProperties(vector<vector<double> >& R,
 	InitVector(sumSCos, numOfkValues, 0.0);
 	InitVector(sumSSin, numOfkValues, 0.0);
 	InitVector(sk, numOfkValues, 0.0);
+
+	//For tests:
+	vector<double> skCos;
+	vector<double> skSin;
+	InitVector(skCos, numOfkValues, 0.0);
+	InitVector(skSin, numOfkValues, 0.0);
+
 	for (int i = 0; i < N; i++)
 	{
 		for (int k = 0; k < numOfkValues; k++)
 		{
-			for (unsigned int kn = 0; kn < kValues[k].size(); kn++)
+			//int kn = kValues[k].size() - 1;
+			int kn = 0;
+			//for (unsigned int kn = 0; kn < kValues[k].size(); kn++)
 			{
 				sumS = VectorDotProduct_DIM(kValues[k][kn], R[i]);
 				sumSCos[k] += cos(sumS);
@@ -512,8 +536,14 @@ void BosonsBulk::CalculateAdditionalSystemProperties(vector<vector<double> >& R,
 	}
 	for (int k = 0; k < numOfkValues; k++)
 	{
-		sk[k] = (sumSCos[k] * sumSCos[k] + sumSSin[k] * sumSSin[k]) / ((double) (N * kValues[k].size()));
+		//double factor = (double) (N * kValues[k].size());
+		double factor = (double) (N);
+		sk[k] = (sumSCos[k] * sumSCos[k] + sumSSin[k] * sumSSin[k]) / factor;
+		skCos[k] = (sumSCos[k] * sumSCos[k]) / factor;
+		skSin[k] = (sumSSin[k] * sumSSin[k]) / factor;
 		structureFactor.SetValueAtGridIndex(0, k, sk[k]);
+		structureFactorCos.SetValueAtGridIndex(0, k, skCos[k]);
+		structureFactorSin.SetValueAtGridIndex(0, k, skSin[k]);
 	}
 }
 
