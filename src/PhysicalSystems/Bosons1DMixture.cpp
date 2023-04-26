@@ -158,10 +158,10 @@ void Bosons1DMixture::InitSystem()
 	//INFO: Pair potentials
 	double defaultStrength = 10.0;
 	double defaultRange = 0.1;
-	double defaultGamma = 2.0 * 2.0 / 144.0;
-	double eta = 10.0 * 0.0 + 1.0;
-	defaultGamma = params[1];
-	eta = params[0];
+	double defaultGamma = 0.0; // 2.0 * 2.0 / 144.0;
+	double eta = 0.0; //10.0 * 0.0 + 1.0;
+	defaultGamma = params[0];
+	eta = params[1];
 	index = this->correlationIndexMapping[ParticleType::Boson][ParticleType::Boson];
 	if (index > -1)
 	{
@@ -490,9 +490,9 @@ void Bosons1DMixture::CalculateOtherLocalOperators(vector<vector<double> >& R)
 
 					for (int a = 0; a < DIM; a++)
 					{
-						pc.contactSumD[n][a] += evecrni[a] * pc.gamma * exp(-rni / pc.contactLengthscale); //in 2D or 3D one should use vecrni[a] instead of rni (which could also be negative) - check this!!
+						pc.contactSumD[n][a] += evecrni[a] * (pc.gamma / 2.0) * exp(-rni / pc.contactLengthscale); //in 2D or 3D one should use vecrni[a] instead of rni (which could also be negative) - check this!!
 					}
-					pc.contactSumD2[n] += -pc.gamma / pc.contactLengthscale * exp(-rni / pc.contactLengthscale);
+					pc.contactSumD2[n] += -(pc.gamma / 2.0) / pc.contactLengthscale * exp(-rni / pc.contactLengthscale);
 
 					for (int p = 0; p < s; p++)
 					{
@@ -576,11 +576,11 @@ void Bosons1DMixture::CalculateExpectationValues(vector<double>& O, vector<doubl
 				{
 					for (int a = 0; a < DIM; a++)
 					{
-						tmp = -2.0 * pc.gamma * pc.nodeSpacing * pc.splineSumsD[0][n][a];
+						tmp = -pc.gamma * pc.nodeSpacing * pc.splineSumsD[0][n][a];
 						opd.vecKineticSumR1[a] += tmp;
 						//opd.vecKineticSumI1[a] += tmp; //INFO: imaginary part of boundary condition is zero
 					}
-					tmp = -2.0 * pc.gamma * pc.nodeSpacing * pc.splineSumsD2[0][n];
+					tmp = -pc.gamma * pc.nodeSpacing * pc.splineSumsD2[0][n];
 					opd.kineticSumR2 += tmp;
 					//kineticSumI2 += tmp; //INFO: imaginary part of boundary condition is zero
 				}
@@ -588,13 +588,13 @@ void Bosons1DMixture::CalculateExpectationValues(vector<double>& O, vector<doubl
 				{
 					for (int a = 0; a < DIM; a++)
 					{
-						tmp = 2.0 * pc.gamma * exp(-LBOX_2 / pc.contactLengthscale) * pc.nodeSpacing * pc.splineSumsD.back()[n][a];
+						tmp = pc.gamma * exp(-LBOX_2 / pc.contactLengthscale) * pc.nodeSpacing * pc.splineSumsD.back()[n][a];
 						opd.vecKineticSumR1[a] += tmp;
 						tmp = pc.contactSumD[n][a];
 						opd.vecKineticSumR1[a] += tmp;
 						//opd.vecKineticSumI1[a] += tmp; //INFO: imaginary part of boundary condition is zero
 					}
-					tmp = 2.0 * pc.gamma * exp(-LBOX_2 / pc.contactLengthscale) * pc.nodeSpacing * pc.splineSumsD2.back()[n];
+					tmp = pc.gamma * exp(-LBOX_2 / pc.contactLengthscale) * pc.nodeSpacing * pc.splineSumsD2.back()[n];
 					opd.kineticSumR2 += tmp;
 					tmp = pc.contactSumD2[n];
 					opd.kineticSumR2 += tmp;
@@ -770,11 +770,11 @@ void Bosons1DMixture::CalculateWavefunction(vector<double>& O, vector<double>& u
 	{
 		if (pc.useContactInteractionBoundaryCondition)
 		{
-			sum += -2.0 * pc.gamma * pc.nodeSpacing * pc.splineSums[0];
+			sum += -pc.gamma * pc.nodeSpacing * pc.splineSums[0];
 		}
 		else if (pc.useContactInteractionBoundaryConditionExp)
 		{
-			sum += 2.0 * pc.gamma * exp(-LBOX_2 / pc.contactLengthscale) * pc.nodeSpacing * pc.splineSums.back();
+			sum += pc.gamma * exp(-LBOX_2 / pc.contactLengthscale) * pc.nodeSpacing * pc.splineSums.back();
 			sum += pc.contactSum;
 		}
 	}
@@ -839,7 +839,7 @@ void Bosons1DMixture::CalculateWFChange(vector<vector<double> >& R, vector<doubl
 				{
 					pc.sumOldPerBin[bin - p] += pc.splineWeights[bin - p][p][0] + pc.splineWeights[bin - p][p][1] * rni + pc.splineWeights[bin - p][p][2] * rni2 + pc.splineWeights[bin - p][p][3] * rni3;
 				}
-				pc.contactOld += -pc.gamma * pc.contactLengthscale * exp(-rni / pc.contactLengthscale);
+				pc.contactOld += -(pc.gamma / 2.0) * pc.contactLengthscale * exp(-rni / pc.contactLengthscale);
 			}
 			else
 			{
@@ -855,7 +855,7 @@ void Bosons1DMixture::CalculateWFChange(vector<vector<double> >& R, vector<doubl
 				{
 					pc.sumNewPerBin[bin - p] += pc.splineWeights[bin - p][p][0] + pc.splineWeights[bin - p][p][1] * rni + pc.splineWeights[bin - p][p][2] * rni2 + pc.splineWeights[bin - p][p][3] * rni3;
 				}
-				pc.contactNew += -pc.gamma * pc.contactLengthscale * exp(-rni / pc.contactLengthscale);
+				pc.contactNew += -(pc.gamma / 2.0) * pc.contactLengthscale * exp(-rni / pc.contactLengthscale);
 			}
 			else
 			{
@@ -879,11 +879,11 @@ void Bosons1DMixture::CalculateWFChange(vector<vector<double> >& R, vector<doubl
 		//INFO: BCx
 		if (pc.useContactInteractionBoundaryCondition)
 		{
-			sum += -2.0 * pc.gamma * pc.nodeSpacing * pc.splineSumsNew[0];
+			sum += -pc.gamma * pc.nodeSpacing * pc.splineSumsNew[0];
 		}
 		else if (pc.useContactInteractionBoundaryConditionExp)
 		{
-			sum += 2.0 * pc.gamma * exp(-LBOX_2 / pc.contactLengthscale) * pc.nodeSpacing * pc.splineSumsNew.back();
+			sum += pc.gamma * exp(-LBOX_2 / pc.contactLengthscale) * pc.nodeSpacing * pc.splineSumsNew.back();
 			sum += pc.contactSumNew;
 		}
 		for (int i = 0; i < pc.np1; i++)
