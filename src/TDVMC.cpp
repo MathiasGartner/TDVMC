@@ -6,6 +6,7 @@
 #include "CSDataBulkSplinesBR.h"
 #include "MathOperators.h"
 #include "MPIMethods.h"
+#include "SimulationStats.h"
 #include "SimulationStepData.h"
 #include "Timer.h"
 #include "Utils.h"
@@ -144,6 +145,7 @@ double mc_nsteps;
 int mc_nsteps_original;
 double mc_nadditionalsteps;
 double currentTime;
+SimulationStats currentStats;
 
 vector<double> localOperators; // for <O_k>
 double localEnergyR; // for <E^R>
@@ -194,9 +196,11 @@ extern uniform_int_distribution<int> distParticleIndex1;
 /// Log messages ///
 ////////////////////
 
+int logLevel = 1;
+
 enum MessageType
 {
-	NORMAL, WARNING, ERROR
+	DEBUG, INFO, WARNING, ERROR
 };
 
 void Log(string message)
@@ -208,14 +212,29 @@ void Log(string message, MessageType messageType)
 {
 	switch (messageType)
 	{
-	case NORMAL:
-		Log(message);
+	case DEBUG:
+		if (logLevel >= 0)
+		{
+			Log(message);
+		}
+		break;
+	case INFO:
+		if (logLevel >= 1)
+		{
+			Log(message);
+		}
 		break;
 	case WARNING:
-		cout << "\033[1;33m" << "#" << setfill(' ') << setw(2) << processRank << "@" << get_cpu_id() << ": " << message << "\033[0m" << endl << flush;
+		if (logLevel >= 2)
+		{
+			cout << "\033[1;33m" << "#" << setfill(' ') << setw(2) << processRank << "@" << get_cpu_id() << ": " << message << "\033[0m" << endl << flush;
+		}
 		break;
 	case ERROR:
-		cout << "\033[1;31m" << "#" << setfill(' ') << setw(2) << processRank << "@" << get_cpu_id() << ": " << message << "\033[0m" << endl << flush;
+		if (logLevel >= 3)
+		{
+			cout << "\033[1;31m" << "#" << setfill(' ') << setw(2) << processRank << "@" << get_cpu_id() << ": " << message << "\033[0m" << endl << flush;
+		}
 		break;
 	}
 }
@@ -371,7 +390,7 @@ void ReadConfig(string filePath)
 	{
 		for (auto ci : configItems)
 		{
-			//cout << "Read: " << ci.name << endl;
+			Log("Read: " + ci.name, DEBUG);
 			ci.setValue(configData[ci.name]);
 		}
 	}
@@ -472,6 +491,11 @@ void BroadcastConfig()
 	}
 }
 
+
+/////////////////////////
+/// file input/output ///
+/////////////////////////
+
 void CreateOutputDirectory()
 {
 	//INFO: append config options to output directory path, create the directory and copy the config file
@@ -518,6 +542,11 @@ void BroadcastNewParameters(vector<double>& uR, vector<double>& uI, double* phiR
 	MPIMethods::BroadcastValue(phiI);
 }
 
+
+//////////////////////
+/// initialization ///
+//////////////////////
+
 void Init()
 {
 	if (FileExist(configDirectory + "random/state" + "_generator_" + to_string(processRank) + ".dat") && FileExist(configDirectory + "random/state" + "_uniform_" + to_string(processRank) + ".dat") && FileExist(configDirectory + "random/state" + "_normal_" + to_string(processRank) + ".dat"))
@@ -531,7 +560,6 @@ void Init()
 		generator = mt19937_64(processRank + 1);
 		Log("first random number: " + to_string(random01()));
 		//cout << generator << endl;
-		//generator = default_random_engine(processRank + 1);
 		distParticleIndex = uniform_int_distribution<int>(0, N - 1);
 		distParticleIndex1 = uniform_int_distribution<int>(1, N - 1);
 		//Log("uniform: " + to_string(random01()) + " normal: " + to_string(randomNormal()));
@@ -636,11 +664,20 @@ void PostSystemInit()
 	AllAdditionalSystemProperties.resize(0);
 
 	additionalObservablesMean = sys->GetAdditionalObservablesClone();
+
+	//INFO: variance
+	/*
 	additionalObservablesVar2 = sys->GetAdditionalObservablesClone();
 	additionalObservablesErr = sys->GetAdditionalObservablesClone();
+	*/
 	//additionalObservablesMean.observables[0]->name = "test";
 	//additionalObservablesMean.observables[0]->name = "test2";
 }
+
+
+//////////////////////////
+/// particle positions ///
+//////////////////////////
 
 void WriteParticlesToFile(vector<vector<double> >& R, string ending)
 {
@@ -654,7 +691,7 @@ bool LoadLastPositionsFromFile(string filename, vector<vector<double> >& R)
 	string prevline;
 	vector<string> coordinates;
 	ifstream file;
-	//Log("try read particle configuration from file: " + configDirectory + filename + ".csv");
+	Log("try read particle configuration from file: " + configDirectory + filename + ".csv", DEBUG);
 	file.open(configDirectory + filename + ".csv", ios::in);
 	while (getline(file, line))
 	{
@@ -662,7 +699,7 @@ bool LoadLastPositionsFromFile(string filename, vector<vector<double> >& R)
 	}
 	if (prevline.length() > 0)
 	{
-		Log("init coordinates from file: " + filename);
+		Log("init coordinates from file: " + filename, INFO);
 		coordinates = split(prevline, ',');
 		int j = 0;
 		for (unsigned int i = 0; i < coordinates.size(); i += DIM)
@@ -681,6 +718,7 @@ bool LoadLastPositionsFromFile(string filename, vector<vector<double> >& R)
 
 void InitCoordinateConfiguration(vector<vector<double> >& R)
 {
+	//INFO: if main process finds a coordinate file, all processes will load the file with the corresponding process rank
 	int fileFound = 0;
 	if (isRootRank)
 	{
@@ -703,7 +741,11 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 		{
 			cout << "LBOX=" << LBOX << endl;
 		}
-		int type = sys->USE_NIC ? 1 : 2; //INFO: 1: lattice, 2: drop
+		//INFO: type of coordinate initialization
+		//		0: random
+		//		1: lattice
+		//		2: droplets
+		int type = sys->USE_NIC ? 1 : 2;
 		if (type == 0)
 		{
 			//Random
@@ -713,17 +755,12 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 				for (int j = 0; j < DIM; j++)
 				{
 					R[i][j] = (random01() - 0.5) * LBOX / 2.0;
-					if (j == 1 || j == 2)
-					{
-						//R[i][j] = 0;
-					}
 				}
 			}
 		}
 		else if (type == 1)
 		{
-			//Lattice
-			//TODO: funktioniert nicht
+			//lattice
 			if (isRootRank)
 			{
 				Log("init coordinates on lattice");
@@ -771,7 +808,7 @@ void InitCoordinateConfiguration(vector<vector<double> >& R)
 		}
 		else if (type == 2)
 		{
-			//Drop
+			//droplets
 			Log("init coordinates for drop");
 			int i = 0;
 			double l = pow(LBOX, 1.0 / 3.0);
@@ -1071,7 +1108,10 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 
 	if (isRootRank && !intermediateStep)
 	{
-		cout << "exponent=" << sys->GetExponent() << "\t\twf=" << sys->GetWf() << "\t\tphiR=" << phiR << endl;
+		currentStats.exponent = sys->GetExponent();
+		currentStats.wf = sys->GetWf();
+		currentStats.phiR = phiR;
+		//cout << "exponent=" << sys->GetExponent() << "\t\twf=" << sys->GetWf() << "\t\tphiR=" << phiR << endl;
 	}
 	//cout << "wf=" << Sys::wf << endl;
 	//Sys::WriteLocalOperatorsToFile("start");
@@ -1123,13 +1163,13 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 			//cout << (i / (double)MC_NSTEPS * 100.0) << "%" << endl;
 			if (isRootRank && !intermediateStep)
 			{
-				cout << "." << flush;
+				//cout << "." << flush;
 			}
 		}
 	}
 	if (isRootRank && !intermediateStep)
 	{
-		cout << endl;
+		//cout << endl;
 	}
 
 	//INFO: contribution to average values is calculated in each evaluation
@@ -1149,7 +1189,7 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 
 	if (isRootRank && !intermediateStep)
 	{
-		cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
+		//cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
 		for (int i = 0; i < N; i++)
 		{
 			//cout << i << ": " << (nAcceptancesPP[i] / (nTrialsPP[i] / 100.0)) << "% (" << nAcceptancesPP[i] << "/" << nTrialsPP[i] << ")" << endl;
@@ -1288,7 +1328,7 @@ void UpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingData*>& sa
 			//cout << (i / (double)MC_NSTEPS * 100.0) << "%" << endl;
 			if (isRootRank && !intermediateStep)
 			{
-				cout << "." << flush;
+				//cout << "." << flush;
 				//cout << weight << endl;
 			}
 		}
@@ -1391,15 +1431,14 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
 		//additionalObservablesMean = additionalObservablesMean + (sys->GetAdditionalObservables() - additionalObservablesMean) / (i + 1.0);
 		//additionalObservablesMean += (sys->GetAdditionalObservables() - additionalObservablesMean) / (i + 1.0);
 
-		/*
 		auto tmp = sys->GetAdditionalObservablesClone();
 		tmp -= additionalObservablesMean;
 		tmp /= (i + 1.0);
 		additionalObservablesMean += tmp;
 		tmp.Destroy();
-		*/
 
 		//INFO: most probably very inefficient...every observable should hold its own mean and error
+		/*
 		auto data = sys->GetAdditionalObservablesClone();
 
 		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(data.observables[1]))
@@ -1420,16 +1459,22 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
 		additionalObservablesVar2 += delta;
 		data.Destroy();
 		delta.Destroy();
+		*/
 
 		if ((100 * i) % MC_NADDITIONALSTEPS == 0)
 		{
 			//cout << (i / (double)MC_NSTEPS * 100.0) << "%" << endl;
 			if (isRootRank)
 			{
-				//cout << "." << flush;
+				cout << "#" << flush;
 				percent++;
-				cout << percent << "%" << endl;
-				//cout << percent << "%\r" << flush;
+				//cout << percent << "%" << endl;
+				//cout << percent << "%  \r" << flush;
+				//cout << percent << "%  " << flush;
+				if (percent > 0 && percent % 10 == 0)
+				{
+					cout << "|";
+				}
 			}
 		}
 	}
@@ -1440,7 +1485,7 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
 	}
 	if (isRootRank)
 	{
-		cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
+		//cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
 		for (int i = 0; i < N; i++)
 		{
 			//cout << i << ": " << (nAcceptancesPP[i] / (nTrialsPP[i] / 100.0)) << "% (" << nAcceptancesPP[i] << "/" << nTrialsPP[i] << ")" << endl;
@@ -1502,6 +1547,9 @@ void ParallelCalculateAdditionalSystemProperties(vector<vector<double> >& R, vec
 
 	//MPIMethods::ReduceToAverage(additionalSystemProperties);
 	MPIMethods::ReduceToAverage(additionalObservablesMean);
+
+	//INFO: variance
+	/*
 	MPIMethods::ReduceToAverage(additionalObservablesVar2); //TODO: not correct!!!! but okay for large MC_NADDITIONALSTEPS
 	if (isRootRank)
 	{
@@ -1510,6 +1558,7 @@ void ParallelCalculateAdditionalSystemProperties(vector<vector<double> >& R, vec
 		additionalObservablesErr *= (1.0 / ((double)MC_NADDITIONALSTEPS * numOfProcesses));
 		additionalObservablesErr.ApplySquareRoot();
 	}
+	*/
 }
 
 /////////////////////////////////
@@ -2587,7 +2636,8 @@ void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<doubl
 	if (isRootRank)
 	{
 		t.stop();
-		Log("DGL duration = " + to_string(t.duration()) + " ms");
+		//Log("DGL duration = " + to_string(t.duration()) + " ms");
+		currentStats.durationDGL = t.duration();
 	}
 }
 
@@ -3589,7 +3639,7 @@ int mainMPI(int argc, char** argv)
 			{
 				AppendDataToFile(currentTime, "timesAdditional");
 				tFull.stop();
-				Log("duration for full time evolution between two calculate additional system properties steps: " + to_string(tFull.duration()) + " ms", WARNING);
+				Log("full duration since last additional data calculation (see config CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP): " + to_string(tFull.duration()) + " ms", WARNING);
 				AppendDataToFile(tFull.duration(), "timings");
 				tFull.start();
 			}
@@ -3897,13 +3947,13 @@ int mainMPI(int argc, char** argv)
 					WriteDataToFile(localOperatorlocalEnergyI, "localOperatorlocalEnergyI" + to_string(step), "localOperatorlocalEnergyI");
 					WriteDataToFile(otherExpectationValues, "otherExpectationValues" + to_string(step), "Ekin, Ekin_cor, Epot, Epot_corr, wf, g(r)_1, ..., g(r)_100");
 				}
-				cout << "t=" << currentTime << endl;
-				cout << "Acceptance AVG: " << (avgAcceptances / (nTrials / 100.0)) << "% (" << avgAcceptances << "/" << nTrials << ")" << endl;
+				//cout << "t=" << currentTime << endl;
+				//cout << "Acceptance AVG: " << (avgAcceptances / (nTrials / 100.0)) << "% (" << avgAcceptances << "/" << nTrials << ")" << endl;
 				//cout << "localEnergyR=" << localEnergyR << " (" << otherExpectationValues[0] << " + " << otherExpectationValues[1] << ")" << endl;
-				cout << "localEnergyR/N=" << localEnergyR / (double) N << " (" << otherExpectationValues[0] / (double) N << "(kin) + " << otherExpectationValues[1] / (double) N << " (pot) + " << "(Er=" << otherExpectationValues[4] << " + " << otherExpectationValues[6] <<
+				//cout << "localEnergyR/N=" << localEnergyR / (double) N << " (" << otherExpectationValues[0] / (double) N << "(kin) + " << otherExpectationValues[1] / (double) N << " (pot) + " << "(Er=" << otherExpectationValues[4] << " + " << otherExpectationValues[6] <<
 				//otherExpectationValues[2] / (double) N << " + " <<
 				//otherExpectationValues[3] / (double) N << ")" <<
-						endl;
+				//		endl;
 				//cout << "localEnergyR/N=" << localEnergyR / (double)N << endl;
 				AllLocalEnergyR.push_back(localEnergyR);
 				AllLocalEnergyI.push_back(localEnergyI);
@@ -3914,6 +3964,29 @@ int mainMPI(int argc, char** argv)
 				AllParametersI.push_back(uI);
 				AllParametersI[AllParametersI.size() - 1].push_back(phiI);
 			}
+
+			/////////////////////
+			/// status output ///
+			/////////////////////
+			if (isRootRank)
+			{
+				if (step % 25 == 0)
+				{
+					string s = currentStats.getHeader();
+					cout << endl;
+					cout << s << endl;
+				}
+				currentStats.currentTime = currentTime;
+				currentStats.acceptanceAVGPercent = avgAcceptances / (nTrials / 100.0);
+				currentStats.acceptanceAVGCount = avgAcceptances;
+				currentStats.nTrials = nTrials;
+				currentStats.locE = localEnergyR / (double) N;
+				currentStats.locEKin = otherExpectationValues[0] / (double) N;
+				currentStats.locEPot = otherExpectationValues[1] / (double) N;
+				string s = currentStats.toString();
+				cout << s << endl;
+			}
+
 			if (sys->USE_NORMALIZATION_AND_PHASE)
 			{
 				CalculateNextParameters(dynTimestep, R, uR, uI, &phiR, &phiI);
@@ -4079,7 +4152,8 @@ int mainMPI(int argc, char** argv)
 		if (isRootRank)
 		{
 			t.stop();
-			Log("duration for full timestep: " + to_string(t.duration()) + " ms");
+			//Log("duration for full timestep: " + to_string(t.duration()) + " ms");
+			currentStats.durationFullStep = t.duration();
 		}
 
 		step++;
@@ -4164,10 +4238,14 @@ int mainMPI(int argc, char** argv)
 		//WriteDataToFile(additionalSystemProperties, "AdditionalSystemProperties", "g(r), ...");
 		//WriteDataToFile(AllAdditionalSystemProperties, "AllAdditionalSystemProperties", "g(r), ...");
 		WriteDataToFile(additionalObservablesMean, "AdditionalObservables");
+
+		//INFO: variance
+		/*
 		WriteDataToFile(additionalObservablesVar2, "AdditionalObservablesVar2");
 		WriteDataToFile(additionalObservablesErr, "AdditionalObservablesErr");
 		WriteDataToFile(testSamples, "testSamples", "testSamples", 1);
 		WriteDataToFile(testSamples2, "testSamples2", "testSamples2", 1);
+		*/
 	}
 
 	// Write config file for successive simulations
@@ -4503,7 +4581,7 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BulkSplines";
 		//SYSTEM_TYPE = "BulkSplinesScaled";
 		//SYSTEM_TYPE = "HeDrop";
-		SYSTEM_TYPE = "Bosons1D";
+		//SYSTEM_TYPE = "Bosons1D";
 		//SYSTEM_TYPE = "Bosons1D0th";
 		//SYSTEM_TYPE = "Bosons1D4th";
 		//SYSTEM_TYPE = "Bosons1DSp";
@@ -4516,7 +4594,7 @@ int main(int argc, char **argv)
 		//SYSTEM_TYPE = "BosonMixtureCluster_4thorder";
 		//SYSTEM_TYPE = "BosonMixtureCluster";
 		//SYSTEM_TYPE = "InhBosons1D";
-		//SYSTEM_TYPE = "InhContactBosons";
+		SYSTEM_TYPE = "InhContactBosons";
 		//SYSTEM_TYPE = "LinearChain";
 		//SYSTEM_TYPE = "NUBosonsBulk";
 		//SYSTEM_TYPE = "NUBosonsBulkPB";
@@ -4624,9 +4702,10 @@ int main(int argc, char **argv)
 		else if (SYSTEM_TYPE == "InhContactBosons")
 		{
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosons.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosonsLinearResponseToPulse.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosonsLinearResponseToPulse.config";
 			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhContactBosons_QU.config";
-			configFilePath = "/home/gartner/Sources/TDVMC/config/InhBosons1D_non_interacting.config";
+			//configFilePath = "/home/gartner/Sources/TDVMC/config/InhBosons1D_non_interacting.config";
+			configFilePath = "/home/gartner/Sources/TDVMC/config/Soliton.config";
 		}
 		else if (SYSTEM_TYPE == "LinearChain")
 		{

@@ -13,6 +13,7 @@ CPP_SRCS += \
 ../src/OneParticleData.cpp \
 ../src/ParticlePairProperties.cpp \
 ../src/ParticleProperties.cpp \
+../src/SimulationStats.cpp \
 ../src/SimulationStepData.cpp \
 ../src/SplineFactory.cpp \
 ../src/TDVMC.cpp \
@@ -28,6 +29,7 @@ OBJS += \
 ./src/OneParticleData.o \
 ./src/ParticlePairProperties.o \
 ./src/ParticleProperties.o \
+./src/SimulationStats.o \
 ./src/SimulationStepData.o \
 ./src/SplineFactory.o \
 ./src/TDVMC.o \
@@ -43,6 +45,7 @@ CPP_DEPS += \
 ./src/OneParticleData.d \
 ./src/ParticlePairProperties.d \
 ./src/ParticleProperties.d \
+./src/SimulationStats.d \
 ./src/SimulationStepData.d \
 ./src/SplineFactory.d \
 ./src/TDVMC.d \
