@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			MathOperators.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	see MathOperators.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "MathOperators.h"
 
 using namespace std;

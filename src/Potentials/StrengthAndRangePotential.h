@@ -1,3 +1,12 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			StrengthAndRangePotential.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Prototype for an interaction potential characterized
+ * 						by a strength parameter and a range parameter.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "IPairPotential.h"

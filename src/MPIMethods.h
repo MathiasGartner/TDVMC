@@ -1,3 +1,12 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			MPIMethods.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Wrapper functions for the standard MPI methods as well
+ * 						as functions combining multiple MPI calls.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "mpi.h"

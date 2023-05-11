@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			LJ.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Lennard-Jones potential.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "IPairPotential.h"

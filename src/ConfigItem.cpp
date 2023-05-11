@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			ConfigItem.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see ConfigItem.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "ConfigItem.h"
 
 ConfigItem::ConfigItem(string name, ConfigItemType type, bool allowChangeAtRuntime)

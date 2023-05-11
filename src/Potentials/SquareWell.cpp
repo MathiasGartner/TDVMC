@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			SquareWell.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see SquareWell.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "SquareWell.h"
 
 using namespace std;

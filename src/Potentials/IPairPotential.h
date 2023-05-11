@@ -1,3 +1,12 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			IPairPotential.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Interface for a distance dependent interaction
+ * 						potential.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include <cmath>

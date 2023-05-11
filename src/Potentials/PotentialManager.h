@@ -1,3 +1,12 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			PotentialManager.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Helper methods to write the values of a potential in a
+ * 						specific range to output files.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "../Utils.h"

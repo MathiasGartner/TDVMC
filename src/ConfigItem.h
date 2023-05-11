@@ -1,3 +1,13 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			ConfigItem.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Holds a simulation parameter of type <ConfigItemType>.
+ * 						Simulations parameters are typically read from a
+ * 						configuration file in JSON format.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "Utils.h"

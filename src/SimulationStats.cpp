@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			SimulationStats.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see SimulationStats.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "SimulationStats.h"
 
 string SimulationStats::getHeader()

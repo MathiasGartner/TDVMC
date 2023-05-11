@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			SquareWell.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Rectangular shaped potential.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "StrengthAndRangePotential.h"

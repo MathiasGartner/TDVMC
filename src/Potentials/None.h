@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			None.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	A potential with value zero everywhere.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "IPairPotential.h"

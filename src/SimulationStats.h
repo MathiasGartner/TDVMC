@@ -1,3 +1,12 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			SimulationStats.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Holds information about the current status of the
+ * 						simulation. Used for printing status reports.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include <iomanip>

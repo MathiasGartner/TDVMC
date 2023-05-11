@@ -1,3 +1,12 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			Constants.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Constants for the simulation that are shared within the
+ * 						whole tVMC program.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include <math.h>

@@ -1,3 +1,13 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			Utils.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Utitlity functions for random number generation, vector
+ * 						operations (initialization, summation, ...) and file
+ * 						input output operations.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "Constants.h"

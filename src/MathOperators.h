@@ -1,3 +1,13 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			MathOperators.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Overloading of operators for mathematical operations on
+ * 						different scalar, vector and matrix data types, as well
+ * 						as <ObservableCollection>.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "Observables/ObservableCollection.h"
