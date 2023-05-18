@@ -1,38 +1,18 @@
-# TDVMC
-TDVMC - Time Dependent Variational Monte Carlo
+# tVMC
+tVMC - Time Dependent Variational Monte Carlo
 
 ## resources
 use json parser from https://github.com/open-source-parsers/jsoncpp
 
-## Makefile for zusie server
-CXX      := mpicxx
-CXXFLAGS := -O3 -std=c++11
-LDFLAGS  := -lmpi -L./libs -llapack -lrefblas -lgfortran -lpthread
-BUILD    := ./build
-OBJ_DIR  := $(BUILD)/objects
-APP_DIR  := $(BUILD)
-TARGET   := TDVMC
-INCLUDE  :=
-SRC      := $(wildcard src/*.cpp) $(wildcard src/*/*.cpp) $(wildcard resources/*.cpp)
+## building from source using Makefile
+you can specify options according to the machine your are compiling the project, eg.
+CXX = {mpic++, mpicxx, ...}
+C++ standard >= -std=c++17
+build directory (default is ./build)
 
-OBJECTS := $(SRC:%.cpp=$(OBJ_DIR)/%.o)
+## config file for simulation run
+config files are in JSON format
+example config file can be found in directory config/examples/
+there is also a README file config/examples/README.md with explanation for all the fields in the config
+at the end of every simulation a file AAfinish_tVMC.config is generated in the simulation directory. This file contains the final parameters an can be used in a subsequent simulation (eg. for further imaganinary time propagation if parameters are not converged, for real time propagation following an imaginary time propagation, for further real time simulations, ...). 
 
-all: build $(APP_DIR)/$(TARGET)
-
-$(OBJ_DIR)/%.o: %.cpp
-        @mkdir -p $(@D)
-        $(CXX) $(CXXFLAGS) $(INCLUDE) -o $@ -c $<
-
-$(APP_DIR)/$(TARGET): $(OBJECTS)
-        @mkdir -p $(@D)
-        $(CXX) $(CXXFLAGS) $(OBJECTS) -o $(APP_DIR)/$(TARGET) $(INCLUDE) $(LDFLAGS)
-
-.PHONY: all build clean
-
-build:
-        @mkdir -p $(APP_DIR)
-        @mkdir -p $(OBJ_DIR)
-
-clean:
-        -@rm -rf $(OBJ_DIR)/*
-        -@rm -rf $(APP_DIR)/*

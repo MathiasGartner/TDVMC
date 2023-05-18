@@ -26,13 +26,15 @@ public:
 
 	double locE;
 	double locEKin;
-	double locEPot;
+	double locEExt;
+	double locEInt;
 
 	double exponent;
 	double wf;
 	double phiR;
 
-	double durationDGL;
+	double durationSampling;
+	double durationSolveEOM;
 	double durationFullStep;
 
 

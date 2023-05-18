@@ -389,6 +389,7 @@ map<int, int> GatherHistogram(int data)
 void GetCPUAllocation(bool printOnlyMultipleAllocations)
 {
 	bool print = false;
+	bool infoPrinted = false;
 	int id = get_cpu_id();
 	map<int, int> histogram = MPIMethods::GatherHistogram(id);
 
@@ -398,6 +399,12 @@ void GetCPUAllocation(bool printOnlyMultipleAllocations)
 		{
 			if (printOnlyMultipleAllocations)
 			{
+				if (!infoPrinted)
+				{
+					cout << "########################" <<  endl;
+					cout << "muliple CPU allocations:" <<  endl;
+					infoPrinted = true;
+				}
 				cout << h.first << ":" << h.second << endl;
 			}
 			else
@@ -406,6 +413,10 @@ void GetCPUAllocation(bool printOnlyMultipleAllocations)
 				break;
 			}
 		}
+	}
+	if (infoPrinted)
+	{
+		cout << "########################" <<  endl;
 	}
 	if (print)
 	{
