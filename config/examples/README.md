@@ -1,18 +1,16 @@
 # Description of fields in config files
 
-the config file is given in JSON notation
-
-for boolean types the values 0 (=false) and 1 (=true) are used.
+- the config file is given in JSON notation
+- for boolean types the values 0 (=false) and 1 (=true) are used.
 lists are specified with [ ... ]
+- the following properties need to be set in the config file:
 
-the following properties need to be set in the config file:
-
-`CONFIG_VERSION` : the currently supported version of a config file is specified in src/TDVMC.cpp in the variable `requiredConfigVersion` and is cuurently set to "0.24". If new config fields are added/renamed/deleted, this value should be updated.
-`SYSTEM_TYPE` : the type of physical model that is simulated. The value must correspond to a class located in src/IPhysicalSystems/ eg. "Bosons1D"
-`OUTPUT_DIRECTORY` : in this directory a new simulation directory for all the output files will be created. The simulation directory is created as "step=<MC_NSTEPS>_therm=<MC_NTHERMSTEPS>_time=<TIMESTEP><OUT_DIR_SUFFIX>" if no value for <OUT_DIR_NAME> is specified.
-`OUT_DIR_SUFFIX` : name that is appended to the created simulation directory, eg: "_GS_1D_N=100_"
-`OUT_DIR_NAME` : if specified the created simulation directory will be named exactly by this eg. "1D_groundstate_N=40"
-`N` : number of particles, eg. 100
+- `CONFIG_VERSION` : the currently supported version of a config file is specified in src/TDVMC.cpp in the variable `requiredConfigVersion` and is cuurently set to "0.24". If new config fields are added/renamed/deleted, this value should be updated.
+- `SYSTEM_TYPE` : the type of physical model that is simulated. The value must correspond to a class located in src/IPhysicalSystems/ eg. "Bosons1D"
+- `OUTPUT_DIRECTORY` : in this directory a new simulation directory for all the output files will be created. The simulation directory is created as "step=<MC_NSTEPS>_therm=<MC_NTHERMSTEPS>_time=<TIMESTEP><OUT_DIR_SUFFIX>" if no value for <OUT_DIR_NAME> is specified.
+- `OUT_DIR_SUFFIX` : name that is appended to the created simulation directory, eg: "_GS_1D_N=100_"
+- `OUT_DIR_NAME` : if specified the created simulation directory will be named exactly by this eg. "1D_groundstate_N=40"
+- `N` : number of particles, eg. 100
 `LBOX` : size of the simulation box, eg. 100.0
 `DIM` : number of dimensions, eg. one of {1, 2, 3}
 `N_PARAM` : number of variational parameters, eg. 100
