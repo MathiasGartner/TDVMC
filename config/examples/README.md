@@ -6,7 +6,7 @@
 
 ## the following properties need to be set in the config file:
 
-- `CONFIG_VERSION` : the currently supported version of a config file is specified in src/TDVMC.cpp in the variable `requiredConfigVersion` and is cuurently set to "0.24". If new config fields are added/renamed/deleted, this value should be updated.
+- `CONFIG_VERSION` : the currently supported version of a config file is specified in src/TDVMC.cpp in the variable `requiredConfigVersion` and is currently set to "0.24". If new config fields are added/renamed/deleted, this value should be updated.
 - `SYSTEM_TYPE` : the type of physical model that is simulated. The value must correspond to a class located in src/IPhysicalSystems/ eg. "Bosons1D"
 - `OUTPUT_DIRECTORY` : in this directory a new simulation directory for all the output files will be created. The simulation directory is created as "step=<MC_NSTEPS>_therm=<MC_NTHERMSTEPS>_time=<TIMESTEP><OUT_DIR_SUFFIX>" if no value for <OUT_DIR_NAME> is specified.
 - `OUT_DIR_SUFFIX` : name that is appended to the created simulation directory, eg: "_GS_1D_N=100_"
@@ -15,12 +15,12 @@
 - `LBOX` : size of the simulation box, eg. 100.0
 - `DIM` : number of dimensions, eg. one of {1, 2, 3}
 - `N_PARAM` : number of variational parameters, eg. 100
-- `USE_PARAM_START` : the index at which the parameter array will be used. mainly used for code development (eg. if the first 10 parameters should stay at a fixed value). default value. 0
+- `USE_PARAM_START` : the index at which the parameter array will be used. mainly used for code development (eg. 10 if the first 10 parameters should stay at a fixed value). default value. 0
 - `USE_PARAM_END` : same functionality as USE_PARAM_START. mainly used for code development. default value is N_PARAM - 1. eg 99
 - `RHO` : the particle density. This value is ignored in most SYSTEM_TYPE implementations since the density is given by N/LBOX
 - `RC` : not used anymore. has been used to specify the position r_c where the Lennard-Jones potential is cut off
-- `MC_STEP` : size of a Monte Carlo step
-- `MC_STEP_OFFSET` : offset for a Monte Carlo step
+- `MC_STEP` : magnitude of coordinate displacement during a Monte Carlo step
+- `MC_STEP_OFFSET` : offset of coordinate displacement for a Monte Carlo step
 - `MC_NSTEPS` : Monte Carlo samples for a timestep created in each process
 - `MC_NTHERMSTEPS` : intermediate MC samples generated between each of the MC_NSTEPS steps
 - `MC_NINITIALIZATIONSTEPS` : initial MC samples generated before the first of the MC_NSTEPS

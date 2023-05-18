@@ -14,5 +14,10 @@ you can specify options according to the machine your are compiling the project,
 - config files are in JSON format
 - example config file can be found in directory config/examples/
 - there is also a README file config/examples/README.md with explanation for all the fields in the config
-- at the end of every simulation a file AAfinish_tVMC.config is generated in the simulation directory. This file contains the final parameters an can be used in a subsequent simulation (eg. for further imaganinary time propagation if parameters are not converged, for real time propagation following an imaginary time propagation, for further real time simulations, ...). 
+- at the end of every simulation a file AAfinish_tVMC.config is generated in the simulation directory. This file contains the final parameters an can be used in a subsequent simulation (eg. for further imaganinary time propagation if parameters are not converged, for real time propagation following an imaginary time propagation, for further real time simulations, ...).
 
+## the most advanced PhysicalSystem implemetations are
+- `InhContactBosons`: Bosons in 1D with contact interaction and external potential. Periodic boundary conditions. Wavefunction has single particle and pair correlation parts
+- `BosonMixtureCluster`: Bosonic mixtures in 3D. Used for ground state optimization of few-body clusters. Piecewise defined wavefunction.
+- `Bosons1D`: Bosons in 1D with arbitrary interaction potential. Homogeneous system with periodic boundary conditions. Wavefunction has only pair correlations.
+- `Bosons1DMixture`: Bosonic mixtures in 1D with arbitrary interaction potential. Homogeneous system with periodic boundary conditions. Wavefunction has only pair correlations.
