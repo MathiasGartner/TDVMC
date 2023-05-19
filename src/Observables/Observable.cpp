@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			Observable.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see Observable.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "Observable.h"
 
 namespace Observables

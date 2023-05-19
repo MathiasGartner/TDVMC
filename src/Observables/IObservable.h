@@ -1,3 +1,12 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			SplinedFunction.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Interface for providing math operators to
+ * 						observables.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include <cmath>

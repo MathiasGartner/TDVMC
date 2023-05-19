@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			ObservableV.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see ObservableV.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "ObservableV.h"
 
 #include "../Utils.h"

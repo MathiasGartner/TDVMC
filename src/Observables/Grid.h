@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			Grid.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Grid on which vector valued observables are defined.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include <string>

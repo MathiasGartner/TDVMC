@@ -1,4 +1,12 @@
-//!HFD-B(He) Aziz et al: Mol. Phys. 61, 1487 (1987)
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			HFDB.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	HFDB potential, see:
+ * 							Aziz et al: Mol. Phys. 61, 1487 (1987)
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "IPairPotential.h"

@@ -1,3 +1,13 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			OneParticleData.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Holds observables for a single particle.
+ * 						Used in simulations with mixtures of different particle
+ * 						species.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "Constants.h"

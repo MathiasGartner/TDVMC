@@ -1,3 +1,12 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			KTTY_He_Cs.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	KTTY with interaction parameters for He and Cs atoms
+ * 						see also KTTY.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "KTTY.h"

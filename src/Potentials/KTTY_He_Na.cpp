@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			KTTY_He_Na.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see KTTY_He_Na.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "KTTY_He_Na.h"
 
 using namespace std;

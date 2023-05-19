@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			LJ_XSplit.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see LJ_XSplit.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "LJ_XSplit.h"
 
 using namespace std;

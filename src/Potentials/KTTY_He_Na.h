@@ -1,3 +1,12 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			KTTY_He_Na.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	KTTY with interaction parameters for He and Na atoms
+ * 						see also KTTY.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "KTTY.h"

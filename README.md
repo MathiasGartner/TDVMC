@@ -33,7 +33,7 @@ Start the program with multiple processes using the required MPI command on the 
 
 `mpiexec -perhost 250 ./build/TDVMC ./config/Bosons1D_quench.config`
 
-## config file for simulation run
+## Configuration file for simulation run
 
 - config files are in JSON format
 - example config file can be found in directory `config/examples/`

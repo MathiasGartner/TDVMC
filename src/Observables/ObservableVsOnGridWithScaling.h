@@ -1,3 +1,12 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			ObservableVsOnGridWithScaling.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Vector valued observable on an underlying Grid
+ * 						implementing volume-scaling in 1, 2 and 3 dimensions
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "ObservableVsOnGrid.h"

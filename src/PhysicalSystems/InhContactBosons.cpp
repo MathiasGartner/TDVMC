@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			InhContactBosons.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see InhContactBosons.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "InhContactBosons.h"
 
 #include "../SplineFactory.h"

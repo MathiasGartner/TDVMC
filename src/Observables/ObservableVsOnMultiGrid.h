@@ -1,3 +1,12 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			ObservableVsOnMultiGrid.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Multi-dimensional observables on an underlying
+ * 						Grid for each dimension. Used eg. for the pair density
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "Grid.h"

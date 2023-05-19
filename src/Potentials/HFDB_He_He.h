@@ -1,4 +1,14 @@
-//!HFD-B(He) Aziz et al: Mol. Phys. 61, 1487 (1987)
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			HFDB_He_He.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	HFDB with parameters for Helium - Helium interaction
+ * 						see
+ * 							Aziz et al: Mol. Phys. 61, 1487 (1987)
+ * 						see also HFDB.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "HFDB.h"

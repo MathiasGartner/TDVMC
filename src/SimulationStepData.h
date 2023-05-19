@@ -1,3 +1,13 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			SimulationStepData.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Holds information about the variational parameters,
+ * 						the wavefunction and other observables at a single
+ * 						time step.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include <vector>

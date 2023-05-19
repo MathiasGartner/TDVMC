@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			ParticleProperties.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Holds properties for specific particle species.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include <vector>

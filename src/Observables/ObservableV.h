@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			ObservableV.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Vector valued observable
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "IObservable.h"

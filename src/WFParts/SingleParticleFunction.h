@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			SplinedFunction.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Single particle function of the variational wavefunction
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "SplinedFunction.h"

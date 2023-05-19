@@ -1,3 +1,13 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			TDVMC.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	Main entry point for tVMC simulations.
+ * 						Provides the whole workflow and numerics
+ * 						for dynamic simulations.
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "mpi.h"
 
 #include "ConfigItem.h"

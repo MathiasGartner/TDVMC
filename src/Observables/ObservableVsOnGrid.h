@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			ObservableVsOnGrid.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Vector valued observable on an underlying Grid
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "Grid.h"

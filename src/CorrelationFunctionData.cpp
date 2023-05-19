@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			CorrelationFunctionData.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see CorrelationFunctionData.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "CorrelationFunctionData.h"
 
 CorrelationFunctionData::CorrelationFunctionData()

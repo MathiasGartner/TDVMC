@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			HFDB_He_He.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see HFDB_He_He.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "HFDB_He_He.h"
 
 using namespace std;

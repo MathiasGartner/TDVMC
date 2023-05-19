@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			SplinedFunction.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see SplinedFunction.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "SplinedFunction.h"
 
 namespace WFParts

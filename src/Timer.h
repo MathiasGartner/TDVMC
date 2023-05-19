@@ -1,3 +1,12 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			Timer.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Measures execution time. Used for benchmarking and
+ * 						status reporting.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include <chrono>

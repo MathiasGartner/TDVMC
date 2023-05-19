@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			Observable.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Scalar valued observable
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "IObservable.h"

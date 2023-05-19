@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			Gauss.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Gaussian shaped potential.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "StrengthAndRangePotential.h"

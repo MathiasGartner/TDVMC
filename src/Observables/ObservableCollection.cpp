@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			ObservableCollection.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see ObservableCollection.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "ObservableCollection.h"
 
 namespace Observables

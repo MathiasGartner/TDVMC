@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			SingleParticleFunction.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see SingleParticleFunction.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "SingleParticleFunction.h"
 
 namespace WFParts

@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			ObservableVsOnGrid.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see ObservableVsOnGrid.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "ObservableVsOnGrid.h"
 
 #include "../Utils.h"

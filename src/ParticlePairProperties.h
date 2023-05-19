@@ -1,3 +1,12 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			ParticlePairProperties.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Holds properties for a pair of particles of different
+ * 						(or same) particle type.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "Potentials/IPairPotential.h"

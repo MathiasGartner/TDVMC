@@ -1,3 +1,15 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			SplinedFunction.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Interface for a one-dimensional splined function
+ * 						used for wavefunction modeling.
+ * 						Holds the underlying grid, derivatives of the function,
+ * 						as well as restictions due to boundary conditions on the
+ * 						wavefunction.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "../Utils.h"

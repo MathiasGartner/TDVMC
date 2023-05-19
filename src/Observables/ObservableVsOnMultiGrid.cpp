@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			ObservableVsOnMultiGrid.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see ObservableVsOnMultiGrid.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "ObservableVsOnMultiGrid.h"
 
 #include "../Utils.h"

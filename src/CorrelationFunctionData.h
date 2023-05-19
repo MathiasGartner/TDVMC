@@ -1,3 +1,14 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			CorrelationFunctionData.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Holds observables related to the local operators in the
+ * 						wavefunction for a pair of particles.
+ * 						Used in simulations with mixtures of different particle
+ * 						species.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "Constants.h"

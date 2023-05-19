@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			ObservableVsOnGridWithScaling.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see ObservableVsOnGridWithScaling.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "ObservableVsOnGridWithScaling.h"
 
 #include "../Utils.h"

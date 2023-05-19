@@ -1,3 +1,14 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			KTTY.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	KTTY potential, see:
+ * 							U. Kleinekathöfer, M. Lewerenz, and M. Mladenović,
+ * 							“Long Range Binding in AlkaliHelium Pairs”,
+ * 							Physical Review Letters 83, 4717–4720 (1999)
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "IPairPotential.h"

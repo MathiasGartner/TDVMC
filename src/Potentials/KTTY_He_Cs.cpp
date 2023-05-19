@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			KTTY_He_Cs.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see KTTY_He_Cs.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "KTTY_He_Cs.h"
 
 using namespace std;

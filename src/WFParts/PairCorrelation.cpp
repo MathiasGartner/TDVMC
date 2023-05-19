@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			PairCorrelation.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see PairCorrelation.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "PairCorrelation.h"
 
 namespace WFParts

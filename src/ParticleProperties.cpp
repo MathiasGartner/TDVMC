@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			ParticleProperties.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see ParticleProperties.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "ParticleProperties.h"
 
 ParticleProperties::ParticleProperties()

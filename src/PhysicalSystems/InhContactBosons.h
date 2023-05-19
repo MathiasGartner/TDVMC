@@ -1,3 +1,12 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			InhContactBosons.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Bosons in 1D.
+ * 						Wavefunction has single particle and pair correlation parts
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "IPhysicalSystem.h"

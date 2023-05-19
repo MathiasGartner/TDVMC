@@ -1,3 +1,13 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			ObservableCollection.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Holds a list of elements implementing the IObservable
+ * 						interface. Every IPhysicalSystem should hold an
+ * 						ObservableCollection to store the data.
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "IObservable.h"

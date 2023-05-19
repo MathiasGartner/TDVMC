@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			PairCorrelation.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Pair correlation part of the variational wavefunction
+ *
+ * --------------------------------------------------------------------------*/
+
 #pragma once
 
 #include "SplinedFunction.h"

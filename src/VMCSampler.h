@@ -1,3 +1,12 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			VMCSampler.h
+ * 		Author:			Mathias Gartner
+ * 		Description:	Only used for development and testing.
+ * 						Create samples from model specified directly in this file.
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "Constants.h"
 #include "MathOperators.h"
 #include "Utils.h"

@@ -1,3 +1,11 @@
+/*-----------------------------------------------------------------------------
+ *
+ * 		Name:			OneParticleData.cpp
+ * 		Author:			Mathias Gartner
+ * 		Description:	see OneParticleData.h
+ *
+ * --------------------------------------------------------------------------*/
+
 #include "OneParticleData.h"
 
 OneParticleData::OneParticleData()
