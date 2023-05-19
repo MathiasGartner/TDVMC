@@ -1,4 +1,6 @@
 .vscode
+.cproject
+.project
 Debug/TDVMC
 Debug/src/*.d
 Debug/src/*.o
