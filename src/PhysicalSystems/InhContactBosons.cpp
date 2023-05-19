@@ -24,9 +24,13 @@ InhContactBosons::InhContactBosons(vector<double>& params, string configDirector
 
 	//INFO: gamma=10 equals c=20 in 10.1103/PhysRevA.74.031605
 	gamma = params[0] == 0.0 ? params[1] : 0.0;
+
+	//INFO: scaling of parameters according to the units used in optical lattice simulations
+	/*
 	double potentialK = params[2];
 	double kf = M_PI;
 	gamma *= potentialK * kf;
+	*/
 }
 
 void InhContactBosons::ExtendNodes(vector<double>& n)
@@ -66,7 +70,7 @@ void InhContactBosons::InitSystem()
 	numOfOtherLocalOperators = 4; //INFO: potentialIntern, potentialInternComplex, potentialExtern, potentialExternComplex
 	otherLocalOperators.resize(numOfOtherLocalOperators);
 	numOfkValues = 100;
-	numOfOtherExpectationValues = 9;
+	numOfOtherExpectationValues = 10;
 	numOfAdditionalSystemProperties = numOfOtherExpectationValues;
 
 	halfLength = LBOX / 2.0;
@@ -448,6 +452,27 @@ vector<double> InhContactBosons::GetCenterOfMass(vector<vector<double> >& R)
 double InhContactBosons::GetExternalPotential(vector<double>& r)
 {
 	double x;
+	double value = 0.0;
+	double potentialWidth = params[2];
+	double potentialStrength = params[3];
+	x = GetCoordinateNIC(r[0]);
+
+	/*
+	// square well
+	if (abs(x) < potentialWidth)
+	{
+		value = potentialStrength;
+	}
+	*/
+
+	// Gaussian
+	double x_a = x / potentialWidth;
+	value = potentialStrength * exp(-x_a * x_a);
+
+
+	//optical lattice
+	/*
+	double x;
 	double k;
 	double value = 0.0;
 	double potentialK = params[2]; //given in units of kf
@@ -470,7 +495,8 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 			value *= k * k; //INFO: potential is given by k^2 V_0 / E_r sin^2(k x) to get a factor of 1 in front of kinetic energy
 		}
 	}
-	//INFO: add perturbation
+
+	//additional perturbation
 	if (params.size() > 8)
 	{
 		//additive noise
@@ -499,7 +525,7 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 	}
 	if (params.size() > 4 && params[4] > 0.0 && this->time >= params[4])
 	{
-		value = 0.0;
+		//value = 0.0;
 	}
 	else if (params.size() > 8)
 	{
@@ -508,9 +534,13 @@ double InhContactBosons::GetExternalPotential(vector<double>& r)
 		//gauss
 		//value *= exp(-pow((this->time - params[9])/(params[9] * 0.4), 2.0));
 	}
+
+	*/
+
 	//value = 0.0;
 	//value = abs(x);
 	//value = 1.0;
+
 	return value;
 }
 
@@ -666,15 +696,16 @@ void InhContactBosons::CalculateExpectationValues(vector<double>& O, vector<vect
 		localOperatorlocalEnergyI[k] = O[k] * localEnergyI;
 	}
 
-	otherExpectationValues[0] = kineticR;
-	otherExpectationValues[1] = otherO[0];
+	otherExpectationValues[0] = kineticR; //E_kin real
+	otherExpectationValues[1] = otherO[0]; //E_pot real
 	otherExpectationValues[2] = wf;
 	otherExpectationValues[3] = exponent;
-	otherExpectationValues[4] = kineticSumR1;
-	otherExpectationValues[5] = kineticSumI1;
-	otherExpectationValues[6] = kineticSumR2;
-	otherExpectationValues[7] = kineticSumI2;
-	otherExpectationValues[8] = kineticSumR1I1;
+	otherExpectationValues[4] = otherO[2]; //V_ext real
+	otherExpectationValues[5] = kineticSumR1;
+	otherExpectationValues[6] = kineticSumI1;
+	otherExpectationValues[7] = kineticSumR2;
+	otherExpectationValues[8] = kineticSumI2;
+	otherExpectationValues[9] = kineticSumR1I1;
 }
 
 void InhContactBosons::CalculateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
@@ -701,7 +732,7 @@ void InhContactBosons::CalculateAdditionalSystemProperties(vector<vector<double>
 	double weight2 = 1.0;
 
 	//density
-	weight = 1.0 / 2.0;
+	weight = 1.0;
 	for (int i = 0; i < N; i++)
 	{
 		r = GetCoordinateNIC(R[i][0]) + halfLength; //to get coordinate in interval [0, LBOX]
