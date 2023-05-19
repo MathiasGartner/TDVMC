@@ -36,8 +36,12 @@ protected:
 
 	vector<double> otherExpectationValues; // eg. for potential and kinetic energy
 	int numOfOtherExpectationValues;
+
+	//INFO: <additionalSystemProperties> is only used in old PhysicalSystems (ie. HeBulk, HeDrop, ...).
+	//		for more recently developed systems this is stored in <additionalObservables>.
 	vector<double> additionalSystemProperties; // for properties at the end of the simulation
 	int numOfAdditionalSystemProperties;
+
 	Observables::ObservableCollection additionalObservables;
 
 public:

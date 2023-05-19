@@ -16,32 +16,19 @@
 
 #include "PhysicalSystems/IPhysicalSystem.h"
 #include "PhysicalSystems/Bosons1D.h"
-#include "PhysicalSystems/Bosons1D0th.h"
-#include "PhysicalSystems/Bosons1D4th.h"
-#include "PhysicalSystems/Bosons1DSp.h"
 #include "PhysicalSystems/Bosons1DMixture.h"
 #include "PhysicalSystems/BosonsBulk.h"
 #include "PhysicalSystems/BosonsBulkDamped.h"
 #include "PhysicalSystems/BosonCluster.h"
 #include "PhysicalSystems/BosonClusterWithLog.h"
 #include "PhysicalSystems/BosonClusterWithLogParam.h"
-#include "PhysicalSystems/BosonsDiscrete.h"
-#include "PhysicalSystems/BosonMixtureCluster_4thorder.h"
 #include "PhysicalSystems/BosonMixtureCluster.h"
-#include "PhysicalSystems/BulkSplines.h"
-#include "PhysicalSystems/BulkSplinesPhi.h"
-#include "PhysicalSystems/BulkSplinesScaled.h"
 #include "PhysicalSystems/GaussianWavepacket.h"
 #include "PhysicalSystems/HeBulk.h"
 #include "PhysicalSystems/HeDrop.h"
 #include "PhysicalSystems/InhBosons1D.h"
 #include "PhysicalSystems/InhContactBosons.h"
 #include "PhysicalSystems/LinearChain.h"
-#include "PhysicalSystems/NUBosonsBulk.h"
-#include "PhysicalSystems/NUBosonsBulkPB.h"
-#include "PhysicalSystems/NUBosonsBulkPBBox.h"
-#include "PhysicalSystems/NUBosonsBulkPBBoxAndRadial.h"
-#include "PhysicalSystems/NUBosonsBulkPBWhitehead.h"
 
 #include "Potentials/PotentialManager.h"
 
@@ -213,25 +200,25 @@ void Log(string message, MessageType messageType)
 	switch (messageType)
 	{
 	case DEBUG:
-		if (logLevel >= 0)
+		if (logLevel <= 0)
 		{
 			Log(message);
 		}
 		break;
 	case INFO:
-		if (logLevel >= 1)
+		if (logLevel <= 1)
 		{
 			Log(message);
 		}
 		break;
 	case WARNING:
-		if (logLevel >= 2)
+		if (logLevel <= 2)
 		{
 			cout << "\033[1;33m" << "#" << setfill(' ') << setw(2) << processRank << "@" << get_cpu_id() << ": " << message << "\033[0m" << endl << flush;
 		}
 		break;
 	case ERROR:
-		if (logLevel >= 3)
+		if (logLevel <= 3)
 		{
 			cout << "\033[1;31m" << "#" << setfill(' ') << setw(2) << processRank << "@" << get_cpu_id() << ": " << message << "\033[0m" << endl << flush;
 		}
@@ -491,6 +478,14 @@ void BroadcastConfig()
 	}
 }
 
+void BroadcastNewParameters(vector<double>& uR, vector<double>& uI, double* phiR, double* phiI)
+{
+	MPIMethods::BroadcastValues(uR);
+	MPIMethods::BroadcastValues(uI);
+	MPIMethods::BroadcastValue(phiR);
+	MPIMethods::BroadcastValue(phiI);
+}
+
 
 /////////////////////////
 /// file input/output ///
@@ -515,9 +510,9 @@ void CreateOutputDirectory()
 	//dir = "step=" + to_string(MC_NSTEPS) + "_therm=" + to_string(MC_NTHERMSTEPS) + "_time=" + to_string(TIMESTEP);
 	//OUT_DIR = OUTPUT_DIRECTORY + dir + OUT_DIR_SUFFIX + "/";
 	tmp = system(("rm -rf " + OUT_DIR).c_str());
-	cout << tmp << endl;
+	cout << "remove output direcitory if existing. return value (0=OK): " << tmp << endl;
 	tmp = system(("mkdir " + OUT_DIR).c_str());
-	cout << tmp << endl;
+	cout << "create output directory. return value (0=OK): " << tmp << endl;
 	CopyFile(configFilePath, OUT_DIR + "vmc.config");
 }
 
@@ -534,12 +529,134 @@ void WriteParticleInputFile(string fileName, vector<vector<double> >& R)
 	WriteDataToFile(particlePositionList, fileName, { "r_i,x", "..." }, 1, false);
 }
 
-void BroadcastNewParameters(vector<double>& uR, vector<double>& uI, double* phiR, double* phiI)
+
+void WriteAdditionalObservablesToFiles()
 {
-	MPIMethods::BroadcastValues(uR);
-	MPIMethods::BroadcastValues(uI);
-	MPIMethods::BroadcastValue(phiR);
-	MPIMethods::BroadcastValue(phiI);
+	//TODO: generalize this for all types of IPhysicalSystems and all types of IObservable
+	if (auto s = dynamic_cast<PhysicalSystems::Bosons1D*>(sys))
+	{
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "gr");
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "sk");
+		}
+		if (auto o = dynamic_cast<Observables::ObservableV*>(additionalObservablesMean.observables[2]))
+		{
+			AppendDataToFile(o->values, "overlap");
+		}
+	}
+	if (auto s = dynamic_cast<PhysicalSystems::Bosons1DMixture*>(sys))
+	{
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "gr");
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "sk");
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
+		{
+			for (unsigned int i = 0; i < o->observablesV.size(); i++)
+			{
+				AppendDataToFile(o->observablesV[i].values, "rho_" + o->observablesV[i].name);
+			}
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[3]))
+		{
+			for (unsigned int i = 0; i < o->observablesV.size(); i++)
+			{
+				AppendDataToFile(o->observablesV[i].values, "g_" + o->observablesV[i].name);
+			}
+		}
+	}
+	else if (auto s = dynamic_cast<PhysicalSystems::BosonsBulk*>(sys))
+	{
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "gr");
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "sk");
+		}
+	}
+	else if (auto s = dynamic_cast<PhysicalSystems::InhBosons1D*>(sys))
+	{
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "rho");
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "gr");
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "sk");
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "rho2");
+		}
+	}
+	else if (auto s = dynamic_cast<PhysicalSystems::InhContactBosons*>(sys))
+	{
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "rho");
+			//INFO: write external potential
+			vector<double> potExt;
+			for (auto r : o->grid.gridCenterPoints)
+			{
+				vector<double> vr = { r };
+				potExt.push_back(s->GetExternalPotential(vr));
+			}
+			AppendDataToFile(potExt, "V_ext");
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "gr");
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "sk");
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "rho2");
+		}
+	}
+	else if (auto s = dynamic_cast<PhysicalSystems::LinearChain*>(sys))
+	{
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "rho");
+			//INFO: write external potential
+			vector<double> potExt;
+			for (auto r : o->grid.gridCenterPoints)
+			{
+				vector<double> vr = { r };
+				potExt.push_back(s->GetExternalPotential(vr));
+			}
+			AppendDataToFile(potExt, "V_ext");
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "gr");
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "sk");
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
+		{
+			AppendDataToFile(o->observablesV[0].values, "rho2");
+		}
+	}
 }
 
 
@@ -556,14 +673,14 @@ void Init()
 	}
 	else
 	{
-		cout << "init with:" << (processRank + 1) << endl;
 		generator = mt19937_64(processRank + 1);
-		Log("first random number: " + to_string(random01()));
-		//cout << generator << endl;
 		distParticleIndex = uniform_int_distribution<int>(0, N - 1);
 		distParticleIndex1 = uniform_int_distribution<int>(1, N - 1);
-		//Log("uniform: " + to_string(random01()) + " normal: " + to_string(randomNormal()));
 		srand(processRank + 1);
+		//cout << "init with:" << (processRank + 1) << endl;
+		//Log("first random number: " + to_string(random01()));
+		//cout << generator << endl;
+		//Log("uniform: " + to_string(random01()) + " normal: " + to_string(randomNormal()));
 	}
 	//INFO: box length is specified in cofig file due to problems with rounding errors
 	//LBOX = pow((N / RHO), 1.0 / DIM); //box with dimensions [-L/2, L/2]
@@ -646,6 +763,100 @@ void Init()
 		AssignVector_DIM = AssignVector;
 		RandomDisplaceParticle_DIM = RandomDisplaceParticle;
 		break;
+	}
+}
+
+void WriteGridFiles()
+{
+	if (auto s = dynamic_cast<PhysicalSystems::Bosons1D*>(sys))
+	{
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+		{
+			WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+		{
+			WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
+		}
+	}
+	if (auto s = dynamic_cast<PhysicalSystems::Bosons1DMixture*>(sys))
+	{
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+		{
+			WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+		{
+			WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
+		}
+	}
+	else if (auto s = dynamic_cast<PhysicalSystems::BosonsBulk*>(sys))
+	{
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+		{
+			WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+		{
+			WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
+		}
+	}
+	else if (auto s = dynamic_cast<PhysicalSystems::InhBosons1D*>(sys))
+	{
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+		{
+			WriteDataToFile(o->grid.gridCenterPoints, "rho_grid", o->grid.name);
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+		{
+			WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
+		{
+			WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
+		{
+			WriteGridsToFile(o->grids, "rho2_grid", true);
+		}
+	}
+	else if (auto s = dynamic_cast<PhysicalSystems::InhContactBosons*>(sys))
+	{
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+		{
+			WriteDataToFile(o->grid.gridCenterPoints, "rho_grid", o->grid.name);
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+		{
+			WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
+		{
+			WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
+		{
+			WriteGridsToFile(o->grids, "rho2_grid", true);
+		}
+	}
+	else if (auto s = dynamic_cast<PhysicalSystems::LinearChain*>(sys))
+	{
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
+		{
+			WriteDataToFile(o->grid.gridCenterPoints, "rho_grid", o->grid.name);
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
+		{
+			WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
+		{
+			WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
+		}
+		if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
+		{
+			WriteGridsToFile(o->grids, "rho2_grid", true);
+		}
 	}
 }
 
@@ -855,63 +1066,13 @@ void MoveCenterOfMassToZero(vector<vector<double> >& R)
 	}
 }
 
-void DoReducedMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
-{
-	double p;
-	bool sampleOkay = true;
-	int randomParticle = distParticleIndex1(generator); //INFO: do not choose the first particle
-	vector<double> oldPosition(R[randomParticle]);
-	for (int i = 0; i < DIM; i++)
-	{
-		R[randomParticle][i] += randomNormal(MC_STEP);
-	}
-	double wfQuotient = sys->CalculateWFQuotient(R, uR, uI, phiR, phiI, randomParticle, oldPosition);
-	if (!isfinite(wfQuotient) || !isfinite(sys->GetExponentNew()) || !isfinite(sys->GetExponent()))
-	{
-		sampleOkay = false;
-		if (!isfinite(wfQuotient) && sys->GetExponentNew() > 0 && sys->GetExponent() == 0) //INFO: this can happen when a new timestep is startet and the wavefunction is zero for the first particle configuration
-		{
-			sampleOkay = true;
-			wfQuotient = 1; //INFO: accept by 100%
-		}
-	}
 
-	p = random01();
-	if (!sampleOkay || wfQuotient < p)
-	{
-		for (int i = 0; i < DIM; i++)
-		{
-			R[randomParticle][i] = oldPosition[i];
-		}
-	}
-	else
-	{
-		sys->AcceptMove();
-		nAcceptances++;
-		nAcceptancesPP[randomParticle]++;
-	}
-	nTrials++;
-	nTrialsPP[randomParticle]++;
-}
-
-void DoReducedMetropolisSteps(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, int n)
-{
-	for (int i = 0; i < n; i++)
-	{
-		DoReducedMetropolisStep(R, uR, uI, phiR, phiI);
-	}
-}
+////////////////////////////
+/// Monte Carlo sampling ///
+////////////////////////////
 
 void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
-	//INFO: no performance increase for dimension-dependent functions measureable on asterix
-	//int randomParticle = randomInt(N - 1);
-	//RandomDisplaceParticle_DIM(R[randomParticle]);
-	//R[randomParticle][0] += randomNormal(MC_STEP);
-	//R[randomParticle][1] += randomNormal(MC_STEP);
-	//AssignVector_DIM(oldPosition, R[randomParticle]);
-	//R[randomParticle][0] = oldPosition[0];
-	//R[randomParticle][1] = oldPosition[1];
 	double p;
 	bool sampleOkay = true;
 	int randomParticle = randomParticleIndex();
@@ -921,8 +1082,9 @@ void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<dou
 		R[randomParticle][i] += randomNormal(MC_STEP);
 	}
 	double wfQuotient = sys->CalculateWFQuotient(R, uR, uI, phiR, phiI, randomParticle, oldPosition);
-	//cout << wfQuotient << endl;
+	Log(to_string(wfQuotient), DEBUG);
 
+	//INFO: for debugging
 	//if (wfQuotient == 0 || sys->GetWfNew() == 0 || sys->GetWf() == 0)
 	//{
 	//	cout << "something == 0 !!!!!!!!!!!!!!!!!!!!!!!!" << endl;
@@ -932,11 +1094,11 @@ void DoMetropolisStep(vector<vector<double> >& R, vector<double>& uR, vector<dou
 	//if (!isfinite(wfQuotient) || !isfinite(sys->GetWfNew()) || !isfinite(sys->GetWf()))
 	if (!isfinite(wfQuotient) || !isfinite(sys->GetExponentNew()) || !isfinite(sys->GetExponent()))
 	{
+		//INFO: for debugging
 		//cout << "something != finite !!!!!!!!!!!!!!!!!!!!!!!!" << endl;
 		//cout << "wfQuotient=" << wfQuotient << ", wfNew=" << sys->GetWfNew() << ", wf=" << sys->GetWf() << ", nTrials=" << nTrials << endl;
 		//sleep(1);
 		sampleOkay = false;
-		//if (!isfinite(wfQuotient) && sys->GetWfNew() > 0 && sys->GetWf() == 0) //INFO: this can happen when a new timestep is startet and the wavefunction is zero for the first particle configuration
 		if (!isfinite(wfQuotient) && sys->GetExponentNew() > 0 && sys->GetExponent() == 0) //INFO: this can happen when a new timestep is startet and the wavefunction is zero for the first particle configuration
 		{
 			sampleOkay = true;
@@ -1084,6 +1246,7 @@ void UpdateSamples(vector<ICorrelatedSamplingData*>& samples, vector<double>& uR
 
 void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, bool intermediateStep = false)
 {
+	//INFO: to save memory, only real part of local energies is stored
 	//vector<vector<double> > singlelocalOperators; // for all O_k
 	vector<double> singlelocalEnergyR; // for all E^R
 	//vector<double> singlelocalEnergyI; // for all E^I
@@ -1111,15 +1274,13 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 		currentStats.exponent = sys->GetExponent();
 		currentStats.wf = sys->GetWf();
 		currentStats.phiR = phiR;
-		//cout << "exponent=" << sys->GetExponent() << "\t\twf=" << sys->GetWf() << "\t\tphiR=" << phiR << endl;
 	}
-	//cout << "wf=" << Sys::wf << endl;
-	//Sys::WriteLocalOperatorsToFile("start");
+
 	for (int i = 0; i < MC_NINITIALIZATIONSTEPS; i++)
 	{
 		DoMetropolisStep(R, uR, uI, phiR, phiI);
 	}
-	//cout << "MC_NINITIALIZATIONSTEPS done" << endl;
+	Log("MC_NINITIALIZATIONSTEPS done", DEBUG);
 	for (int i = 0; i < MC_NSTEPS; i++)
 	{
 		for (int nTherm = 0; nTherm < MC_NTHERMSTEPS; nTherm++)
@@ -1129,6 +1290,7 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 
 		sys->CalculateExpectationValues(R, uR, uI, phiR, phiI);
 
+		//INFO: if correlated sampling strategies are used, store the sample and wavefunction
 		if (i < mc_nsteps_original && UPDATE_SAMPLES_EVERY_NTH_STEP > 0)
 		{
 			correlatedSamplingData[i]->R = R;
@@ -1140,7 +1302,7 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 			sys->FillCorrelatedSamplingData(correlatedSamplingData[i]);
 		}
 
-		//INFO: consumes too much memory
+		//INFO: consumes too much memory if all data is kept, therefore for now keep only local energy
 		//singlelocalOperators.push_back(Sys::localOperators);
 		singlelocalEnergyR.push_back(sys->GetLocalEnergyR());
 		//singlelocalEnergyI.push_back(Sys::localEnergyI);
@@ -1187,6 +1349,7 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 		//WriteParticlesToFile(R, to_string(t));
 	}
 
+	//INFO: write acceptances per particle index (used if different particle species are simulated)
 	if (isRootRank && !intermediateStep)
 	{
 		//cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
@@ -1201,15 +1364,15 @@ void UpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vec
 
 void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI, bool intermediateStep = false)
 {
-	Timer t;
-	double dblDuration;
-	t.start();
+	//Timer t;
+	//double dblDuration;
+	//t.start();
 
 	UpdateExpectationValues(R, uR, uI, phiR, phiI, intermediateStep);
 	//MPIMethods::Barrier();
 
-	t.stop();
-	dblDuration = (double) t.duration();
+	//t.stop();
+	//dblDuration = (double) t.duration();
 	//INFO: sometimes error **MPI Error, rank:0, function:MPI_REDUCE, Message truncated on receive**
 	//					 or **MPT ERROR: rank:0, function:MPI_REDUCE, Message truncated on receive: sender sent too much data**
 	/*vector<double> timings = MPIMethods::ReduceToMinMaxMean(dblDuration);
@@ -1233,13 +1396,13 @@ void ParallelUpdateExpectationValues(vector<vector<double> >& R, vector<double>&
 	//		in MPIMethods::ReduceToAverage(double*) ()
 	//INFO: so I try to fix this with MPI Barriers
 	MPIMethods::ReduceToAverage(localOperators);
-	MPIMethods::Barrier();
+	//MPIMethods::Barrier();
 	//Log("ER=" + localEnergyR);
 	MPIMethods::ReduceToAverage(&localEnergyR);
-	MPIMethods::Barrier();
+	//MPIMethods::Barrier();
 	//Log("EI=" + localEnergyI);
 	MPIMethods::ReduceToAverage(&localEnergyI);
-	MPIMethods::Barrier();
+	//MPIMethods::Barrier();
 	MPIMethods::ReduceToAverage(localOperatorsMatrix);
 	MPIMethods::ReduceToAverage(localOperatorlocalEnergyR);
 	MPIMethods::ReduceToAverage(localOperatorlocalEnergyI);
@@ -1318,41 +1481,7 @@ void UpdateExpectationValuesForGivenSamples(vector<ICorrelatedSamplingData*>& sa
 		localOperatorlocalEnergyR += sys->GetLocalOperatorlocalEnergyR() / dblCount;		// * weight;
 		localOperatorlocalEnergyI += sys->GetLocalOperatorlocalEnergyI() / dblCount;		// * weight;
 		otherExpectationValues += sys->GetOtherExpectationValues() / dblCount;		// * weight;
-
-		//weights.push_back(weight);
-		//newWf2s.push_back(sys->GetWf() * sys->GetWf());
-		//los.push_back(sys->GetLocalOperators());
-
-		if ((10 * i) % count == 0)
-		{
-			//cout << (i / (double)MC_NSTEPS * 100.0) << "%" << endl;
-			if (isRootRank && !intermediateStep)
-			{
-				//cout << "." << flush;
-				//cout << weight << endl;
-			}
-		}
 	}
-
-	//if (isRootRank && sys->GetStep() > 1 && !intermediateStep)
-	//{
-	//	WriteDataToFile(weights, "__Test_weights", "phiR=" + to_string(phiR));
-	//	WriteDataToFile(los, "__Test_los", "los");
-	//	WriteDataToFile(newWf2s, "__Test_newWf2s", "newWf2s");
-	//}
-
-	//double inverseWeightMean = dblCount / weightSum;
-	//if (isRootRank && !intermediateStep)
-	//{
-	//	cout << "mean: " << (1.0/inverseWeightMean) << endl;
-	//}
-	//localOperators *= inverseWeightMean;
-	//localEnergyR *= inverseWeightMean;
-	//localEnergyI *= inverseWeightMean;
-	//localOperatorsMatrix *= inverseWeightMean;
-	//localOperatorlocalEnergyR *= inverseWeightMean;
-	//localOperatorlocalEnergyI *= inverseWeightMean;
-	//otherExpectationValues *= inverseWeightMean;
 
 	if (isRootRank && !intermediateStep)
 	{
@@ -1492,54 +1621,6 @@ void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<doub
 		}
 	}
 }
-
-/*void CalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
- {
- int percent = 0;
- ClearVector(additionalSystemProperties);
- ClearVector(AllAdditionalSystemProperties);
- sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
- for (int i = 0; i < MC_NADDITIONALINITIALIZATIONSTEPS; i++)
- {
- DoMetropolisStep(R, uR, uI, phiR, phiI);
- }
- for (int i = 0; i < MC_NADDITIONALSTEPS; i++)
- {
- for (int nTherm = 0; nTherm < MC_NADDITIONALTHERMSTEPS; nTherm++)
- {
- DoMetropolisStep(R, uR, uI, phiR, phiI);
- }
-
- sys->CalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
-
- //INFO: calculate contribution to average value
- additionalSystemProperties += sys->GetAdditionalSystemProperties() / mc_nadditionalsteps;
- //INFO: is too much data when calculating distance matrices
- //AllAdditionalSystemProperties.push_back(sys->GetAdditionalSystemProperties());
-
- //additionalObservablesMean = additionalObservablesMean + (sys->GetAdditionalObservables() - additionalObservablesMean) / (i + 1.0);
-
-
- if ((100 * i) % MC_NADDITIONALSTEPS == 0)
- {
- //cout << (i / (double)MC_NSTEPS * 100.0) << "%" << endl;
- if (isRootRank)
- {
- //cout << "." << flush;
- percent++;
- cout << percent << "%" << endl;
- }
- }
- }
- if (isRootRank)
- {
- cout << endl;
- }
- if (isRootRank)
- {
- cout << "Acceptance: " << (nAcceptances / (nTrials / 100.0)) << "% (" << nAcceptances << "/" << nTrials << ")" << endl;
- }
- }*/
 
 void ParallelCalculateAdditionalSystemProperties(vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double phiR, double phiI)
 {
@@ -1841,6 +1922,9 @@ void RegularizeEquationSystem(vector<vector<double> >& matrix, double eps)
 
 void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double *phiDotR, double *phiDotI)
 {
+	Timer tSolveEOM;
+	tSolveEOM.start();
+
 	vector<double> energiesReal; //rhs of the equation that corresponds to uDotR;
 	vector<double> energiesImag; //rhs of the equation that corresponds to uDotI;
 	vector<vector<double> > matrix;
@@ -1952,8 +2036,9 @@ void SolveForParametersDot(vector<double>& uDotR, vector<double>& uDotI, double 
 				uDotI[i] /= preconditionScalings[i];
 			}
 		}
-
 	}
+	tSolveEOM.stop();
+	currentStats.durationSolveEOM = tSolveEOM.duration();
 }
 
 ///////////////////////
@@ -2582,12 +2667,6 @@ void CalculateNextParametersCrankNicolson(double dt, vector<double>& uR, vector<
 
 void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<double>& uR, vector<double>& uI, double *phiR, double *phiI)
 {
-	Timer t;
-	if (isRootRank)
-	{
-		t.start();
-	}
-
 	if (ODE_SOLVER_TYPE == 0)
 	{
 		CalculateNextParametersEuler(dt, uR, uI, phiR, phiI);
@@ -2631,13 +2710,6 @@ void CalculateNextParameters(double dt, vector<vector<double> >& R, vector<doubl
 		{
 			CalculateNextParametersCrankNicolson(dt, uR, uI, phiR, phiI);
 		}
-	}
-
-	if (isRootRank)
-	{
-		t.stop();
-		//Log("DGL duration = " + to_string(t.duration()) + " ms");
-		currentStats.durationDGL = t.duration();
 	}
 }
 
@@ -2924,15 +2996,6 @@ bool InitializePhysicalSystem()
 	{
 		sys = new PhysicalSystems::HeBulk(SYSTEM_PARAMS, configDirectory);
 	}
-	else if (SYSTEM_TYPE == "BulkSplines")
-	{
-		//sys = new BulkSplines(SYSTEM_PARAMS, configDirectory);
-		sys = new PhysicalSystems::BulkSplinesPhi(SYSTEM_PARAMS, configDirectory);
-	}
-	else if (SYSTEM_TYPE == "BulkSplinesScaled")
-	{
-		sys = new PhysicalSystems::BulkSplinesScaled(SYSTEM_PARAMS, configDirectory);
-	}
 	else if (SYSTEM_TYPE == "GaussianWavepacket")
 	{
 		sys = new PhysicalSystems::GaussianWavepacket(SYSTEM_PARAMS, configDirectory);
@@ -2946,30 +3009,6 @@ bool InitializePhysicalSystem()
 		}
 		dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->SetPairDistributionBinCount(GR_BIN_COUNT);
 		dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->SetInitialParameters(PARAMS_REAL, PARAMS_IMAGINARY, PARAM_PHIR, PARAM_PHII);
-	}
-	else if (SYSTEM_TYPE == "Bosons1D0th")
-	{
-		sys = new PhysicalSystems::Bosons1D0th(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<PhysicalSystems::Bosons1D0th*>(sys)->SetNodes(NURBS_GRID);
-		}
-	}
-	else if (SYSTEM_TYPE == "Bosons1D4th")
-	{
-		sys = new PhysicalSystems::Bosons1D4th(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<PhysicalSystems::Bosons1D4th*>(sys)->SetNodes(NURBS_GRID);
-		}
-	}
-	else if (SYSTEM_TYPE == "Bosons1DSp")
-	{
-		sys = new PhysicalSystems::Bosons1DSp(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<PhysicalSystems::Bosons1DSp*>(sys)->SetNodes(NURBS_GRID);
-		}
 	}
 	else if (SYSTEM_TYPE == "Bosons1DMixture")
 	{
@@ -3021,24 +3060,6 @@ bool InitializePhysicalSystem()
 		}
 		dynamic_cast<PhysicalSystems::BosonClusterWithLogParam*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
 	}
-	else if (SYSTEM_TYPE == "BosonsDiscrete")
-	{
-		sys = new PhysicalSystems::BosonsDiscrete(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<PhysicalSystems::BosonsDiscrete*>(sys)->SetNodes(NURBS_GRID);
-		}
-	}
-	else if (SYSTEM_TYPE == "BosonMixtureCluster_4thorder")
-	{
-		sys = new PhysicalSystems::BosonMixtureCluster_4thorder(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<PhysicalSystems::BosonMixtureCluster_4thorder*>(sys)->SetNodes(NURBS_GRID);
-		}
-		dynamic_cast<PhysicalSystems::BosonMixtureCluster_4thorder*>(sys)->SetDensityProfileBinCount(GR_BIN_COUNT);
-		dynamic_cast<PhysicalSystems::BosonMixtureCluster_4thorder*>(sys)->SetParticleType(PARTICLE_TYPES);
-	}
 	else if (SYSTEM_TYPE == "BosonMixtureCluster")
 	{
 		sys = new PhysicalSystems::BosonMixtureCluster(SYSTEM_PARAMS, configDirectory);
@@ -3081,51 +3102,6 @@ bool InitializePhysicalSystem()
 		}
 		dynamic_cast<PhysicalSystems::LinearChain*>(sys)->SetPairDistributionBinCount(GR_BIN_COUNT);
 		dynamic_cast<PhysicalSystems::LinearChain*>(sys)->SetDensityBinCount(RHO_BIN_COUNT);
-	}
-	else if (SYSTEM_TYPE == "NUBosonsBulk")
-	{
-		sys = new PhysicalSystems::NUBosonsBulk(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<PhysicalSystems::NUBosonsBulk*>(sys)->SetNodes(NURBS_GRID);
-		}
-		dynamic_cast<PhysicalSystems::NUBosonsBulk*>(sys)->SetGrBinCount(GR_BIN_COUNT);
-	}
-	else if (SYSTEM_TYPE == "NUBosonsBulkPB")
-	{
-		sys = new PhysicalSystems::NUBosonsBulkPB(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<PhysicalSystems::NUBosonsBulkPB*>(sys)->SetNodes(NURBS_GRID);
-		}
-		dynamic_cast<PhysicalSystems::NUBosonsBulkPB*>(sys)->SetGrBinCount(GR_BIN_COUNT);
-	}
-	else if (SYSTEM_TYPE == "NUBosonsBulkPBBox")
-	{
-		sys = new PhysicalSystems::NUBosonsBulkPBBox(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<PhysicalSystems::NUBosonsBulkPBBox*>(sys)->SetNodes(NURBS_GRID);
-		}
-		dynamic_cast<PhysicalSystems::NUBosonsBulkPBBox*>(sys)->SetGrBinCount(GR_BIN_COUNT);
-	}
-	else if (SYSTEM_TYPE == "NUBosonsBulkPBBoxAndRadial")
-	{
-		sys = new PhysicalSystems::NUBosonsBulkPBBoxAndRadial(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<PhysicalSystems::NUBosonsBulkPBBoxAndRadial*>(sys)->SetNodes(NURBS_GRID);
-		}
-		dynamic_cast<PhysicalSystems::NUBosonsBulkPBBoxAndRadial*>(sys)->SetGrBinCount(GR_BIN_COUNT);
-	}
-	else if (SYSTEM_TYPE == "NUBosonsBulkPBWhitehead")
-	{
-		sys = new PhysicalSystems::NUBosonsBulkPBWhitehead(SYSTEM_PARAMS, configDirectory);
-		if (USE_NURBS == 1)
-		{
-			dynamic_cast<PhysicalSystems::NUBosonsBulkPBWhitehead*>(sys)->SetNodes(NURBS_GRID);
-		}
-		dynamic_cast<PhysicalSystems::NUBosonsBulkPBWhitehead*>(sys)->SetGrBinCount(GR_BIN_COUNT);
 	}
 	else
 	{
@@ -3272,100 +3248,11 @@ int mainMPI(int argc, char** argv)
 
 	sys->InitSystem();
 	PostSystemInit();
-	//Write grid files for observables
-	//INFO: for now only implemented for Bosons1D
+
 	if (isRootRank)
 	{
-		if (auto s = dynamic_cast<PhysicalSystems::Bosons1D*>(sys))
-		{
-			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-			{
-				WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
-			}
-			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-			{
-				WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
-			}
-		}
-		if (auto s = dynamic_cast<PhysicalSystems::Bosons1DMixture*>(sys))
-		{
-			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-			{
-				WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
-			}
-			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-			{
-				WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
-			}
-		}
-		else if (auto s = dynamic_cast<PhysicalSystems::BosonsBulk*>(sys))
-		{
-			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-			{
-				WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
-			}
-			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-			{
-				WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
-			}
-		}
-		else if (auto s = dynamic_cast<PhysicalSystems::InhBosons1D*>(sys))
-		{
-			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-			{
-				WriteDataToFile(o->grid.gridCenterPoints, "rho_grid", o->grid.name);
-			}
-			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-			{
-				WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
-			}
-			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
-			{
-				WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
-			}
-			if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
-			{
-				WriteGridsToFile(o->grids, "rho2_grid", true);
-			}
-		}
-		else if (auto s = dynamic_cast<PhysicalSystems::InhContactBosons*>(sys))
-		{
-			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-			{
-				WriteDataToFile(o->grid.gridCenterPoints, "rho_grid", o->grid.name);
-			}
-			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-			{
-				WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
-			}
-			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
-			{
-				WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
-			}
-			if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
-			{
-				WriteGridsToFile(o->grids, "rho2_grid", true);
-			}
-		}
-		else if (auto s = dynamic_cast<PhysicalSystems::LinearChain*>(sys))
-		{
-			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-			{
-				WriteDataToFile(o->grid.gridCenterPoints, "rho_grid", o->grid.name);
-			}
-			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-			{
-				WriteDataToFile(o->grid.gridCenterPoints, "gr_grid", o->grid.name);
-			}
-			if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
-			{
-				WriteDataToFile(o->grid.grid, "sk_grid", o->grid.name);
-			}
-			if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
-			{
-				WriteGridsToFile(o->grids, "rho2_grid", true);
-			}
-		}
+		//Write grid files for observables
+		WriteGridFiles();
 	}
 
 	if (isRootRank)
@@ -3549,10 +3436,10 @@ int mainMPI(int argc, char** argv)
 	/// start simulation ///
 	////////////////////////
 
-	Timer t;
-	Timer tFull;
-	Timer tExp;
-	tFull.start();
+	Timer tOneTimestep;
+	Timer tObservableStep;
+	Timer tSampleExpectationValues;
+	tObservableStep.start();
 	int step = 0;
 	int acceptNewParams;
 	int nrOfAcceptParameterTrials;
@@ -3575,7 +3462,7 @@ int mainMPI(int argc, char** argv)
 	{
 		if (isRootRank)
 		{
-			t.start();
+			tOneTimestep.start();
 		}
 		acceptNewParams = 0;
 		nrOfAcceptParameterTrials = 0;
@@ -3638,205 +3525,16 @@ int mainMPI(int argc, char** argv)
 			if (isRootRank)
 			{
 				AppendDataToFile(currentTime, "timesAdditional");
-				tFull.stop();
-				Log("full duration since last additional data calculation (see config CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP): " + to_string(tFull.duration()) + " ms", WARNING);
-				AppendDataToFile(tFull.duration(), "timings");
-				tFull.start();
+				tObservableStep.stop();
+				Log("full duration since last additional data calculation (see config CALCULATE_ADDITIONAL_DATA_EVERY_NTH_STEP): " + to_string(tObservableStep.duration()) + " ms", WARNING);
+				AppendDataToFile(tObservableStep.duration(), "timings");
+				tObservableStep.start();
 			}
 			ParallelCalculateAdditionalSystemProperties(R, uR, uI, phiR, phiI);
-			//TODO: generalize this for all types of IPhysicalSystems and all types of IObservable
+
 			if (isRootRank)
 			{
-				if (auto s = dynamic_cast<PhysicalSystems::Bosons1D*>(sys))
-				{
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "gr");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "sk");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableV*>(additionalObservablesMean.observables[2]))
-					{
-						AppendDataToFile(o->values, "overlap");
-					}
-				}
-				else if (auto s = dynamic_cast<PhysicalSystems::Bosons1D0th*>(sys))
-				{
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "gr");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "sk");
-					}
-				}
-				else if (auto s = dynamic_cast<PhysicalSystems::Bosons1D4th*>(sys))
-				{
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "gr");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "sk");
-					}
-				}
-				else if (auto s = dynamic_cast<PhysicalSystems::Bosons1DSp*>(sys))
-				{
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "gr");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "sk");
-					}
-				}
-				if (auto s = dynamic_cast<PhysicalSystems::Bosons1DMixture*>(sys))
-				{
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "gr");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "sk");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
-					{
-						for (unsigned int i = 0; i < o->observablesV.size(); i++)
-						{
-							AppendDataToFile(o->observablesV[i].values, "rho_" + o->observablesV[i].name);
-						}
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[3]))
-					{
-						for (unsigned int i = 0; i < o->observablesV.size(); i++)
-						{
-							AppendDataToFile(o->observablesV[i].values, "g_" + o->observablesV[i].name);
-						}
-					}
-				}
-				else if (auto s = dynamic_cast<PhysicalSystems::BosonsBulk*>(sys))
-				{
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "gr");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "sk");
-					}
-				}
-				else if (auto s = dynamic_cast<PhysicalSystems::BosonsDiscrete*>(sys))
-				{
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "gr");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "sk");
-					}
-				}
-				else if (auto s = dynamic_cast<PhysicalSystems::InhBosons1D*>(sys))
-				{
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "rho");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "gr");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "sk");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "rho2");
-					}
-				}
-				else if (auto s = dynamic_cast<PhysicalSystems::InhContactBosons*>(sys))
-				{
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "rho");
-						//INFO: write external potential
-						vector<double> potExt;
-						for (auto r : o->grid.gridCenterPoints)
-						{
-							vector<double> vr = { r };
-							potExt.push_back(s->GetExternalPotential(vr));
-						}
-						AppendDataToFile(potExt, "V_ext");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "gr");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "sk");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "rho2");
-					}
-				}
-				else if (auto s = dynamic_cast<PhysicalSystems::LinearChain*>(sys))
-				{
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "rho");
-						//INFO: write external potential
-						vector<double> potExt;
-						for (auto r : o->grid.gridCenterPoints)
-						{
-							vector<double> vr = { r };
-							potExt.push_back(s->GetExternalPotential(vr));
-						}
-						AppendDataToFile(potExt, "V_ext");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "gr");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[2]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "sk");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[3]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "rho2");
-					}
-				}
-				else if (auto s = dynamic_cast<PhysicalSystems::NUBosonsBulkPB*>(sys))
-				{
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "gr");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[1]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "sk");
-					}
-				}
-				else if (auto s = dynamic_cast<PhysicalSystems::NUBosonsBulkPBWhitehead*>(sys))
-				{
-					if (auto o = dynamic_cast<Observables::ObservableVsOnGrid*>(additionalObservablesMean.observables[0]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "gr");
-					}
-					if (auto o = dynamic_cast<Observables::ObservableVsOnMultiGrid*>(additionalObservablesMean.observables[1]))
-					{
-						AppendDataToFile(o->observablesV[0].values, "grMulti");
-					}
-				}
+				WriteAdditionalObservablesToFiles();
 			}
 		}
 
@@ -3853,16 +3551,17 @@ int mainMPI(int argc, char** argv)
 			{
 				if (isRootRank)
 				{
-					tExp.start();
+					tSampleExpectationValues.start();
 				}
 
 				ParallelUpdateExpectationValues(R, uR, uI, phiR, phiI);
 
 				if (isRootRank)
 				{
-					AppendDataToFile(tExp.duration(), "timings_exp");
+					tSampleExpectationValues.stop();
+					currentStats.durationSampling = tSampleExpectationValues.duration();
+					//AppendDataToFile(tSampleExpectationValues.duration(), "timings_exp");
 					//Log("duration for calculating expectation values: " + to_string(tExp.duration()) + " ms", WARNING);
-					tExp.stop();
 				}
 				//if (ODE_SOLVER_TYPE == 4 || ODE_SOLVER_TYPE == 6)
 				//{
@@ -3982,7 +3681,8 @@ int mainMPI(int argc, char** argv)
 				currentStats.nTrials = nTrials;
 				currentStats.locE = localEnergyR / (double) N;
 				currentStats.locEKin = otherExpectationValues[0] / (double) N;
-				currentStats.locEPot = otherExpectationValues[1] / (double) N;
+				currentStats.locEExt = otherExpectationValues[4] / (double) N;
+				currentStats.locEInt = otherExpectationValues[1] / (double) N;
 				string s = currentStats.toString();
 				cout << s << endl;
 			}
@@ -4151,9 +3851,9 @@ int mainMPI(int argc, char** argv)
 
 		if (isRootRank)
 		{
-			t.stop();
+			tOneTimestep.stop();
 			//Log("duration for full timestep: " + to_string(t.duration()) + " ms");
-			currentStats.durationFullStep = t.duration();
+			currentStats.durationFullStep = tOneTimestep.duration();
 		}
 
 		step++;
