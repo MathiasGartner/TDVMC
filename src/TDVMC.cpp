@@ -3198,20 +3198,13 @@ int mainMPI(int argc, char** argv)
 	/////////////////////////////
 
 	Init();
-	if (isRootRank)
-	{
-		//cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
-		//cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
-		//cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
-	}
-	//Log("uniform: " + to_string(random01()) + " normal: " + to_string(randomNormal()));
 
-	vector<vector<double> > R(N);
-	vector<double> uR(N_PARAM);
-	vector<double> uI(N_PARAM);
-	double phiR;
-	double phiI;
-	PARAMS_REAL.resize(N_PARAM, 0.0);
+	vector<vector<double> > R(N); //coordinates
+	vector<double> uR(N_PARAM); //variational parameters, real part
+	vector<double> uI(N_PARAM); //variational parameters, imaginary part
+	double phiR; //variational parameters, normalization
+	double phiI; //variational parameters, phase
+	PARAMS_REAL.resize(N_PARAM, 0.0); //fix the length of the parameters from the config file to the correct length (trim or pad with zeros)
 	PARAMS_IMAGINARY.resize(N_PARAM, 0.0);
 
 	for (unsigned int i = 0; i < R.size(); i++)
@@ -3264,6 +3257,11 @@ int mainMPI(int argc, char** argv)
 		//Write grid files for observables
 		WriteGridFiles();
 	}
+
+	////////////////////////////////////////////////////////
+	/// optional caluclations done before the simulation ///
+	/// mainly used for testing (eg. write potentials)   ///
+	////////////////////////////////////////////////////////
 
 	if (isRootRank)
 	{
@@ -3399,34 +3397,6 @@ int mainMPI(int argc, char** argv)
 		{
 			obdms[s] /= obdmSampleCount[s];
 		}
-		/*
-		 for (int s = 0; s < rSteps; s++)
-		 {
-		 if (isRootRank)
-		 {
-		 cout << "s=" << s << endl;
-		 }
-		 r[0] = s * rStep;
-		 for (int i = 0; i < obdm_mcsteps; i++)
-		 {
-		 R[0][0] = 0.0;
-		 sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
-		 double wf0 = sys->GetExponent();
-		 R[0][0] = r[0];
-		 sys->CalculateWavefunction(R, uR, uI, phiR, phiI);
-		 double wfr = sys->GetExponent();
-		 double obdm = wf0 - wfr;
-		 //double obdm = dynamic_cast<PhysicalSystems::Bosons1D*>(sys)->CalculateOBDMKernel(r, R, uR, uI, phiR, phiI);
-		 obdms[s] += obdm / obdm_mcsteps;
-		 //DoReducedMetropolisSteps(R, uR, uI, phiR, phiI, 100);
-		 DoMetropolisSteps(R, uR, uI, phiR, phiI, 100);
-		 }
-		 if (isRootRank)
-		 {
-		 //cout << obdms[s] << endl;
-		 }
-		 }
-		 */
 		MPIMethods::ReduceToAverage(obdms);
 		MPIMethods::Barrier();
 		if (isRootRank)
@@ -3656,14 +3626,6 @@ int mainMPI(int argc, char** argv)
 					WriteDataToFile(localOperatorlocalEnergyI, "localOperatorlocalEnergyI" + to_string(step), "localOperatorlocalEnergyI");
 					WriteDataToFile(otherExpectationValues, "otherExpectationValues" + to_string(step), "Ekin, Ekin_cor, Epot, Epot_corr, wf, g(r)_1, ..., g(r)_100");
 				}
-				//cout << "t=" << currentTime << endl;
-				//cout << "Acceptance AVG: " << (avgAcceptances / (nTrials / 100.0)) << "% (" << avgAcceptances << "/" << nTrials << ")" << endl;
-				//cout << "localEnergyR=" << localEnergyR << " (" << otherExpectationValues[0] << " + " << otherExpectationValues[1] << ")" << endl;
-				//cout << "localEnergyR/N=" << localEnergyR / (double) N << " (" << otherExpectationValues[0] / (double) N << "(kin) + " << otherExpectationValues[1] / (double) N << " (pot) + " << "(Er=" << otherExpectationValues[4] << " + " << otherExpectationValues[6] <<
-				//otherExpectationValues[2] / (double) N << " + " <<
-				//otherExpectationValues[3] / (double) N << ")" <<
-				//		endl;
-				//cout << "localEnergyR/N=" << localEnergyR / (double)N << endl;
 				AllLocalEnergyR.push_back(localEnergyR);
 				AllLocalEnergyI.push_back(localEnergyI);
 				AllLocalOperators.push_back(localOperators);
@@ -3867,7 +3829,7 @@ int mainMPI(int argc, char** argv)
 		}
 
 		step++;
-	}
+	} //INFO: end of time evolution
 
 	//if (isRootRank)
 	//{
@@ -3902,15 +3864,15 @@ int mainMPI(int argc, char** argv)
 	{
 		int tmp = 0;
 		tmp = system(("mkdir " + OUT_DIR + "random").c_str());
-		cout << tmp << endl;
+		//cout << tmp << endl;
 	}
 	MPIMethods::Barrier(); // wait for main process to create directory
 	WriteRandomGeneratorStatesToFile("random/state", configDirectory, processRank);
 	if (isRootRank)
 	{
-		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
-		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
-		cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
+		//cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
+		//cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
+		//cout << "uniform: " << random01() << endl << "normal: " << randomNormal() << endl;
 	}
 
 	////////////////////////////////////////////////////
@@ -3964,7 +3926,7 @@ int mainMPI(int argc, char** argv)
 	{
 		int tmp = 0;
 		tmp = system(("mkdir " + OUT_DIR + "coords").c_str());
-		cout << tmp << endl;
+		//cout << tmp << endl;
 	}
 	MPIMethods::Barrier();
 	WriteParticleInputFile("coords/particleconfiguration_" + to_string(N) + "_" + to_string(DIM) + "D_" + to_string(processRank), R);
@@ -3972,10 +3934,10 @@ int mainMPI(int argc, char** argv)
 	{
 		MC_NSTEPS = mc_nsteps_original;
 		WriteParticleInputFile("AAFinish_particleconfiguration_" + to_string(N) + "_" + to_string(DIM) + "D", R);
-		cout << "phiR=" << phiR << endl;
+		//cout << "phiR=" << phiR << endl;
 		//cout << "log(additionalSystemProperties[2])=" << log(additionalSystemProperties[2]) << endl;
 		//phiR = phiR - log(additionalSystemProperties[2]);
-		cout << "phiR=" << phiR << endl;
+		//cout << "phiR=" << phiR << endl;
 		for (int i = 0; i < N_PARAM; i++)
 		{
 			PARAMS_REAL[i] = uR[i];

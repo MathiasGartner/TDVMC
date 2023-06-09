@@ -1,5 +1,7 @@
 # tVMC - Time Dependent Variational Monte Carlo
 
+Time-dependent Variational Monte Carlo code for bosonic many-body systems in continuous space.
+
 Source code used in:
 
 - Mathias Gartner, Ferran Mazzanti, Robert E. Zillich  
@@ -12,6 +14,9 @@ Source code used in:
 - Mathias Gartner, David Miesbauer, Michael Kobler, Julia Freund, Giuseppe Carleo, Robert E. Zillich  
   "Interaction quenches in Bose gases studied with a time-dependent hypernetted-chain Euler-Lagrange method"  
   https://arxiv.org/abs/2212.07113
+- Mathias Gartner, Master thesis  
+  "Implementation and Application of the Time Dependent Variational Monte Carlo method in real and imaginary time"   
+  https://epub.jku.at/obvulihs/2581938
 
 ## Building from source using Makefile
 
@@ -23,7 +28,7 @@ This program uses MPI for multiprocess execution. You may need to specify option
 
 ## Run a simulation
 
-The simulation config file needs to be provided as the first parameter to the program.
+The simulation config file needs to be provided as the first parameter to the program, eg:
 
 `./build/TDVMC ./config/Bosons1D_quench.config`
 
@@ -38,12 +43,12 @@ Start the program with multiple processes using the required MPI command on the 
 - config files are in JSON format
 - example config file can be found in directory `config/examples/`
 - there is also a README file `config/examples/README.md` with explanation for all the fields in the config
-- at the end of every simulation a file `AAfinish_tVMC.config` is generated in the simulation directory. This file contains the final parameters and can be used in a subsequent simulation (eg. for further imaginary time propagation if parameters are not converged, for real time propagation following an imaginary time propagation, for further real time simulations, ...).
+- at the end of every simulation a file `AAfinish_tVMC.config` is generated in the simulation directory. This file contains the final parameters and can be used in a subsequent simulation (eg. for further imaginary time propagation if parameters are not converged, for real time propagation following an imaginary time propagation, for continuing real time simulations, ...).
 
 ## The most advanced PhysicalSystem implemetations are
 
-- `InhContactBosons`: Bosons in 1D with contact interaction and external potential. Periodic boundary conditions. Wavefunction has single particle and pair correlation parts
-- `BosonMixtureCluster`: Bosonic mixtures in 3D. Used for ground state optimization of few-body clusters. Piecewise defined wavefunction.
+- `InhContactBosons`: Bosons in 1D with contact interaction and an external potential. Periodic boundary conditions. Wavefunction has single particle and pair correlation parts
+- `BosonMixtureCluster`: Bosonic mixtures in 3D. Used for ground state optimization of few-body clusters. Piecewise defined Jastrow wavefunction.
 - `Bosons1D`: Bosons in 1D with arbitrary interaction potential. Homogeneous system with periodic boundary conditions. Wavefunction has only pair correlations.
 - `Bosons1DMixture`: Bosonic mixtures in 1D with arbitrary interaction potential. Homogeneous system with periodic boundary conditions. Wavefunction has only pair correlations.
 
