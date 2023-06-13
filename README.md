@@ -49,7 +49,7 @@ Start the program with multiple processes using the required MPI command on the 
 
 To start your first tVMC simulation you can do the following steps:
 
-- download the whole proj
+- download the whole project
 - open a terminal and navigate to the project directory
 - type `make` to build the project
 - specify an existing directory as `OUTPUT_DIRECTORY` in the file `./config/examples/LiebLinigerGroundState.config` 
