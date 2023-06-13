@@ -45,6 +45,16 @@ Start the program with multiple processes using the required MPI command on the 
 - there is also a README file `config/examples/README.md` with explanation for all the fields in the config
 - at the end of every simulation a file `AAfinish_tVMC.config` is generated in the simulation directory. This file contains the final parameters and can be used in a subsequent simulation (eg. for further imaginary time propagation if parameters are not converged, for real time propagation following an imaginary time propagation, for continuing real time simulations, ...).
 
+## Running your first tVMC simulation
+
+To start your first tVMC simulation you can do the following steps:
+
+- download the whole proj
+- open a terminal and navigate to the project directory
+- type `make` to build the project
+- specify an existing directory as `OUTPUT_DIRECTORY` in the file `./config/examples/LiebLinigerGroundState.config` 
+- run the program on eg. 8 CPU cores with `mpirun -np 8 ./build/TDVMC ./config/examples/LiebLinigerGroundState.config`
+
 ## The most advanced PhysicalSystem implemetations are
 
 - `InhContactBosons`: Bosons in 1D with contact interaction and an external potential. Periodic boundary conditions. Wavefunction has single particle and pair correlation parts
